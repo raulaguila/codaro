@@ -1,5 +1,6 @@
 import json
 
+from rich.text import Text
 from typer.testing import CliRunner
 
 from codaro.cli import app
@@ -181,4 +182,4 @@ def test_unknown_command_still_reports_typo():
 def test_directory_shortcut_help_does_not_launch_chat():
     result = runner.invoke(app, [".", "--help"])
     assert result.exit_code == 0
-    assert "--read-only" in result.stdout
+    assert "--read-only" in Text.from_ansi(result.stdout).plain
