@@ -8,12 +8,13 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from codaro.agent import Agent
+from codaro.agent import Agent, AgentEvent
 from codaro.index import CodeIndex, safe_preview
 from codaro.provider import ModelError, OpenAICompatible, Settings
 from codaro.repository import Repository
@@ -114,10 +115,29 @@ def ask(question: str, repo: Root = Path(".")):
     """Investiga uma pergunta usando ferramentas e o modelo configurado."""
     try:
         agent = Agent(Repository(repo), OpenAICompatible(Settings.from_env()))
-        answer = agent.ask(
-            question, lambda message: errors.print(message, style="dim", markup=False)
-        )
-        console.print(Markdown(safe_preview(answer)))
+        parts: list[str] = []
+
+        def detail(event: AgentEvent):
+            if event.kind in {"status", "tool_end"}:
+                duration = f" · {event.elapsed_ms:.0f} ms" if event.elapsed_ms is not None else ""
+                errors.print(
+                    safe_preview(f"{event.title}{duration}\n{event.detail}"),
+                    style="dim",
+                    markup=False,
+                )
+
+        with Live(Markdown("Investigando…"), console=console, refresh_per_second=10) as live:
+
+            def delta(fragment: str):
+                parts.append(fragment)
+                live.update(Markdown(safe_preview("".join(parts))))
+
+            try:
+                answer = agent.ask(question, on_delta=delta, on_detail=detail)
+                live.update(Markdown(safe_preview(answer)))
+            except (ModelError, ValueError, OSError, sqlite3.Error):
+                live.update(Markdown("Resposta interrompida. Consulte o erro abaixo."))
+                raise
     except (ModelError, ValueError, OSError, sqlite3.Error) as exc:
         fail(exc)
 

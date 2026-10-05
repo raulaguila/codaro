@@ -46,10 +46,10 @@ O executor restrito deste ambiente apresentou bloqueio no encerramento de asynci
 1. **Modelo real:** não há Ollama ativo nem credencial de API configurada nesta sessão. Verificar qualidade de tool calling, latência, consumo de contexto e respostas com um modelo real antes de divulgação ampla. Os testes de HTTP usam respostas simuladas.
 2. **Busca semântica:** esta versão combina texto e símbolos. Embeddings, reranking e LSP ainda não existem; não apresentar o produto como busca por vetores. Medir Recall@5 em perguntas reais antes de escolher modelos e ranking adicional.
 3. **Tokens:** os orçamentos são em caracteres de JSON serializado, não tokens do provedor. Eles controlam volume, mas não garantem caber na janela de todo modelo.
-4. **Cancelamento e prazo:** Ctrl+X cancela entre operações e descarta a resposta recebida; não interrompe imediatamente uma conexão ativa. O timeout é por operação HTTP. Até três tentativas podem ampliar o tempo total de uma chamada.
+4. **Cancelamento e prazo:** Ctrl+X cancela entre operações e fragmentos recebidos; uma conexão sem dados ainda pode aguardar o timeout. O timeout é por operação HTTP. Até três tentativas podem ampliar o tempo total de uma chamada.
 5. **Escala:** atualização e busca verificam hashes dos arquivos. Não foi realizado benchmark representativo em repositórios grandes. Limite de 20.000 arquivos não equivale a uma garantia de desempenho; ignore dependências e dados desnecessários.
 6. **Linguagens:** somente Python tem extração estrutural com Tree-sitter. Outras extensões usam janelas de arquivo. Extração sintática não é análise de tipos, resolução de chamadas ou garantia de validade do programa.
-7. **Plataformas:** execução local validada em Linux/Python 3.12. CI para 3.11 e 3.13 está configurado, mas não foi executado remotamente nesta sessão. O fallback sem `O_NOFOLLOW` não tem as mesmas garantias do caminho POSIX contra mudanças concorrentes.
+7. **Plataformas:** execução local validada em Linux/Python 3.12. O CI inicial passou em 3.11, 3.12 e 3.13 no [run de publicação](https://github.com/raulaguila/codaro/actions/runs/37333295862). O fallback sem `O_NOFOLLOW` não tem as mesmas garantias do caminho POSIX contra mudanças concorrentes.
 8. **Dados privados:** as exclusões padrão não detectam todos os segredos. Perguntas e trechos consultados são enviados ao endpoint escolhido; o índice guarda conteúdo local em `.codaro`. Revise `.codaroignore` antes de usar um provedor externo.
 9. **Capacidades:** as ferramentas implementadas são de investigação. Não há edição, execução de comandos/testes pelo agente ou isolamento para essas futuras operações. O prompt sobre conteúdo não confiável não é uma defesa completa contra prompt injection.
 10. **Armazenamento:** corrupção do SQLite é reportada, não reparada automaticamente. Como o índice é derivado, feche processos, renomeie `.codaro` e reindexe para recuperação.
@@ -69,3 +69,11 @@ codaro doctor
 codaro index --repo examples/demo
 codaro search can_edit --repo examples/demo --json
 ```
+
+## Atualização: streaming e interface Markdown
+
+A entrega seguinte adiciona streaming SSE em `chat` e `ask`, respostas Markdown com código destacado, cartões de ferramentas com alvo/resultado/duração e volume de contexto na barra de status.
+
+Validação local: **135 testes aprovados**, lint e formatação aprovados. Os novos casos cobrem UTF-8 dividido entre chunks, montagem incremental de argumentos de ferramentas, cancelamento, EOF prematuro, limites, fallback JSON, falha de conexão sem repetição, roundtrip SSE com ferramentas e renderização parcial/final na interface. Os modelos continuam simulados: esta entrega não comprova a qualidade de um modelo real.
+
+O streaming limita a resposta a 2 MB de transporte e 16.000 caracteres de conteúdo, com as mesmas validações de ferramentas. Eventos de conclusão inválidos e conteúdo depois da conclusão são rejeitados. Atualizações da interface são agrupadas para reduzir o custo de renderização; o histórico mantém somente respostas concluídas.

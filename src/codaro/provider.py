@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import codecs
 import json
 import os
+import threading
 import time
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
@@ -10,10 +13,15 @@ import httpx
 
 MAX_RESPONSE_BYTES = 256_000
 MAX_MESSAGE_CHARS = 16_000
+MAX_STREAM_BYTES = 2_000_000
 
 
 class ModelError(RuntimeError):
     """Provider failure with a user-facing message that excludes remote error bodies."""
+
+
+class RequestCancelled(RuntimeError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -114,6 +122,26 @@ class OpenAICompatible:
         self.transport = transport
 
     def complete(self, messages: list[dict], tools: list[dict] | None = None) -> dict:
+        return self._request(messages, tools)
+
+    def stream(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+        on_delta: Callable[[str], None] | None = None,
+        cancelled: threading.Event | None = None,
+    ) -> dict:
+        return self._request(
+            messages, tools, on_delta=on_delta or (lambda _: None), cancelled=cancelled
+        )
+
+    def _request(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None,
+        on_delta: Callable[[str], None] | None = None,
+        cancelled: threading.Event | None = None,
+    ) -> dict:
         payload = {
             "model": self.settings.model,
             "messages": messages,
@@ -121,8 +149,9 @@ class OpenAICompatible:
             "max_tokens": 1400,
         }
         if tools:
-            payload["tools"] = tools
-            payload["tool_choice"] = "auto"
+            payload.update(tools=tools, tool_choice="auto")
+        if on_delta is not None:
+            payload["stream"] = True
         headers = {"Content-Type": "application/json"}
         if self.settings.api_key:
             headers["Authorization"] = f"Bearer {self.settings.api_key}"
@@ -131,35 +160,30 @@ class OpenAICompatible:
                 timeout=httpx.Timeout(self.settings.timeout, connect=10), transport=self.transport
             ) as client:
                 for attempt in range(3):
+                    check_cancelled(cancelled)
                     with client.stream(
                         "POST",
                         f"{self.settings.base_url.rstrip('/')}/chat/completions",
                         headers=headers,
                         json=payload,
                     ) as response:
+                        check_cancelled(cancelled)
                         if response.status_code in {429, 502, 503, 504} and attempt < 2:
-                            time.sleep(0.25 * 2**attempt)
+                            if cancelled is None:
+                                time.sleep(0.25 * 2**attempt)
+                            elif cancelled.wait(0.25 * 2**attempt):
+                                check_cancelled(cancelled)
                             continue
                         response.raise_for_status()
-                        raw = bytearray()
-                        for part in response.iter_bytes():
-                            raw.extend(part)
-                            if len(raw) > MAX_RESPONSE_BYTES:
-                                raise ModelError("Resposta da API excede o limite de 256 KB.")
-                        data = json.loads(raw)
-                        choices = data["choices"]
-                        if (
-                            not isinstance(choices, list)
-                            or not choices
-                            or not isinstance(choices[0], dict)
+                        if on_delta is not None and "text/event-stream" in response.headers.get(
+                            "content-type", ""
                         ):
-                            raise ValueError("invalid choices")
-                        choice = choices[0]
-                        if choice.get("finish_reason") == "length":
-                            raise ModelError(
-                                "O modelo atingiu o limite de saída. Faça uma pergunta menor."
-                            )
-                        return validate_message(choice["message"])
+                            return self._read_stream(response, on_delta, cancelled)
+                        message = self._read_json(response, cancelled)
+                        if on_delta is not None and message.get("content"):
+                            on_delta(message["content"])
+                            check_cancelled(cancelled)
+                        return message
         except httpx.HTTPStatusError as exc:
             raise ModelError(
                 f"API retornou HTTP {exc.response.status_code}. "
@@ -177,3 +201,166 @@ class OpenAICompatible:
         except (KeyError, IndexError, TypeError, ValueError, RecursionError) as exc:
             raise ModelError("Resposta incompatível com a API de chat completions.") from exc
         raise ModelError("Não foi possível obter uma resposta do modelo.")
+
+    @staticmethod
+    def _read_json(response: httpx.Response, cancelled: threading.Event | None) -> dict:
+        raw = bytearray()
+        for part in response.iter_bytes():
+            check_cancelled(cancelled)
+            raw.extend(part)
+            if len(raw) > MAX_RESPONSE_BYTES:
+                raise ModelError("Resposta da API excede o limite de 256 KB.")
+        data = json.loads(raw)
+        choices = data["choices"]
+        if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+            raise ValueError("invalid choices")
+        check_finish_reason(choices[0].get("finish_reason"))
+        return validate_message(choices[0]["message"])
+
+    @staticmethod
+    def _read_stream(
+        response: httpx.Response, on_delta: Callable[[str], None], cancelled: threading.Event | None
+    ) -> dict:
+        content = ""
+        calls: dict[int, dict] = {}
+        pending = ""
+        last_emit = 0.0
+        finished = False
+        event_count = 0
+        for data in sse_events(response, cancelled):
+            check_cancelled(cancelled)
+            event_count += 1
+            if event_count > 10_000:
+                raise ModelError("Stream contém eventos demais.")
+            if data == "[DONE]":
+                finished = True
+                break
+            event = json.loads(data)
+            if not isinstance(event, dict) or "error" in event:
+                raise ModelError("O servidor interrompeu o stream com uma resposta inválida.")
+            choices = event.get("choices")
+            if choices == []:
+                continue  # Some servers send a final usage-only event.
+            if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+                raise ValueError("invalid stream choices")
+            choice = choices[0]
+            if choice.get("index", 0) != 0:
+                raise ModelError("Stream retornou uma escolha inesperada.")
+            delta = choice.get("delta")
+            if not isinstance(delta, dict) or delta.get("role", "assistant") != "assistant":
+                raise ValueError("invalid delta")
+            if finished and (delta.get("content") or delta.get("tool_calls")):
+                raise ModelError("O stream enviou conteúdo após concluir a resposta.")
+            fragment = delta.get("content")
+            if fragment is not None:
+                if not isinstance(fragment, str):
+                    raise ValueError("invalid content delta")
+                content += fragment
+                pending += fragment
+                if len(content) > MAX_MESSAGE_CHARS:
+                    raise ModelError("Resposta textual maior que o limite permitido.")
+                if pending and (time.monotonic() - last_emit >= 0.04 or len(pending) >= 256):
+                    on_delta(pending)
+                    pending = ""
+                    last_emit = time.monotonic()
+            fragments = delta.get("tool_calls")
+            if fragments is not None:
+                if not isinstance(fragments, list) or len(fragments) > 8:
+                    raise ValueError("invalid tool deltas")
+                for item in fragments:
+                    if not isinstance(item, dict):
+                        raise ValueError("invalid tool delta")
+                    index = item.get("index")
+                    if type(index) is not int or not 0 <= index < 8:
+                        raise ValueError("invalid tool index")
+                    call = calls.setdefault(
+                        index,
+                        {"id": "", "type": "function", "function": {"name": "", "arguments": ""}},
+                    )
+                    if item.get("type", "function") != "function":
+                        raise ValueError("invalid tool type")
+                    if "id" in item:
+                        call["id"] = merge_fragment(call["id"], item["id"], 200)
+                    function = item.get("function", {})
+                    if not isinstance(function, dict):
+                        raise ValueError("invalid function delta")
+                    if "name" in function:
+                        call["function"]["name"] = merge_fragment(
+                            call["function"]["name"], function["name"], 80
+                        )
+                    if "arguments" in function:
+                        arguments = function["arguments"]
+                        if not isinstance(arguments, str):
+                            raise ValueError("invalid arguments delta")
+                        call["function"]["arguments"] += arguments
+                        if len(call["function"]["arguments"]) > 8000:
+                            raise ModelError("Argumentos de ferramenta excedem o limite permitido.")
+            reason = choice.get("finish_reason")
+            if reason is not None:
+                check_finish_reason(reason)
+                finished = True
+        if not finished:
+            raise ModelError("Conexão interrompida antes de concluir a resposta.")
+        check_cancelled(cancelled)
+        message = {"role": "assistant", "content": content or None}
+        if calls:
+            message["tool_calls"] = [calls[index] for index in sorted(calls)]
+        validated = validate_message(message)
+        if pending:
+            on_delta(pending)
+            check_cancelled(cancelled)
+        return validated
+
+
+def check_cancelled(cancelled: threading.Event | None):
+    if cancelled is not None and cancelled.is_set():
+        raise RequestCancelled("Investigação cancelada.")
+
+
+def check_finish_reason(reason: str | None):
+    if reason == "length":
+        raise ModelError("O modelo atingiu o limite de saída. Faça uma pergunta menor.")
+    if reason == "content_filter":
+        raise ModelError("O provedor interrompeu a geração da resposta.")
+    if reason not in {None, "stop", "tool_calls", "function_call"}:
+        raise ModelError("Motivo de conclusão incompatível com a API.")
+
+
+def merge_fragment(current: str, fragment: object, limit: int) -> str:
+    if not isinstance(fragment, str):
+        raise ValueError("invalid string fragment")
+    result = (
+        current
+        if fragment == current
+        else (fragment if fragment.startswith(current) else current + fragment)
+    )
+    if len(result) > limit:
+        raise ModelError("Fragmento de ferramenta excede o limite permitido.")
+    return result
+
+
+def sse_events(response: httpx.Response, cancelled: threading.Event | None) -> Iterator[str]:
+    decoder = codecs.getincrementaldecoder("utf-8")("strict")
+    buffer = ""
+    fields: list[str] = []
+    total = 0
+    for raw in response.iter_bytes():
+        check_cancelled(cancelled)
+        total += len(raw)
+        if total > MAX_STREAM_BYTES:
+            raise ModelError("Stream excede o limite de 2 MB.")
+        buffer += decoder.decode(raw)
+        while "\n" in buffer:
+            line, buffer = buffer.split("\n", 1)
+            line = line.removesuffix("\r")
+            if not line:
+                if fields:
+                    yield "\n".join(fields)
+                    fields = []
+            elif line.startswith("data:"):
+                fields.append(line[5:].removeprefix(" "))
+    buffer += decoder.decode(b"", final=True)
+    if buffer.startswith("data:"):
+        fields.append(buffer[5:].removeprefix(" ").removesuffix("\r"))
+    if fields:
+        yield "\n".join(fields)

@@ -4,13 +4,14 @@ import logging
 import sqlite3
 import threading
 
+from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
-from textual.widgets import Footer, Header, Input, RichLog, Static
+from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.widgets import Footer, Header, Input, Markdown, RichLog, Static
 
-from codaro.agent import Agent, InvestigationCancelled
+from codaro.agent import Agent, AgentEvent, InvestigationCancelled
 from codaro.index import safe_preview
 from codaro.provider import ModelError
 
@@ -24,13 +25,23 @@ class CodaroApp(App):
     Screen { background: #111827; }
     Header { background: #172554; }
     #main { height: 1fr; }
-    #conversation { width: 3fr; border: round #38bdf8; padding: 1 2; }
-    #sidebar { width: 1fr; min-width: 25; max-width: 42; }
+    #conversation { width: 3fr; border: round #38bdf8; padding: 0 1; }
+    #sidebar { width: 1fr; min-width: 28; max-width: 45; }
     .narrow #sidebar { display: none; }
     #repository { height: auto; max-height: 16; border: round #475569; padding: 1; }
     #activity { height: 1fr; border: round #475569; padding: 1; }
     #prompt { margin: 0 1; border: round #38bdf8; }
     #status { height: 1; margin: 0 2; color: #94a3b8; }
+    .question { height: auto; margin: 1 0; padding: 1; background: #172554; }
+    .assistant { margin: 0; padding: 0 1; background: #111827; }
+    .speaker { height: 1; margin: 1 1 0 1; color: #38bdf8; text-style: bold; }
+    .tool-card {
+        height: auto; margin: 0 1; padding: 0 1;
+        border-left: thick #475569; color: #94a3b8;
+    }
+    .tool-card.error { border-left: thick #f87171; }
+    .tool-card.success { border-left: thick #34d399; }
+    .notice { height: auto; margin: 1; color: #fbbf24; }
     """
     BINDINGS = [
         Binding("ctrl+q", "quit", "Sair", priority=True),
@@ -43,15 +54,26 @@ class CodaroApp(App):
         self.agent = agent
         self.busy = False
         self.cancelled = threading.Event()
+        self.response_text = ""
+        self.rendered_text = ""
+        self.reply: Markdown | None = None
+        self.context_chars = 0
 
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal(id="main"):
-            yield RichLog(id="conversation", wrap=True, markup=False, max_lines=4000)
+            with VerticalScroll(id="conversation"):
+                yield Markdown(
+                    "# Codaro\nExplore seu repositório com respostas apoiadas no código.\n\n"
+                    "Pergunte **onde está uma validação** ou **como funciona um fluxo**.\n\n"
+                    "O chat envia a pergunta e os trechos consultados ao modelo configurado.",
+                    classes="assistant",
+                    open_links=False,
+                )
             with Vertical(id="sidebar"):
                 yield Static("", id="repository", markup=False)
                 yield RichLog(id="activity", wrap=True, markup=False, max_lines=1000)
-        yield Static("Busca progressiva · ferramentas de leitura · fontes no código", id="status")
+        yield Static("Pronto · busca textual e por símbolos", id="status")
         yield Input(placeholder="Pergunte sobre o repositório…", id="prompt", max_length=8000)
         yield Footer()
 
@@ -60,16 +82,19 @@ class CodaroApp(App):
         self.query_one("#repository", Static).update(
             f"REPOSITÓRIO\n{self.agent.repository.root}\n\nMODELO\n{self.agent.provider.settings.model}"
         )
-        self.query_one("#conversation", RichLog).write(
-            "Codaro — assistente de investigação\n\n"
-            "Exemplos: onde está a validação de acesso? Como funciona a indexação?\n"
-            "O chat envia a pergunta e os trechos consultados ao modelo configurado.\n"
-            "Busca atual: textual e por símbolos."
-        )
+        self.set_interval(0.08, self.flush_response)
         self.query_one(Input).focus()
 
     def on_resize(self):
         self.screen.set_class(self.size.width < 90, "narrow")
+
+    def mount_message(self, widget):
+        conversation = self.query_one("#conversation", VerticalScroll)
+        if len(conversation.children) >= 100:
+            for old in list(conversation.children)[:10]:
+                old.remove()
+        conversation.mount(widget)
+        self.call_after_refresh(conversation.scroll_end, animate=False)
 
     def on_input_submitted(self, event: Input.Submitted):
         question = event.value.strip()
@@ -77,9 +102,13 @@ class CodaroApp(App):
             return
         self.busy = True
         self.cancelled.clear()
+        self.response_text = self.rendered_text = ""
+        self.reply = None
         event.input.value = ""
         event.input.disabled = True
-        self.query_one("#conversation", RichLog).write(f"\nVocê › {question}\n")
+        self.mount_message(
+            Static(f"Você\n{safe_preview(question)}", classes="question", markup=False)
+        )
         self.query_one("#status", Static).update("Investigando…")
         self.investigate(question)
 
@@ -88,17 +117,19 @@ class CodaroApp(App):
             try:
                 self.call_from_thread(callback, *args)
             except RuntimeError:
-                # The app may close while a network request is returning.
                 return
 
     @work(thread=True, exclusive=True)
     def investigate(self, question: str):
+        successful = False
         try:
             answer = self.agent.ask(
                 question,
-                lambda message: self.deliver(self.activity, message),
-                self.cancelled,
+                cancelled=self.cancelled,
+                on_delta=lambda delta: self.deliver(self.append_delta, delta),
+                on_detail=lambda event: self.deliver(self.activity, event),
             )
+            successful = True
         except InvestigationCancelled:
             answer = "Investigação cancelada."
         except (ModelError, ValueError, OSError) as exc:
@@ -110,14 +141,72 @@ class CodaroApp(App):
         except Exception:
             logger.exception("Unexpected investigation failure")
             answer = "Falha inesperada. Execute codaro ask para diagnosticar o fluxo."
-        self.deliver(self.finish, answer)
+        self.deliver(self.finish, answer, successful)
 
-    def activity(self, message: str):
-        self.query_one("#activity", RichLog).write(safe_preview(message))
-        self.query_one("#status", Static).update(safe_preview(message))
+    def activity(self, event: AgentEvent):
+        if event.kind == "model_start":
+            self.flush_response()
+            self.response_text = self.rendered_text = ""
+            self.reply = None
+            self.context_chars = event.context_chars or 0
+            self.query_one("#status", Static).update(
+                f"Consultando modelo · contexto: {self.context_chars:,} caracteres"
+            )
+        elif event.kind == "model_end":
+            self.flush_response()
+        elif event.kind == "tool_start":
+            self.query_one("#status", Static).update(
+                f"{event.title} · {safe_preview(event.detail)}"
+            )
+        elif event.kind == "tool_end":
+            duration = f"{event.elapsed_ms:.0f} ms" if event.elapsed_ms is not None else ""
+            text = safe_preview(f"{event.title} · {duration}\n{event.detail}")
+            color = "red" if event.state == "error" else "green"
+            log = Text(event.title + " · " + duration, style=color)
+            log.append("\n" + safe_preview(event.detail) + "\n", style="dim")
+            self.query_one("#activity", RichLog).write(log)
+            self.mount_message(Static(text, classes=f"tool-card {event.state}", markup=False))
+            self.query_one("#status", Static).update(f"{event.title} · {duration}")
+        else:
+            self.query_one("#activity", RichLog).write(
+                safe_preview(f"{event.title} · {event.detail}".rstrip(" ·"))
+            )
+            self.query_one("#status", Static).update(safe_preview(event.title))
 
-    def finish(self, answer: str):
-        self.query_one("#conversation", RichLog).write(f"Codaro › {safe_preview(answer)}\n")
+    def append_delta(self, delta: str):
+        self.response_text += safe_preview(delta)
+        self.query_one("#status", Static).update(
+            f"Respondendo… · contexto: {self.context_chars:,} caracteres · Ctrl+X para cancelar"
+        )
+        # Render the first fragment immediately; subsequent fragments are coalesced by the timer.
+        if self.reply is None:
+            self.flush_response()
+
+    def flush_response(self):
+        if not self.response_text or self.response_text == self.rendered_text:
+            return
+        conversation = self.query_one("#conversation", VerticalScroll)
+        follow = conversation.is_vertical_scroll_end
+        if self.reply is None:
+            self.mount_message(Static("Codaro", classes="speaker", markup=False))
+            self.reply = Markdown(self.response_text, classes="assistant", open_links=False)
+            self.mount_message(self.reply)
+        else:
+            self.reply.update(self.response_text)
+        self.rendered_text = self.response_text
+        if follow:
+            self.call_after_refresh(conversation.scroll_end, animate=False)
+
+    def finish(self, answer: str, successful: bool = True):
+        if successful:
+            self.response_text = safe_preview(answer)
+            self.flush_response()
+        else:
+            self.response_text = self.rendered_text = ""
+            if self.reply is not None:
+                self.reply.remove()
+                self.reply = None
+            self.mount_message(Static(safe_preview(answer), classes="notice", markup=False))
         self.busy = False
         prompt = self.query_one(Input)
         prompt.disabled = False
@@ -128,14 +217,16 @@ class CodaroApp(App):
         if self.busy:
             return
         self.agent.turns.clear()
-        self.query_one("#conversation", RichLog).clear()
+        self.response_text = self.rendered_text = ""
+        self.reply = None
+        self.query_one("#conversation", VerticalScroll).remove_children()
         self.query_one("#activity", RichLog).clear()
 
     def action_cancel(self):
         if self.busy:
             self.cancelled.set()
             self.query_one("#status", Static).update(
-                "Cancelamento solicitado · aguardando requisição ativa…"
+                "Cancelamento solicitado · aguardando resposta ativa…"
             )
 
     def on_unmount(self):

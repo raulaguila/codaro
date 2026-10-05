@@ -3,10 +3,12 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
+import time
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from codaro.index import CodeIndex
-from codaro.provider import ModelError, OpenAICompatible, validate_message
+from codaro.provider import ModelError, OpenAICompatible, RequestCancelled, validate_message
 from codaro.repository import Repository
 
 SYSTEM = """Você é Codaro, um assistente de investigação de código. Responda em português,
@@ -89,8 +91,54 @@ TOOLS = [
 ]
 
 
-class InvestigationCancelled(RuntimeError):
-    pass
+InvestigationCancelled = RequestCancelled
+
+
+@dataclass(frozen=True)
+class AgentEvent:
+    kind: str
+    title: str
+    detail: str = ""
+    state: str = ""
+    elapsed_ms: float | None = None
+    context_chars: int | None = None
+
+
+def tool_target(name: str, args: dict) -> str:
+    if name == "search_code":
+        return f"Consulta: {args.get('query', '')[:160]}"
+    if name == "read_symbol":
+        return f"{args.get('path', '')} · {args.get('symbol', '')}"[:240]
+    if name == "read_lines":
+        return f"{args.get('path', '')}:{args.get('start', '')}–{args.get('end', '')}"[:240]
+    return f"Página a partir do arquivo {args.get('offset', 0)}"
+
+
+TOOL_TITLES = {
+    "search_code": "Buscar código",
+    "read_symbol": "Ler símbolo",
+    "read_lines": "Ler linhas",
+    "list_files": "Listar arquivos",
+}
+
+
+def tool_outcome(result: dict) -> tuple[str, str]:
+    if "error" in result:
+        return "error", str(result["error"])[:200]
+    if result.get("already_read"):
+        return "cached", "Conteúdo já consultado; arquivo sem alterações"
+    if "results" in result:
+        summary = f"{len(result['results'])} resultados"
+    elif "content" in result:
+        summary = (
+            f"Linhas {result['start_line']}–{result['end_line']} · "
+            f"{len(result['content'])} caracteres"
+        )
+    else:
+        summary = f"{len(result.get('files', []))} arquivos"
+    if result.get("truncated"):
+        summary += " · leitura parcial"
+    return "success", summary
 
 
 class Agent:
@@ -125,17 +173,33 @@ class Agent:
         question: str,
         on_event: Callable[[str], None] | None = None,
         cancelled: threading.Event | None = None,
+        *,
+        on_delta: Callable[[str], None] | None = None,
+        on_detail: Callable[[AgentEvent], None] | None = None,
     ) -> str:
         if not isinstance(question, str) or not question.strip() or len(question) > 8000:
             raise ValueError("A pergunta deve ter entre 1 e 8000 caracteres.")
         if not self._lock.acquire(blocking=False):
             raise ValueError("Já existe uma investigação em andamento.")
         try:
-            return self._ask(question, on_event or (lambda _: None), cancelled)
+            return self._ask(
+                question,
+                on_event or (lambda _: None),
+                cancelled,
+                on_delta,
+                on_detail or (lambda _: None),
+            )
         finally:
             self._lock.release()
 
-    def _ask(self, question: str, event: Callable[[str], None], cancelled: threading.Event | None):
+    def _ask(
+        self,
+        question: str,
+        event: Callable[[str], None],
+        cancelled: threading.Event | None,
+        on_delta: Callable[[str], None] | None,
+        detail: Callable[[AgentEvent], None],
+    ):
         def check_cancelled():
             if cancelled is not None and cancelled.is_set():
                 raise InvestigationCancelled("Investigação cancelada.")
@@ -143,7 +207,15 @@ class Agent:
         check_cancelled()
         with CodeIndex(self.repository) as index:
             event("Atualizando índice local…")
-            index.update()
+            detail(AgentEvent("status", "Atualizando índice local"))
+            stats = index.update()
+            detail(
+                AgentEvent(
+                    "status",
+                    "Índice pronto",
+                    f"{stats['files']} arquivos · {stats['changed']} atualizados",
+                )
+            )
             check_cancelled()
             while self.turns and len(serialize(self.turns)) > self.history_budget:
                 self.turns.pop(0)
@@ -173,6 +245,11 @@ class Agent:
                     }
                     if tools:
                         payload.update(tools=tools, tool_choice="auto")
+                    streaming = on_delta is not None and callable(
+                        getattr(self.provider, "stream", None)
+                    )
+                    if streaming:
+                        payload["stream"] = True
                     size = len(serialize(payload))
                     if size <= self.context_budget:
                         break
@@ -183,9 +260,21 @@ class Agent:
                             "Contexto excede o limite. Reduza a pergunta ou o escopo da busca."
                         )
                 event("Consultando modelo…")
-                message = validate_message(self.provider.complete(messages, tools))
+                detail(AgentEvent("model_start", "Consultando modelo", context_chars=size))
+                if streaming:
+                    message = self.provider.stream(messages, tools, on_delta, cancelled)
+                else:
+                    message = self.provider.complete(messages, tools)
+                message = validate_message(message)
                 check_cancelled()
+                if not streaming and on_delta is not None and message.get("content"):
+                    on_delta(message["content"])
                 calls = message.get("tool_calls") or []
+                detail(
+                    AgentEvent(
+                        "model_end", "Modelo respondeu", state="tools" if calls else "answer"
+                    )
+                )
                 if not calls:
                     answer = message["content"]
                     # Keep question/answer pairs, not large tool payloads or stale source contents.
@@ -211,11 +300,16 @@ class Agent:
                     name = function["name"]
                     event(f"Ferramenta: {name}")
                     check_cancelled()
+                    started = time.monotonic()
+                    title = TOOL_TITLES.get(name, name)
+                    target = ""
                     try:
                         arguments = json.loads(function["arguments"])
                         if not isinstance(arguments, dict):
                             raise ValueError("Argumentos devem ser um objeto JSON.")
                         self.validate_arguments(name, arguments)
+                        target = tool_target(name, arguments)
+                        detail(AgentEvent("tool_start", title, target, state="running"))
                         remaining = self.tool_budget - used
                         if remaining < denial_reserve:
                             result = {"error": "Orçamento esgotado."}
@@ -248,11 +342,22 @@ class Agent:
                                     cache.add(key)
                         output = serialize(result)
                     except (ValueError, TypeError, OSError, RecursionError) as exc:
-                        output = serialize({"error": str(exc)[:200]})
+                        result = {"error": str(exc)[:200]}
+                        output = serialize(result)
                     if len(output) > self.tool_budget - used:
                         # No extra bytes are charged to the payload budget after exhaustion.
                         output = ""
                     used += len(output)
+                    state, outcome = tool_outcome(result)
+                    detail(
+                        AgentEvent(
+                            "tool_end",
+                            title,
+                            f"{target}\n{outcome}".strip(),
+                            state,
+                            (time.monotonic() - started) * 1000,
+                        )
+                    )
                     turn.append({"role": "tool", "tool_call_id": call["id"], "content": output})
             raise ModelError("O agente excedeu o limite de etapas.")
 

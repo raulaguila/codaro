@@ -116,3 +116,75 @@ def test_narrow_terminal_hides_sidebar(tmp_path):
             assert app.query_one("#status", Static)
 
     run_ui(scenario())
+
+
+class StreamingUIModel(UIModel):
+    def stream(self, messages, tools=None, on_delta=None, cancelled=None):
+        self.started.set()
+        on_delta("## Resposta\n\n**Parcial**")
+        self.release.wait(3)
+        if cancelled and cancelled.is_set():
+            from codaro.provider import RequestCancelled
+
+            raise RequestCancelled("Cancelada.")
+        on_delta("\n\n```python\ndef f():\n    return True\n```")
+        return {
+            "content": "## Resposta\n\n**Parcial**\n\n```python\ndef f():\n    return True\n```"
+        }
+
+
+def test_chat_displays_partial_markdown_before_completion(tmp_path):
+    from textual.widgets import Markdown
+
+    model = StreamingUIModel()
+    app = CodaroApp(Agent(Repository(tmp_path), model))
+
+    async def scenario():
+        async with app.run_test(size=(120, 35)) as pilot:
+            await pilot.press("o", "i", "enter")
+            assert app.busy
+            assert "Parcial" in app.response_text
+            assert app.reply is not None
+            assert app.query(Markdown)
+            model.release.set()
+            await wait_ready(app, pilot)
+            await pilot.pause(0.1)
+            assert len(app.query("MarkdownFence")) == 1
+            assert app.rendered_text.count("Parcial") == 1
+
+    run_ui(scenario())
+
+
+def test_chat_cancel_removes_partial_response(tmp_path):
+    model = StreamingUIModel()
+    agent = Agent(Repository(tmp_path), model)
+    app = CodaroApp(agent)
+
+    async def scenario():
+        async with app.run_test(size=(120, 35)) as pilot:
+            await pilot.press("o", "i", "enter")
+            assert "Parcial" in app.response_text
+            await pilot.press("ctrl+x")
+            model.release.set()
+            await wait_ready(app, pilot)
+            assert app.reply is None
+            assert not app.response_text
+            assert not agent.turns
+
+    run_ui(scenario())
+
+
+def test_tool_cards_visible_on_narrow_terminal(tmp_path):
+    from codaro.agent import AgentEvent
+
+    async def scenario():
+        app = CodaroApp(Agent(Repository(tmp_path), UIModel()))
+        async with app.run_test(size=(70, 25)) as pilot:
+            app.activity(
+                AgentEvent("tool_end", "Ler símbolo", "auth.py · can_edit\n3 linhas", "success", 12)
+            )
+            await pilot.pause()
+            assert len(app.query(".tool-card")) == 1
+            assert app.screen.has_class("narrow")
+
+    run_ui(scenario())

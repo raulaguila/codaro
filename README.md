@@ -2,7 +2,7 @@
 
 Assistente de IA no terminal para investigar repositórios locais, com fontes no código e recuperação progressiva de contexto.
 
-> MVP de investigação: busca, leitura e explicação. Edição de arquivos, execução de comandos, streaming e referências via LSP estão no roadmap.
+> MVP de investigação: busca, leitura e explicação. Edição de arquivos, execução de comandos, referências via LSP e interrupção imediata de conexões ociosas estão no roadmap.
 
 ## Instalação
 
@@ -48,7 +48,17 @@ codaro ask 'Como validamos o acesso antes de editar um projeto?' --repo examples
 codaro chat --repo examples/demo
 ```
 
-O chat tem painéis de conversa, repositório/modelo e atividade; a lateral é ocultada em terminais menores que 90 colunas. `Ctrl+L` limpa a conversa, `Ctrl+X` solicita cancelamento e `Ctrl+Q` encerra. O cancelamento impede novas ações e descarta a resposta, mas aguarda uma requisição de rede ativa terminar ou atingir o timeout. O histórico fica apenas na memória da sessão. O modelo deve suportar `tools` na API de chat completions; a confiabilidade das chamadas varia conforme modelo e servidor.
+O chat tem painéis de conversa, repositório/modelo e atividade; a lateral é ocultada em terminais menores que 90 colunas. `Ctrl+L` limpa a conversa, `Ctrl+X` solicita cancelamento e `Ctrl+Q` encerra. O cancelamento é verificado entre fragmentos da resposta e chamadas de ferramentas; se o servidor estiver parado sem enviar dados, aguarda o próximo fragmento ou o timeout. O histórico fica apenas na memória da sessão. O modelo deve suportar `tools` na API de chat completions; a confiabilidade das chamadas varia conforme modelo e servidor.
+
+## Interface e streaming
+
+- `codaro chat` mostra a resposta enquanto ela chega, em Markdown, com títulos, listas, tabelas e destaque de sintaxe em blocos de código.
+- Cada ação mostra consulta ou arquivo/símbolo, quantidade de resultados ou linhas, duração e indicação de leitura parcial ou reutilização de conteúdo.
+- As ações também aparecem na conversa para ficarem visíveis em terminais estreitos. A lateral mantém o histórico de atividades.
+- A barra de status mostra o volume de contexto enviado em caracteres, não tokens.
+- `codaro ask` também atualiza a resposta progressivamente no terminal e envia as informações de atividade para stderr.
+- O provedor usa SSE da API OpenAI-compatible. Se o servidor responder com JSON comum, a resposta é exibida de uma vez.
+- Uma resposta interrompida ou cancelada não é salva no histórico. O chat remove o bloco parcial e informa a interrupção.
 
 ## API compatível com OpenAI
 
@@ -109,7 +119,7 @@ Veja os achados e as limitações em [AUDIT.md](AUDIT.md).
 - Benchmark com perguntas reais, Recall@5, latência e volume de contexto.
 - Reranking quando houver ganho medido.
 - Definições e referências via LSP, com novos parsers Tree-sitter.
-- Streaming e interrupção imediata da requisição de rede no chat.
+- Interrupção imediata de conexões que estejam sem enviar fragmentos.
 - Edição por patches, revisão de diff e execução controlada de testes.
 
 
@@ -118,7 +128,7 @@ Veja os achados e as limitações em [AUDIT.md](AUDIT.md).
 `codaro doctor` verifica ripgrep, SQLite FTS5 e a configuração do modelo, sem chamar a API ou mostrar a chave. Retorna código 1 se um requisito local estiver ausente.
 
 - Configure `CODARO_TIMEOUT` entre 1 e 300 segundos (padrão: 90). É um limite por operação HTTP, não um prazo total de investigação.
-- Respostas 429, 502, 503 e 504 têm até duas novas tentativas com espera curta. Outros erros retornam uma mensagem sem expor o corpo remoto.
+- Respostas 429, 502, 503 e 504 têm até duas novas tentativas com espera curta. Uma conexão interrompida depois de começar a resposta não é repetida automaticamente, para evitar duplicações. Outros erros retornam uma mensagem sem expor o corpo remoto.
 - Use um modelo/servidor compatível com ferramentas na API OpenAI. Modelos só de completions não bastam. O modelo padrão é `qwen2.5:7b`; você pode substituí-lo por outro com suporte a tools.
 - O índice é um cache derivado. Se estiver corrompido, feche processos Codaro, renomeie a pasta `.codaro` e execute `codaro index --repo ...` novamente. Formatos antigos conhecidos são reconstruídos ao atualizar a versão do schema.
 - Conteúdo binário e texto fora de UTF-8 são ignorados no índice e rejeitados na leitura. Arquivos vazios são suportados.

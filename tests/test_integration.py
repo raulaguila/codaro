@@ -64,3 +64,51 @@ def test_agent_roundtrip_through_openai_http_contract(tmp_path):
     answer = Agent(Repository(tmp_path), provider).ask("Quem pode editar?")
     assert "auth.py:2" in answer
     assert len(requests) == 3
+
+
+def test_agent_streaming_tool_roundtrip(tmp_path):
+    (tmp_path / "auth.py").write_text("def can_edit(user):\n    return user.is_admin\n")
+    requests = []
+
+    def handle(request):
+        payload = json.loads(request.content)
+        assert payload["stream"]
+        requests.append(payload)
+        if len(requests) == 1:
+            delta = {
+                "tool_calls": [
+                    {
+                        "index": 0,
+                        "id": "call-1",
+                        "type": "function",
+                        "function": {
+                            "name": "read_symbol",
+                            "arguments": '{"path":"auth.py","symbol":"can_edit"}',
+                        },
+                    }
+                ]
+            }
+            reason = "tool_calls"
+        else:
+            assert "return user.is_admin" in payload["messages"][-1]["content"]
+            delta = {"content": "**Verificação:** `auth.py:2` consulta `user.is_admin`."}
+            reason = "stop"
+        events = [
+            {"choices": [{"index": 0, "delta": delta, "finish_reason": None}]},
+            {"choices": [{"index": 0, "delta": {}, "finish_reason": reason}]},
+        ]
+        body = (
+            "".join("data: " + json.dumps(event) + "\n\n" for event in events) + "data: [DONE]\n\n"
+        )
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=body)
+
+    model = OpenAICompatible(
+        Settings("https://example.test/v1", "test"), httpx.MockTransport(handle)
+    )
+    received = []
+    agent = Agent(Repository(tmp_path), model)
+    answer = agent.ask("Quem pode editar?", on_delta=received.append)
+    assert "".join(received) == answer
+    assert "auth.py:2" in answer
+    assert len(requests) == 2
+    assert agent.turns[-1][-1]["content"] == answer

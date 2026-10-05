@@ -251,3 +251,43 @@ def test_deeply_nested_tool_arguments_are_returned_as_error(tmp_path):
     Agent(Repository(tmp_path), model).ask("Liste.")
     output = next(item for item in model.requests[-1][0] if item["role"] == "tool")
     assert "error" in json.loads(output["content"])
+
+
+def test_detailed_tool_events_include_target_outcome_and_duration(tmp_path):
+    (tmp_path / "x.py").write_text("def f(): return True")
+    model = FakeModel(
+        [
+            call("search_code", {"query": "f"}),
+            call("read_symbol", {"path": "x.py", "symbol": "f"}, "call-2"),
+            {"content": "Resposta."},
+        ]
+    )
+    details = []
+    Agent(Repository(tmp_path), model).ask("Investigue f.", on_detail=details.append)
+    endings = [event for event in details if event.kind == "tool_end"]
+    assert len(endings) == 2
+    assert endings[0].title == "Buscar código"
+    assert "Consulta: f" in endings[0].detail
+    assert "resultados" in endings[0].detail
+    assert "x.py" in endings[1].detail
+    assert endings[1].elapsed_ms >= 0
+    assert all(event.state == "success" for event in endings)
+    assert any(event.context_chars for event in details if event.kind == "model_start")
+
+
+def test_stream_failure_does_not_save_partial_history(tmp_path):
+    import pytest
+
+    from codaro.provider import ModelError
+
+    class BrokenStream:
+        def stream(self, messages, tools, on_delta, cancelled):
+            on_delta("Parcial")
+            raise ModelError("Conexão interrompida.")
+
+    received = []
+    agent = Agent(Repository(tmp_path), BrokenStream())
+    with pytest.raises(ModelError):
+        agent.ask("Investigue.", on_delta=received.append)
+    assert received == ["Parcial"]
+    assert not agent.turns

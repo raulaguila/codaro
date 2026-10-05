@@ -68,6 +68,7 @@ def test_ask_reports_provider_failure(tmp_path, monkeypatch):
         raise ModelError("API indisponível.")
 
     monkeypatch.setattr("codaro.cli.OpenAICompatible.complete", fail)
+    monkeypatch.setattr("codaro.cli.OpenAICompatible.stream", fail)
     result = runner.invoke(app, ["ask", "Explique.", "--repo", str(tmp_path)])
     assert result.exit_code == 1
     assert "API indisponível" in result.stderr
@@ -78,3 +79,15 @@ def test_doctor_fails_when_ripgrep_is_missing(monkeypatch):
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 1
     assert "ausente" in result.stdout
+
+
+def test_ask_stream_renders_answer_and_tools_without_duplicate_output(tmp_path, monkeypatch):
+    def stream(self, messages, tools=None, on_delta=None, cancelled=None):
+        on_delta("**Resultado:** ")
+        on_delta("resposta final.")
+        return {"content": "**Resultado:** resposta final."}
+
+    monkeypatch.setattr("codaro.cli.OpenAICompatible.stream", stream)
+    result = runner.invoke(app, ["ask", "Investigue.", "--repo", str(tmp_path)])
+    assert result.exit_code == 0
+    assert result.stdout.count("resposta final.") == 1
