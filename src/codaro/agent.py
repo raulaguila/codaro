@@ -7,6 +7,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from codaro.edits import EditManager
 from codaro.index import CodeIndex
 from codaro.provider import ModelError, OpenAICompatible, RequestCancelled, validate_message
 from codaro.repository import Repository
@@ -23,6 +24,15 @@ Se faltarem evidências, explique a limitação. Não invente referências, exec
 Se um resultado estiver truncado, leia o intervalo seguinte antes de concluir sobre toda a função.
 Respeite os limites de ferramentas; finalize quando houver evidências suficientes.
 """
+EDIT_SYSTEM = SYSTEM.replace(
+    "Você só pode ler código: não alegue editar arquivos, executar testes ou comandos.",
+    "Você pode propor edições usando propose_edit apenas quando o usuário pedir mudanças. "
+    "Leia o trecho atual antes. old_text é o texto exato, sem números de linha. "
+    "Reúna alterações do mesmo arquivo em uma proposta. Uma proposta não aplica mudanças: "
+    "a aprovação humana ocorre depois da resposta. Não alegue aplicar arquivos ou executar testes. "
+    "Seja explícito sobre as propostas pendentes.",
+)
+
 FINAL_INSTRUCTION = (
     "O orçamento de investigação terminou. Responda com as evidências já obtidas "
     "e indique o que não foi possível verificar. Não solicite ferramentas."
@@ -91,6 +101,19 @@ TOOLS = [
 ]
 
 
+EDIT_TOOL = schema(
+    "propose_edit",
+    "Prepara uma substituição exata em arquivo existente e lido. Nunca aplica mudanças.",
+    {
+        "path": {"type": "string", "maxLength": 2000},
+        "old_text": {"type": "string", "maxLength": 3000},
+        "new_text": {"type": "string", "maxLength": 3000},
+        "reason": {"type": "string", "maxLength": 500},
+    },
+    ["path", "old_text", "new_text", "reason"],
+)
+
+
 InvestigationCancelled = RequestCancelled
 
 
@@ -105,6 +128,8 @@ class AgentEvent:
 
 
 def tool_target(name: str, args: dict) -> str:
+    if name == "propose_edit":
+        return str(args.get("path", ""))[:240]
     if name == "search_code":
         return f"Consulta: {args.get('query', '')[:160]}"
     if name == "read_symbol":
@@ -115,6 +140,7 @@ def tool_target(name: str, args: dict) -> str:
 
 
 TOOL_TITLES = {
+    "propose_edit": "Propor edição",
     "search_code": "Buscar código",
     "read_symbol": "Ler símbolo",
     "read_lines": "Ler linhas",
@@ -125,6 +151,8 @@ TOOL_TITLES = {
 def tool_outcome(result: dict) -> tuple[str, str]:
     if "error" in result:
         return "error", str(result["error"])[:200]
+    if "proposal_id" in result:
+        return "pending", "Diff preparado · aguardando aprovação"
     if result.get("already_read"):
         return "cached", "Conteúdo já consultado; arquivo sem alterações"
     if "results" in result:
@@ -150,6 +178,8 @@ class Agent:
         tool_budget: int = 24_000,
         history_budget: int = 16_000,
         context_budget: int = 64_000,
+        *,
+        allow_edits: bool = False,
     ):
         if (
             type(max_steps) is not int
@@ -165,8 +195,11 @@ class Agent:
         self.tool_budget = tool_budget
         self.history_budget = history_budget
         self.context_budget = context_budget
+        self.allow_edits = allow_edits
+        self.edits = EditManager(repository)
         self.turns: list[list[dict]] = []
         self._lock = threading.Lock()
+        self._read_snapshot: bytes | None = None
 
     def ask(
         self,
@@ -181,7 +214,12 @@ class Agent:
             raise ValueError("A pergunta deve ter entre 1 e 8000 caracteres.")
         if not self._lock.acquire(blocking=False):
             raise ValueError("Já existe uma investigação em andamento.")
+        if self.edits.pending:
+            self._lock.release()
+            raise ValueError("Revise as propostas pendentes antes de iniciar outra pergunta.")
         try:
+            self.edits.observed.clear()
+            self.edits.proposals.clear()
             return self._ask(
                 question,
                 on_event or (lambda _: None),
@@ -189,6 +227,10 @@ class Agent:
                 on_delta,
                 on_detail or (lambda _: None),
             )
+        except Exception:
+            for proposal in self.edits.pending:
+                self.edits.reject(proposal.id)
+            raise
         finally:
             self._lock.release()
 
@@ -228,10 +270,10 @@ class Agent:
             for step in range(self.max_steps + 1):
                 check_cancelled()
                 final = step == self.max_steps or used >= self.tool_budget - denial_reserve
-                tools = None if final else TOOLS
+                tools = None if final else [*TOOLS, *([EDIT_TOOL] if self.allow_edits else [])]
                 while True:
                     messages = [
-                        {"role": "system", "content": SYSTEM},
+                        {"role": "system", "content": EDIT_SYSTEM if self.allow_edits else SYSTEM},
                         *(message for previous in retained for message in previous),
                         *turn,
                     ]
@@ -308,6 +350,8 @@ class Agent:
                         if not isinstance(arguments, dict):
                             raise ValueError("Argumentos devem ser um objeto JSON.")
                         self.validate_arguments(name, arguments)
+                        if name == "propose_edit" and not self.allow_edits:
+                            raise ValueError("Edição desabilitada nesta sessão.")
                         target = tool_target(name, arguments)
                         detail(AgentEvent("tool_start", title, target, state="running"))
                         remaining = self.tool_budget - used
@@ -337,6 +381,13 @@ class Agent:
                                     result = self.fit_result(
                                         result, min(8000, remaining - denial_reserve)
                                     )
+                                if (
+                                    self.allow_edits
+                                    and name in {"read_lines", "read_symbol"}
+                                    and "content" in result
+                                    and self._read_snapshot is not None
+                                ):
+                                    self.edits.observe(result, self._read_snapshot)
                                 # Only cache successful reads of an unchanged source version.
                                 if key is not None and "error" not in result:
                                     cache.add(key)
@@ -389,7 +440,8 @@ class Agent:
     @staticmethod
     def validate_arguments(name: str, args: dict):
         definition = next(
-            (tool["function"] for tool in TOOLS if tool["function"]["name"] == name), None
+            (tool["function"] for tool in [*TOOLS, EDIT_TOOL] if tool["function"]["name"] == name),
+            None,
         )
         if not definition:
             raise ValueError("Ferramenta desconhecida.")
@@ -401,7 +453,7 @@ class Agent:
         for key, value in args.items():
             spec = parameters["properties"][key]
             if spec["type"] == "string":
-                if not isinstance(value, str) or not value.strip():
+                if not isinstance(value, str) or (not value.strip() and key != "new_text"):
                     raise ValueError(f"{key} deve ser texto não vazio.")
                 if len(value) > spec["maxLength"]:
                     raise ValueError(f"{key} excede o limite permitido.")
@@ -413,12 +465,27 @@ class Agent:
 
     def execute(self, index: CodeIndex, name: str, args: dict) -> dict:
         self.validate_arguments(name, args)
+        self._read_snapshot = None
         if name == "search_code":
             return {"results": index.search(args["query"], args.get("limit", 6))}
-        if name == "read_symbol":
-            return index.read_symbol(args["path"], args["symbol"], args.get("start_line"))
-        if name == "read_lines":
-            return self.repository.read_lines(args["path"], args["start"], args["end"])
+        if name == "propose_edit":
+            if not self.allow_edits:
+                raise ValueError("Edição desabilitada nesta sessão.")
+            return self.edits.propose(**args)
+        if name in {"read_symbol", "read_lines"}:
+            path = self.repository.resolve_file(args["path"])
+            canonical = path.relative_to(self.repository.root).as_posix()
+            data = self.repository.read_bytes(path)
+            if name == "read_symbol":
+                result = index.read_symbol(canonical, args["symbol"], args.get("start_line"))
+                if self.repository.read_bytes(path) != data:
+                    raise ValueError("Arquivo mudou durante a leitura. Leia novamente.")
+            else:
+                result = self.repository.render_lines(
+                    canonical, data.decode("utf-8-sig"), args["start"], args["end"]
+                )
+            self._read_snapshot = data
+            return result
         paths = [str(path.relative_to(self.repository.root)) for path in self.repository.files()]
         offset = args.get("offset", 0)
         limit = args.get("limit", 60)

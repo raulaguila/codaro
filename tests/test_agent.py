@@ -291,3 +291,87 @@ def test_stream_failure_does_not_save_partial_history(tmp_path):
         agent.ask("Investigue.", on_delta=received.append)
     assert received == ["Parcial"]
     assert not agent.turns
+
+
+def edit_responses():
+    return [
+        call("read_lines", {"path": "code.py", "start": 1, "end": 1}),
+        call(
+            "propose_edit",
+            {
+                "path": "code.py",
+                "old_text": "x = 1",
+                "new_text": "x = 2",
+                "reason": "Ajustar valor",
+            },
+            "edit-1",
+        ),
+        {"content": "Preparei uma edição; aguarda aprovação."},
+    ]
+
+
+def test_agent_proposes_without_writing_and_blocks_new_questions(tmp_path):
+    import pytest
+
+    path = tmp_path / "code.py"
+    path.write_text("x = 1\n")
+    model = FakeModel(edit_responses())
+    agent = Agent(Repository(tmp_path), model, allow_edits=True)
+    agent.ask("Mude x para 2.")
+    assert path.read_text() == "x = 1\n"
+    assert len(agent.edits.pending) == 1
+    assert any(tool["function"]["name"] == "propose_edit" for tool in model.requests[0][1])
+    with pytest.raises(ValueError, match="pendentes"):
+        agent.ask("Outra pergunta.")
+    assert len(agent.edits.pending) == 1
+    proposal = agent.edits.pending[0]
+    agent.edits.apply(proposal.id)
+    assert path.read_text() == "x = 2\n"
+
+
+def test_read_only_agent_rejects_edit_tool(tmp_path):
+    (tmp_path / "code.py").write_text("x = 1\n")
+    model = FakeModel(edit_responses())
+    agent = Agent(Repository(tmp_path), model)
+    agent.ask("Mude x.")
+    assert not agent.edits.pending
+    assert all(tool["function"]["name"] != "propose_edit" for tool in model.requests[0][1])
+    result = next(item for item in model.requests[-1][0] if item.get("tool_call_id") == "edit-1")
+    assert "desabilitada" in json.loads(result["content"])["error"]
+
+
+def test_failed_response_discards_proposals_and_history(tmp_path):
+    import pytest
+
+    from codaro.provider import ModelError
+
+    (tmp_path / "code.py").write_text("x = 1\n")
+    agent = Agent(
+        Repository(tmp_path), FakeModel([*edit_responses()[:2], {"content": []}]), allow_edits=True
+    )
+    with pytest.raises(ModelError):
+        agent.ask("Edite.")
+    assert not agent.edits.pending
+    assert not agent.turns
+    assert (tmp_path / "code.py").read_text() == "x = 1\n"
+
+
+def test_cancelled_proposal_is_discarded(tmp_path):
+    import threading
+
+    import pytest
+
+    from codaro.agent import InvestigationCancelled
+
+    (tmp_path / "code.py").write_text("x = 1\n")
+    cancelled = threading.Event()
+    agent = Agent(Repository(tmp_path), FakeModel(edit_responses()), allow_edits=True)
+
+    def detail(event):
+        if event.kind == "tool_end" and event.state == "pending":
+            cancelled.set()
+
+    with pytest.raises(InvestigationCancelled):
+        agent.ask("Edite.", cancelled=cancelled, on_detail=detail)
+    assert not agent.edits.pending
+    assert not agent.turns

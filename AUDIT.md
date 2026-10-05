@@ -77,3 +77,13 @@ A entrega seguinte adiciona streaming SSE em `chat` e `ask`, respostas Markdown 
 Validação local: **135 testes aprovados**, lint e formatação aprovados. Os novos casos cobrem UTF-8 dividido entre chunks, montagem incremental de argumentos de ferramentas, cancelamento, EOF prematuro, limites, fallback JSON, falha de conexão sem repetição, roundtrip SSE com ferramentas e renderização parcial/final na interface. Os modelos continuam simulados: esta entrega não comprova a qualidade de um modelo real.
 
 O streaming limita a resposta a 2 MB de transporte e 16.000 caracteres de conteúdo, com as mesmas validações de ferramentas. Eventos de conclusão inválidos e conteúdo depois da conclusão são rejeitados. Atualizações da interface são agrupadas para reduzir o custo de renderização; o histórico mantém somente respostas concluídas.
+
+## Edição com aprovação — 5 de outubro de 2026
+
+Entrega: ferramenta `propose_edit`, propostas em memória, diff com destaque de sintaxe, revisão no chat e comando `codaro edit`. O modelo não tem acesso à aplicação: cada arquivo exige aprovação na interface. `codaro ask` e `chat --read-only` preservam o modo de investigação.
+
+Controles verificados: leitura prévia do trecho inteiro, substituição exata e única, limites de proposta/diff, descarte ao cancelar ou falhar, bloqueio de novos turnos enquanto há revisão pendente, validação atual de ignores, comparação de conteúdo e identidade do arquivo antes da escrita, rejeição de links simbólicos/hard links, escrita temporária seguida de substituição atômica e limpeza em falhas. BOM UTF-8, LF/CRLF e permissões usuais preservados.
+
+Validação local: **161 testes passaram**, Ruff lint e formatação passaram, `pip check` sem dependências quebradas e `git diff --check` sem erros. Testes de edição cobrem confirmação padrão negativa/EOF na CLI, revisão e aprovação/rejeição no Textual, conflito durante a revisão e durante a escrita temporária, falha de substituição sem perda do original, mudanças nas regras de ignore, conteúdo truncado, resposta interrompida e cancelamento. Modelos são simulados; a qualidade de propostas de modelos reais ainda depende de avaliação com o provedor escolhido.
+
+Limitações: aplicação requer POSIX com `dir_fd` e `O_NOFOLLOW`. Propostas são separadas por arquivo, não uma transação do conjunto; não há criação/exclusão de arquivos, undo automático, execução de testes ou recuperação de propostas entre sessões. A operação preserva bits de permissão usuais, não promete preservar ACLs/metadados estendidos. As verificações de concorrência não constituem proteção contra todo processo hostil que altera caminhos no intervalo mínimo entre verificação e substituição.

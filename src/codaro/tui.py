@@ -4,19 +4,89 @@ import logging
 import sqlite3
 import threading
 
+from rich.syntax import Syntax
 from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import Footer, Header, Input, Markdown, RichLog, Static
+from textual.screen import ModalScreen
+from textual.widgets import Button, Footer, Header, Input, Markdown, RichLog, Static
 
 from codaro.agent import Agent, AgentEvent, InvestigationCancelled
+from codaro.edits import EditProposal
 from codaro.index import safe_preview
 from codaro.provider import ModelError
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
+
+class EditReview(ModalScreen[str]):
+    DEFAULT_CSS = """
+    EditReview { align: center middle; background: #000000 65%; }
+    #review { width: 95%; height: 90%; border: round #38bdf8; background: #111827; }
+    #review-title { height: auto; padding: 1 2; color: #38bdf8; text-style: bold; }
+    #review-diff { height: 1fr; padding: 0 1; }
+    #review-actions { height: auto; align-horizontal: center; padding: 1; }
+    #review-actions Button { margin: 0 1; min-width: 10; }
+    """
+    BINDINGS = [Binding("escape", "back", "Voltar")]
+
+    def __init__(self, proposal: EditProposal):
+        super().__init__()
+        self.proposal = proposal
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="review"):
+            yield Static(
+                safe_preview(f"Revisar edição · {self.proposal.path}\n{self.proposal.reason}"),
+                id="review-title",
+                markup=False,
+            )
+            with VerticalScroll(id="review-diff"):
+                yield Static(
+                    Syntax(
+                        safe_preview(self.proposal.diff), "diff", theme="monokai", word_wrap=True
+                    )
+                )
+            with Horizontal(id="review-actions"):
+                yield Button("Aplicar", variant="success", id="apply-edit")
+                yield Button("Rejeitar", variant="error", id="reject-edit")
+                yield Button("Voltar", id="back-edit")
+
+    def on_mount(self):
+        # Enter must never approve a patch just because the modal appeared.
+        self.query_one("#back-edit", Button).focus()
+
+    def on_button_pressed(self, event: Button.Pressed):
+        self.dismiss({"apply-edit": "apply", "reject-edit": "reject"}.get(event.button.id, "back"))
+
+    def action_back(self):
+        self.dismiss("back")
+
+
+class ProposalCard(Vertical):
+    DEFAULT_CSS = """
+    ProposalCard { height: auto; margin: 1; padding: 1; border: round #fbbf24; }
+    ProposalCard Static { height: auto; }
+    ProposalCard Button { margin-top: 1; }
+    """
+
+    def __init__(self, proposal: EditProposal):
+        super().__init__()
+        self.proposal = proposal
+
+    def compose(self) -> ComposeResult:
+        yield Static(
+            safe_preview(f"Edição pendente · {self.proposal.path}\n{self.proposal.reason}"),
+            markup=False,
+        )
+        yield Button("Revisar diff", id=f"review-{self.proposal.id}", variant="primary")
+
+    def resolve(self, message: str):
+        self.query_one(Static).update(safe_preview(message))
+        self.query_one(Button).disabled = True
 
 
 class CodaroApp(App):
@@ -58,6 +128,7 @@ class CodaroApp(App):
         self.rendered_text = ""
         self.reply: Markdown | None = None
         self.context_chars = 0
+        self.proposal_cards: dict[str, ProposalCard] = {}
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -66,7 +137,12 @@ class CodaroApp(App):
                 yield Markdown(
                     "# Codaro\nExplore seu repositório com respostas apoiadas no código.\n\n"
                     "Pergunte **onde está uma validação** ou **como funciona um fluxo**.\n\n"
-                    "O chat envia a pergunta e os trechos consultados ao modelo configurado.",
+                    + (
+                        "Peça uma mudança para receber um **diff com aprovação**.\n\n"
+                        if self.agent.allow_edits
+                        else "Modo somente leitura.\n\n"
+                    )
+                    + "O chat envia a pergunta e os trechos consultados ao modelo configurado.",
                     classes="assistant",
                     open_links=False,
                 )
@@ -81,6 +157,7 @@ class CodaroApp(App):
         self.screen.set_class(self.size.width < 90, "narrow")
         self.query_one("#repository", Static).update(
             f"REPOSITÓRIO\n{self.agent.repository.root}\n\nMODELO\n{self.agent.provider.settings.model}"
+            f"\n\nEDIÇÃO\n{'Com aprovação' if self.agent.allow_edits else 'Somente leitura'}"
         )
         self.set_interval(0.08, self.flush_response)
         self.query_one(Input).focus()
@@ -100,6 +177,12 @@ class CodaroApp(App):
         question = event.value.strip()
         if not question or self.busy:
             return
+        if self.agent.edits.pending:
+            self.mount_message(
+                Static("Revise as edições pendentes antes de outra pergunta.", classes="notice")
+            )
+            return
+        self.proposal_cards.clear()
         self.busy = True
         self.cancelled.clear()
         self.response_text = self.rendered_text = ""
@@ -161,7 +244,13 @@ class CodaroApp(App):
         elif event.kind == "tool_end":
             duration = f"{event.elapsed_ms:.0f} ms" if event.elapsed_ms is not None else ""
             text = safe_preview(f"{event.title} · {duration}\n{event.detail}")
-            color = "red" if event.state == "error" else "green"
+            color = (
+                "red"
+                if event.state == "error"
+                else "yellow"
+                if event.state == "pending"
+                else "green"
+            )
             log = Text(event.title + " · " + duration, style=color)
             log.append("\n" + safe_preview(event.detail) + "\n", style="dim")
             self.query_one("#activity", RichLog).write(log)
@@ -207,20 +296,84 @@ class CodaroApp(App):
                 self.reply.remove()
                 self.reply = None
             self.mount_message(Static(safe_preview(answer), classes="notice", markup=False))
+        if successful:
+            for proposal in self.agent.edits.pending:
+                card = ProposalCard(proposal)
+                self.proposal_cards[proposal.id] = card
+                self.mount_message(card)
         self.busy = False
         prompt = self.query_one(Input)
         prompt.disabled = False
         prompt.focus()
-        self.query_one("#status", Static).update("Pronto · faça outra pergunta")
+        self.query_one("#status", Static).update(
+            "Aguardando revisão de edições"
+            if self.agent.edits.pending
+            else "Pronto · faça outra pergunta"
+        )
 
     def action_clear_chat(self):
-        if self.busy:
+        if self.busy or isinstance(self.screen, EditReview):
             return
+        for proposal in self.agent.edits.pending:
+            self.agent.edits.reject(proposal.id)
+        self.proposal_cards.clear()
         self.agent.turns.clear()
         self.response_text = self.rendered_text = ""
         self.reply = None
         self.query_one("#conversation", VerticalScroll).remove_children()
         self.query_one("#activity", RichLog).clear()
+        self.query_one("#status", Static).update("Pronto · conversa limpa")
+
+    def on_button_pressed(self, event: Button.Pressed):
+        identifier = (event.button.id or "").removeprefix("review-")
+        if self.busy or identifier not in self.proposal_cards:
+            return
+        proposal = self.proposal_cards[identifier].proposal
+        if proposal.state != "pending":
+            return
+        self.push_screen(
+            EditReview(proposal), lambda decision: self.review_decision(identifier, decision)
+        )
+
+    def review_decision(self, identifier: str, decision: str):
+        if decision == "reject":
+            self.agent.edits.reject(identifier)
+            self.resolve_edit(identifier, "Edição rejeitada; arquivo preservado.")
+        elif decision == "apply":
+            self.busy = True
+            self.query_one(Input).disabled = True
+            self.query_one("#status", Static).update("Verificando arquivo e aplicando edição…")
+            self.apply_edit(identifier)
+
+    @work(thread=True, exclusive=True, group="edits")
+    def apply_edit(self, identifier: str):
+        try:
+            self.agent.edits.apply(identifier)
+            message = "Edição aplicada. Testes não foram executados."
+        except (ValueError, OSError) as exc:
+            message = f"Edição bloqueada: {exc} Faça uma nova proposta sobre o arquivo atual."
+        except Exception:
+            logger.exception("Unexpected edit failure")
+            message = "Falha inesperada na aplicação. Confira o arquivo antes de continuar."
+        self.deliver(self.resolve_edit, identifier, message)
+
+    def resolve_edit(self, identifier: str, message: str):
+        card = self.proposal_cards[identifier]
+        card.resolve(f"{card.proposal.path} · {message}")
+        # Save the actual approval outcome alongside the answer for follow-up questions.
+        if self.agent.turns:
+            self.agent.turns[-1][-1]["content"] += (
+                f"\n\nResultado da revisão: {card.proposal.path}: {message}"
+            )
+        self.busy = False
+        prompt = self.query_one(Input)
+        prompt.disabled = False
+        prompt.focus()
+        self.query_one("#status", Static).update(
+            "Aguardando revisão de edições"
+            if self.agent.edits.pending
+            else "Pronto · faça outra pergunta"
+        )
 
     def action_cancel(self):
         if self.busy:

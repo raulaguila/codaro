@@ -188,3 +188,90 @@ def test_tool_cards_visible_on_narrow_terminal(tmp_path):
             assert app.screen.has_class("narrow")
 
     run_ui(scenario())
+
+
+class EditUIModel(UIModel):
+    def __init__(self):
+        super().__init__()
+        from test_agent import edit_responses
+
+        self.responses = iter(edit_responses())
+
+    def complete(self, messages, tools=None):
+        return next(self.responses)
+
+
+def test_chat_review_apply_and_reject(tmp_path):
+    from codaro.tui import EditReview
+
+    for decision in ("apply", "reject"):
+        path = tmp_path / "code.py"
+        path.write_text("x = 1\n")
+        agent = Agent(Repository(tmp_path), EditUIModel(), allow_edits=True)
+        app = CodaroApp(agent)
+
+        async def scenario(app=app, agent=agent, path=path, decision=decision):
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.press("o", "i", "enter")
+                await wait_ready(app, pilot)
+                await pilot.pause(0.1)
+                proposal = agent.edits.pending[0]
+                assert path.read_text() == "x = 1\n"
+                await pilot.click(f"#review-{proposal.id}")
+                assert isinstance(app.screen, EditReview)
+                assert app.screen.focused.id == "back-edit"
+                await pilot.click(f"#{decision}-edit")
+                await wait_ready(app, pilot)
+                assert proposal.state == ("applied" if decision == "apply" else "rejected")
+                assert path.read_text() == ("x = 2\n" if decision == "apply" else "x = 1\n")
+                assert not agent.edits.pending
+                assert app.proposal_cards[proposal.id].query_one("Button").disabled
+
+        run_ui(scenario())
+
+
+def test_chat_review_conflict_preserves_new_content(tmp_path):
+    path = tmp_path / "code.py"
+    path.write_text("x = 1\n")
+    agent = Agent(Repository(tmp_path), EditUIModel(), allow_edits=True)
+    app = CodaroApp(agent)
+
+    async def scenario():
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.press("o", "i", "enter")
+            await wait_ready(app, pilot)
+            await pilot.pause(0.1)
+            proposal = agent.edits.pending[0]
+            path.write_text("x = 99\n")
+            await pilot.click(f"#review-{proposal.id}")
+            await pilot.click("#apply-edit")
+            await wait_ready(app, pilot)
+            assert proposal.state == "conflict"
+            assert path.read_text() == "x = 99\n"
+            assert not app.query_one(Input).disabled
+
+    run_ui(scenario())
+
+
+def test_chat_review_enter_returns_and_clear_rejects(tmp_path):
+    path = tmp_path / "code.py"
+    path.write_text("x = 1\n")
+    agent = Agent(Repository(tmp_path), EditUIModel(), allow_edits=True)
+    app = CodaroApp(agent)
+
+    async def scenario():
+        async with app.run_test(size=(70, 30)) as pilot:
+            await pilot.press("o", "i", "enter")
+            await wait_ready(app, pilot)
+            await pilot.pause(0.1)
+            proposal = agent.edits.pending[0]
+            await pilot.click(f"#review-{proposal.id}")
+            await pilot.press("enter")
+            await pilot.pause()
+            assert agent.edits.pending
+            assert path.read_text() == "x = 1\n"
+            await pilot.press("ctrl+l")
+            assert proposal.state == "rejected"
+            assert not agent.edits.pending
+
+    run_ui(scenario())

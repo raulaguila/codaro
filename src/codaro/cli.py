@@ -11,6 +11,7 @@ from rich.console import Console
 from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
+from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
@@ -112,9 +113,21 @@ def read(
 
 @app.command()
 def ask(question: str, repo: Root = Path(".")):
-    """Investiga uma pergunta usando ferramentas e o modelo configurado."""
+    """Investiga uma pergunta usando ferramentas e o modelo configurado (somente leitura)."""
+    run_question(question, repo, allow_edits=False)
+
+
+@app.command()
+def edit(question: str, repo: Root = Path(".")):
+    """Propõe mudanças e solicita aprovação para cada diff antes de aplicar."""
+    run_question(question, repo, allow_edits=True)
+
+
+def run_question(question: str, repo: Path, *, allow_edits: bool):
     try:
-        agent = Agent(Repository(repo), OpenAICompatible(Settings.from_env()))
+        agent = Agent(
+            Repository(repo), OpenAICompatible(Settings.from_env()), allow_edits=allow_edits
+        )
         parts: list[str] = []
 
         def detail(event: AgentEvent):
@@ -138,17 +151,41 @@ def ask(question: str, repo: Root = Path(".")):
             except (ModelError, ValueError, OSError, sqlite3.Error):
                 live.update(Markdown("Resposta interrompida. Consulte o erro abaixo."))
                 raise
+        for proposal in agent.edits.pending:
+            console.print(Panel(Text(safe_preview(proposal.reason)), title=Text(proposal.path)))
+            console.print(Syntax(safe_preview(proposal.diff), "diff", word_wrap=True))
+            try:
+                approved = typer.confirm(f"Aplicar a edição em {proposal.path}?", default=False)
+            except (EOFError, typer.Abort):
+                agent.edits.reject(proposal.id)
+                errors.print("Revisão encerrada; edições pendentes não foram aplicadas.")
+                raise typer.Exit(1) from None
+            if approved:
+                agent.edits.apply(proposal.id)
+                console.print("Edição aplicada. Testes não foram executados.")
+            else:
+                agent.edits.reject(proposal.id)
+                console.print("Edição rejeitada; arquivo preservado.")
     except (ModelError, ValueError, OSError, sqlite3.Error) as exc:
         fail(exc)
 
 
 @app.command()
-def chat(repo: Root = Path(".")):
+def chat(
+    repo: Root = Path("."),
+    read_only: Annotated[
+        bool, typer.Option("--read-only", help="Desabilita propostas de edição.")
+    ] = False,
+):
     """Abre o chat interativo com painéis de conversa e atividade."""
     from codaro.tui import CodaroApp
 
     try:
-        CodaroApp(Agent(Repository(repo), OpenAICompatible(Settings.from_env()))).run()
+        CodaroApp(
+            Agent(
+                Repository(repo), OpenAICompatible(Settings.from_env()), allow_edits=not read_only
+            )
+        ).run()
     except (ValueError, OSError, sqlite3.Error) as exc:
         fail(exc)
 

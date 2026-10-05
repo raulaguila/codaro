@@ -2,7 +2,7 @@
 
 Assistente de IA no terminal para investigar repositórios locais, com fontes no código e recuperação progressiva de contexto.
 
-> MVP de investigação: busca, leitura e explicação. Edição de arquivos, execução de comandos, referências via LSP e interrupção imediata de conexões ociosas estão no roadmap.
+> Busca, leitura, explicação e edição de trechos com diff e aprovação. Execução de comandos, referências via LSP e interrupção imediata de conexões ociosas estão no roadmap.
 
 ## Instalação
 
@@ -60,6 +60,25 @@ O chat tem painéis de conversa, repositório/modelo e atividade; a lateral é o
 - O provedor usa SSE da API OpenAI-compatible. Se o servidor responder com JSON comum, a resposta é exibida de uma vez.
 - Uma resposta interrompida ou cancelada não é salva no histórico. O chat remove o bloco parcial e informa a interrupção.
 
+## Edição com revisão de diff
+
+```bash
+# Chat com propostas de edição habilitadas
+codaro chat --repo /caminho/do/projeto
+# Investigação sem ferramenta de edição
+codaro chat --read-only --repo /caminho/do/projeto
+# Uma solicitação de mudança, com revisão e confirmação no terminal
+codaro edit 'Adicione uma validação de entrada à função can_edit' --repo examples/demo
+```
+
+O agente deve ler o trecho atual e chamar `propose_edit` com o texto original exato, o novo texto e o motivo. A proposta fica na memória; o arquivo permanece intacto. No chat, **Revisar diff** abre o diff com destaque de sintaxe, motivo e ações **Aplicar**, **Rejeitar** e **Voltar**. A ação inicialmente focada é Voltar: Enter não aprova automaticamente. No comando `edit`, cada diff aparece antes da confirmação; a resposta padrão é **não**. `ask` continua somente leitura.
+
+- A aplicação verifica novamente as regras de ignore, o conteúdo original e a identidade do arquivo, e usa substituição atômica no mesmo diretório. Uma alteração concorrente detectada bloqueia a proposta; faça uma nova solicitação sobre o arquivo atual.
+- BOM UTF-8, finais de linha LF/CRLF e bits de permissão usuais são preservados. Arquivos binários, links simbólicos, hard links e caminhos proibidos são bloqueados. A aplicação requer POSIX com `dir_fd` e `O_NOFOLLOW`; plataformas sem esses recursos podem investigar, mas não aplicar.
+- Até oito propostas por resposta, uma por arquivo. Cada trecho original/novo tem até 3.000 caracteres; o diff tem até 60.000 caracteres. O trecho original deve ocorrer uma única vez e estar inteiramente em linhas lidas, sem truncamento.
+- Resolva as propostas antes de outra pergunta. Limpar o chat descarta as propostas pendentes. Uma resposta cancelada ou interrompida também descarta suas propostas.
+- Cada arquivo é aprovado e aplicado separadamente: não há transação entre arquivos, criação/exclusão de arquivos, execução de testes, undo automático ou persistência de propostas entre sessões. A escrita atômica evita arquivos parcialmente escritos; não impede toda corrida com um processo hostil que altera caminhos simultaneamente.
+
 ## API compatível com OpenAI
 
 ```bash
@@ -99,7 +118,7 @@ private/**
 customer_data.json
 ```
 
-Arquivos do repositório são tratados como dados pelo prompt do agente. Esta versão oferece somente ferramentas de leitura, com validação de argumentos no programa.
+Arquivos do repositório são tratados como dados pelo prompt do agente. As ferramentas de leitura e de proposta validam argumentos no programa. O modelo não recebe uma ferramenta de aplicação: a escrita depende da aprovação na interface.
 
 ## Desenvolvimento
 
@@ -109,7 +128,7 @@ ruff check .
 ruff format --check .
 ```
 
-Os testes verificam recuperação, atualização e migração do índice, rollback, restrições de arquivos, limites do agente, contratos HTTP, CLI e interação real com a interface Textual em modo headless. Os modelos e respostas HTTP são simulados; não há chamadas pagas ou acesso externo nos testes. O CI está configurado para Python 3.11, 3.12 e 3.13 em Linux. A auditoria local foi executada em Python 3.12.
+Os testes verificam recuperação, atualização e migração do índice, rollback, restrições de arquivos, limites do agente, contratos HTTP, CLI, propostas de edição, conflitos, aplicação atômica e interação real com a interface Textual em modo headless. Os modelos e respostas HTTP são simulados; não há chamadas pagas ou acesso externo nos testes. O CI está configurado para Python 3.11, 3.12 e 3.13 em Linux. A auditoria local foi executada em Python 3.12.
 
 Veja os achados e as limitações em [AUDIT.md](AUDIT.md).
 
@@ -120,7 +139,7 @@ Veja os achados e as limitações em [AUDIT.md](AUDIT.md).
 - Reranking quando houver ganho medido.
 - Definições e referências via LSP, com novos parsers Tree-sitter.
 - Interrupção imediata de conexões que estejam sem enviar fragmentos.
-- Edição por patches, revisão de diff e execução controlada de testes.
+- Execução controlada de testes, criação de arquivos e reversão de edições.
 
 
 ## Diagnóstico e recuperação

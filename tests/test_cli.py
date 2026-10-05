@@ -91,3 +91,44 @@ def test_ask_stream_renders_answer_and_tools_without_duplicate_output(tmp_path, 
     result = runner.invoke(app, ["ask", "Investigue.", "--repo", str(tmp_path)])
     assert result.exit_code == 0
     assert result.stdout.count("resposta final.") == 1
+
+
+def install_edit_model(monkeypatch):
+    from test_agent import edit_responses
+
+    responses = iter(edit_responses())
+
+    def stream(self, messages, tools=None, on_delta=None, cancelled=None):
+        response = next(responses)
+        if response.get("content"):
+            on_delta(response["content"])
+        return response
+
+    monkeypatch.setattr("codaro.cli.OpenAICompatible.stream", stream)
+
+
+def test_edit_cli_approval_applies_only_after_diff(tmp_path, monkeypatch):
+    (tmp_path / "code.py").write_text("x = 1\n")
+    install_edit_model(monkeypatch)
+    result = runner.invoke(app, ["edit", "Mude x.", "--repo", str(tmp_path)], input="y\n")
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "code.py").read_text() == "x = 2\n"
+    assert "-x = 1" in result.stdout and "+x = 2" in result.stdout
+    assert result.stdout.index("+x = 2") < result.stdout.index("Aplicar a edição")
+
+
+def test_edit_cli_default_rejects(tmp_path, monkeypatch):
+    (tmp_path / "code.py").write_text("x = 1\n")
+    install_edit_model(monkeypatch)
+    result = runner.invoke(app, ["edit", "Mude x.", "--repo", str(tmp_path)], input="\n")
+    assert result.exit_code == 0, result.output
+    assert "rejeitada" in result.stdout
+    assert (tmp_path / "code.py").read_text() == "x = 1\n"
+
+
+def test_edit_cli_eof_cannot_apply(tmp_path, monkeypatch):
+    (tmp_path / "code.py").write_text("x = 1\n")
+    install_edit_model(monkeypatch)
+    result = runner.invoke(app, ["edit", "Mude x.", "--repo", str(tmp_path)])
+    assert result.exit_code == 1
+    assert (tmp_path / "code.py").read_text() == "x = 1\n"
