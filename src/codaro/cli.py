@@ -14,14 +14,35 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
+from typer.core import TyperGroup
 
 from codaro.agent import Agent, AgentEvent
 from codaro.index import CodeIndex, safe_preview
 from codaro.provider import ModelError, OpenAICompatible, Settings
 from codaro.repository import Repository
 
+
+class CodaroGroup(TyperGroup):
+    def resolve_command(self, ctx, args: list[str]):
+        if args:
+            target = args[0]
+            explicit_path = (
+                target in {".", ".."} or "/" in target or "\\" in target or target.startswith("~")
+            )
+            if target not in self.commands and (
+                explicit_path or Path(target).expanduser().is_dir()
+            ):
+                return super().resolve_command(ctx, ["chat", "--repo", target, *args[1:]])
+        return super().resolve_command(ctx, args)
+
+
 app = typer.Typer(
-    help="Explore repositórios com busca local e um assistente de IA.", no_args_is_help=True
+    cls=CodaroGroup,
+    help="Explore repositórios com busca local e um assistente de IA.",
+    epilog=(
+        "Atalho: codaro . abre o chat no diretório atual. Use codaro CAMINHO para outro projeto."
+    ),
+    no_args_is_help=True,
 )
 console = Console()
 errors = Console(stderr=True)

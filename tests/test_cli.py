@@ -132,3 +132,53 @@ def test_edit_cli_eof_cannot_apply(tmp_path, monkeypatch):
     result = runner.invoke(app, ["edit", "Mude x.", "--repo", str(tmp_path)])
     assert result.exit_code == 1
     assert (tmp_path / "code.py").read_text() == "x = 1\n"
+
+
+def test_directory_shortcut_uses_terminal_working_directory(tmp_path, monkeypatch):
+    captured = []
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("codaro.tui.CodaroApp.run", lambda self: captured.append(self.agent))
+    result = runner.invoke(app, ["."])
+    assert result.exit_code == 0, result.output
+    assert captured[0].repository.root == tmp_path.resolve()
+    assert captured[0].allow_edits
+
+
+def test_directory_shortcut_accepts_other_paths_and_chat_options(tmp_path, monkeypatch):
+    captured = []
+    project = tmp_path / "projeto com espaços"
+    project.mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("codaro.tui.CodaroApp.run", lambda self: captured.append(self.agent))
+    for target in (project.name, "./" + project.name, str(project)):
+        result = runner.invoke(app, [target, "--read-only"])
+        assert result.exit_code == 0, result.output
+        assert captured[-1].repository.root == project.resolve()
+        assert not captured[-1].allow_edits
+
+
+def test_directory_shortcut_reports_missing_directory(tmp_path):
+    result = runner.invoke(app, [str(tmp_path / "missing")])
+    assert result.exit_code == 1
+    assert "Diretório inexistente" in result.stderr
+    assert "Traceback" not in result.output
+
+
+def test_command_names_take_precedence_over_directories(tmp_path, monkeypatch):
+    (tmp_path / "doctor").mkdir()
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 0
+    assert "Diagnóstico" in result.stdout
+
+
+def test_unknown_command_still_reports_typo():
+    result = runner.invoke(app, ["serach"])
+    assert result.exit_code == 2
+    assert "No such command" in result.output
+
+
+def test_directory_shortcut_help_does_not_launch_chat():
+    result = runner.invoke(app, [".", "--help"])
+    assert result.exit_code == 0
+    assert "--read-only" in result.stdout

@@ -46,7 +46,14 @@ export CODARO_MODEL=qwen2.5:7b
 
 codaro ask 'Como validamos o acesso antes de editar um projeto?' --repo examples/demo
 codaro chat --repo examples/demo
+
+# Dentro de qualquer projeto, abra o chat no diretório atual
+codaro .
+# Ou informe outro diretório
+codaro ./examples/demo
 ```
+
+`codaro .` equivale a `codaro chat --repo .`: o diretório de trabalho do terminal se torna a raiz do projeto. O atalho também aceita caminhos relativos/absolutos e opções do chat, por exemplo `codaro . --read-only`.
 
 O chat tem painéis de conversa, repositório/modelo e atividade; a lateral é ocultada em terminais menores que 90 colunas. `Ctrl+L` limpa a conversa, `Ctrl+X` solicita cancelamento e `Ctrl+Q` encerra. O cancelamento é verificado entre fragmentos da resposta e chamadas de ferramentas; se o servidor estiver parado sem enviar dados, aguarda o próximo fragmento ou o timeout. O histórico fica apenas na memória da sessão. O modelo deve suportar `tools` na API de chat completions; a confiabilidade das chamadas varia conforme modelo e servidor.
 
