@@ -1,0 +1,253 @@
+import json
+
+from codaro.agent import Agent
+from codaro.repository import Repository
+
+
+class FakeModel:
+    def __init__(self, responses):
+        self.responses = iter(responses)
+        self.requests = []
+
+    def complete(self, messages, tools=None):
+        self.requests.append((list(messages), tools))
+        return next(self.responses)
+
+
+def call(name, arguments, identifier="call-1"):
+    return {
+        "role": "assistant",
+        "content": None,
+        "tool_calls": [
+            {
+                "id": identifier,
+                "type": "function",
+                "function": {"name": name, "arguments": json.dumps(arguments)},
+            }
+        ],
+    }
+
+
+def test_agent_searches_then_reads_before_answering(tmp_path):
+    (tmp_path / "auth.py").write_text("def can_edit(user):\n    return user.is_admin\n")
+    model = FakeModel(
+        [
+            call("search_code", {"query": "can_edit"}),
+            call("read_symbol", {"path": "auth.py", "symbol": "can_edit"}, "call-2"),
+            {"role": "assistant", "content": "auth.py:2 verifica user.is_admin."},
+        ]
+    )
+    answer = Agent(Repository(tmp_path), model).ask("Quem pode editar?")
+    assert "auth.py:2" in answer
+    outputs = [message for message in model.requests[-1][0] if message["role"] == "tool"]
+    assert "return user.is_admin" in json.loads(outputs[-1]["content"])["content"]
+
+
+def test_agent_forces_final_response_after_step_limit(tmp_path):
+    model = FakeModel(
+        [
+            call("list_files", {}),
+            {"role": "assistant", "content": "Não há arquivos permitidos."},
+        ]
+    )
+    Agent(Repository(tmp_path), model, max_steps=1).ask("Quais arquivos existem?")
+    assert model.requests[-1][1] is None
+
+
+def test_invalid_tool_arguments_are_returned_as_errors(tmp_path):
+    model = FakeModel(
+        [
+            call("read_lines", {"path": "auth.py", "start": True, "end": 3}),
+            {"role": "assistant", "content": "Não foi possível ler."},
+        ]
+    )
+    Agent(Repository(tmp_path), model).ask("Leia o código.")
+    tool_result = next(item for item in model.requests[-1][0] if item["role"] == "tool")
+    assert "inteiro" in json.loads(tool_result["content"])["error"]
+
+
+def test_malformed_model_message_is_a_controlled_error(tmp_path):
+    import pytest
+
+    from codaro.provider import ModelError
+
+    with pytest.raises(ModelError):
+        Agent(Repository(tmp_path), FakeModel([{"content": []}])).ask("Investigue.")
+
+
+def test_repeated_reads_do_not_repeat_source(tmp_path):
+    (tmp_path / "x.py").write_text("def f(): return True")
+    model = FakeModel(
+        [
+            call("read_lines", {"path": "x.py", "start": 1, "end": 1}),
+            call("read_lines", {"path": "x.py", "start": 1, "end": 1}, "call-2"),
+            {"content": "x.py:1 retorna True."},
+        ]
+    )
+    Agent(Repository(tmp_path), model).ask("Leia f.")
+    outputs = [item for item in model.requests[-1][0] if item["role"] == "tool"]
+    assert json.loads(outputs[1]["content"])["already_read"]
+    assert "return True" not in outputs[1]["content"]
+
+
+def test_bad_tool_json_does_not_break_agent(tmp_path):
+    for arguments in ["{invalid", "[]", "null"]:
+        tool = call("list_files", {})
+        tool["tool_calls"][0]["function"]["arguments"] = arguments
+        model = FakeModel([tool, {"content": "Não foi possível investigar."}])
+        Agent(Repository(tmp_path), model).ask("Liste.")
+        output = next(item for item in model.requests[-1][0] if item["role"] == "tool")
+        assert "error" in json.loads(output["content"])
+
+
+def test_failed_requests_can_be_retried(tmp_path):
+    model = FakeModel(
+        [
+            call("read_lines", {"path": "missing.py", "start": 1, "end": 1}),
+            call("read_lines", {"path": "missing.py", "start": 1, "end": 1}, "call-2"),
+            {"content": "Arquivo inexistente."},
+        ]
+    )
+    Agent(Repository(tmp_path), model).ask("Leia.")
+    outputs = [item for item in model.requests[-1][0] if item["role"] == "tool"]
+    assert all("error" in json.loads(item["content"]) for item in outputs)
+
+
+def test_history_keeps_answers_without_tool_payloads(tmp_path):
+    (tmp_path / "x.py").write_text("def f(): return True")
+    model = FakeModel(
+        [
+            call("read_lines", {"path": "x.py", "start": 1, "end": 1}),
+            {"content": "Primeira resposta."},
+            {"content": "Segunda resposta."},
+        ]
+    )
+    agent = Agent(Repository(tmp_path), model)
+    agent.ask("Leia f.")
+    agent.ask("Explique mais.")
+    assert not any(item["role"] == "tool" for item in model.requests[-1][0])
+    assert "Primeira resposta." in json.dumps(model.requests[-1][0])
+
+
+def test_tool_output_budget_includes_escaping(tmp_path):
+    (tmp_path / "x.py").write_text("x = " + '"\\' * 4000)
+    model = FakeModel(
+        [
+            call("read_lines", {"path": "x.py", "start": 1, "end": 1}),
+            {"content": "Leitura parcial."},
+        ]
+    )
+    Agent(Repository(tmp_path), model, tool_budget=1024).ask("Leia x.")
+    output = next(item for item in model.requests[-1][0] if item["role"] == "tool")
+    assert len(output["content"]) <= 1024
+    assert json.loads(output["content"])["truncated"]
+
+
+def test_context_budget_evicts_complete_turns(tmp_path):
+    from codaro.agent import serialize
+
+    model = FakeModel([{"content": "Nova resposta."}])
+    agent = Agent(Repository(tmp_path), model, history_budget=100_000, context_budget=12_000)
+    agent.turns = [
+        [{"role": "user", "content": "old"}, {"role": "assistant", "content": "x" * 11_000}]
+    ]
+    agent.ask("Pergunta nova.")
+    messages, tools = model.requests[0]
+    assert len(serialize({"messages": messages, "tools": tools})) <= 12_000
+    assert not any(item["content"] == "old" for item in messages)
+
+
+def test_cancellation_prevents_model_call(tmp_path):
+    import threading
+
+    import pytest
+
+    from codaro.agent import InvestigationCancelled
+
+    cancelled = threading.Event()
+    cancelled.set()
+    model = FakeModel([])
+    with pytest.raises(InvestigationCancelled):
+        Agent(Repository(tmp_path), model).ask("Investigue.", cancelled=cancelled)
+    assert not model.requests
+
+
+def test_cancellation_after_response_does_not_save_history(tmp_path):
+    import threading
+
+    import pytest
+
+    from codaro.agent import InvestigationCancelled
+
+    cancelled = threading.Event()
+
+    class CancellingModel:
+        def complete(self, messages, tools=None):
+            cancelled.set()
+            return {"content": "Resposta."}
+
+    agent = Agent(Repository(tmp_path), CancellingModel())
+    with pytest.raises(InvestigationCancelled):
+        agent.ask("Investigue.", cancelled=cancelled)
+    assert not agent.turns
+
+
+def test_concurrent_investigation_is_rejected(tmp_path):
+    import pytest
+
+    agent = Agent(Repository(tmp_path), FakeModel([]))
+    agent._lock.acquire()
+    try:
+        with pytest.raises(ValueError, match="andamento"):
+            agent.ask("Investigue.")
+    finally:
+        agent._lock.release()
+
+
+def test_repeated_read_refreshes_changed_file(tmp_path):
+    source = tmp_path / "x.py"
+    source.write_text("x = 1")
+
+    class EditingModel(FakeModel):
+        def complete(self, messages, tools=None):
+            if len(self.requests) == 1:
+                source.write_text("x = 2")
+            return super().complete(messages, tools)
+
+    model = EditingModel(
+        [
+            call("read_lines", {"path": "x.py", "start": 1, "end": 1}),
+            call("read_lines", {"path": "x.py", "start": 1, "end": 1}, "call-2"),
+            {"content": "O arquivo mudou."},
+        ]
+    )
+    Agent(Repository(tmp_path), model).ask("Leia x.")
+    results = [item for item in model.requests[-1][0] if item["role"] == "tool"]
+    assert "x = 2" in json.loads(results[-1]["content"])["content"]
+
+
+def test_context_budget_never_sends_oversized_batch(tmp_path):
+    import pytest
+
+    from codaro.agent import serialize
+    from codaro.provider import ModelError
+
+    # A model returning oversized tool-call batches is rejected before another request.
+    batch = {"role": "assistant", "content": None, "tool_calls": []}
+    for number in range(8):
+        batch["tool_calls"].append(
+            call("search_code", {"query": "x" * 4000}, str(number))["tool_calls"][0]
+        )
+    model = FakeModel([batch])
+    with pytest.raises(ModelError, match="Lote"):
+        Agent(Repository(tmp_path), model, context_budget=12_000).ask("Busque.")
+    assert all(len(serialize({"messages": m, "tools": t})) <= 12_000 for m, t in model.requests)
+
+
+def test_deeply_nested_tool_arguments_are_returned_as_error(tmp_path):
+    malformed = call("list_files", {})
+    malformed["tool_calls"][0]["function"]["arguments"] = "[" * 1500 + "]" * 1500
+    model = FakeModel([malformed, {"content": "Argumentos inválidos."}])
+    Agent(Repository(tmp_path), model).ask("Liste.")
+    output = next(item for item in model.requests[-1][0] if item["role"] == "tool")
+    assert "error" in json.loads(output["content"])
