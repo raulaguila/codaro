@@ -57,7 +57,7 @@ codaro ./examples/demo
 
 O agente recebe a raiz absoluta do projeto em cada consulta e pode confirmá-la com `get_repository_info`. No chat, `/pwd` mostra essa raiz diretamente, sem chamar o modelo; no terminal, use `codaro pwd --repo /caminho/do/projeto`. A pasta de instalação do Codaro não define a pasta explorada.
 
-O chat tem painéis de conversa, repositório/modelo e atividade; a lateral é ocultada em terminais menores que 90 colunas. `Ctrl+B` alterna a lateral, `Ctrl+L` limpa a conversa, `Ctrl+X` solicita cancelamento e `Ctrl+Q` encerra. O cancelamento é verificado entre fragmentos da resposta e chamadas de ferramentas; se o servidor estiver parado sem enviar dados, aguarda o próximo fragmento ou o timeout. O histórico fica apenas na memória da sessão. O modelo deve suportar `tools` na API de chat completions; a confiabilidade das chamadas varia conforme modelo e servidor.
+O chat tem painéis de conversa, repositório/modelo e atividade; a lateral é ocultada em terminais menores que 90 colunas. `Ctrl+B` alterna a lateral, `Ctrl+L` limpa a conversa, `Ctrl+X` solicita cancelamento e `Ctrl+Q` encerra. O cancelamento é verificado entre fragmentos da resposta e chamadas de ferramentas; se o servidor estiver parado sem enviar dados, aguarda o próximo fragmento ou o timeout. O histórico usado na conversa fica na memória da sessão; o fluxo da última investigação também é registrado em `.codaro/prompt.json` para diagnóstico. O modelo deve suportar `tools` na API de chat completions; a confiabilidade das chamadas varia conforme modelo e servidor.
 
 ## Interface e streaming
 
@@ -129,7 +129,33 @@ codaro doctor --check-tools
 codaro doctor --check-tools --tls-insecure
 ```
 
-Esse diagnóstico faz uma chamada real ao provedor, pede uma ferramenta de teste sem argumentos e verifica a resposta estruturada; nenhuma ferramenta de arquivo é executada. Um resultado positivo confirma essa chamada, não garante a qualidade de toda investigação. `codaro doctor` sem a flag continua sem chamar a API.
+Esse diagnóstico faz duas chamadas reais ao provedor: pede uma ferramenta de teste sem argumentos, devolve um resultado com um identificador aleatório usando `role: tool` e verifica se a resposta final contém esse identificador. A segunda chamada usa o caminho de streaming, incluindo o fallback JSON. Nenhuma ferramenta de arquivo é executada. Um resultado positivo confirma esse ciclo, não garante a qualidade de toda investigação. `codaro doctor` sem a flag continua sem chamar a API.
+
+Resultados de ferramentas incluem `name` e o `tool_call_id`, inclusive nos casos de erro. Um erro em qualquer ferramenta do lote mantém a recuperação de protocolo ativa. Respostas com `function_call` legado ou conclusão `tool_calls` sem chamadas são rejeitadas explicitamente.
+
+## JSON da última investigação
+
+O registro fica **sempre ativo**, sem flag: cada pergunta em `ask`, `edit` ou no chat grava `.codaro/prompt.json` **na raiz do projeto selecionado**, independentemente da pasta de instalação. O arquivo substitui o fluxo anterior e tem um `run_id` único.
+
+- Metadados: pasta, modelo, endpoint, modo, configuração TLS, limites, pergunta, timestamps, duração e status (`running`, `success`, `error` ou `cancelled`).
+- `turns`: todas as requisições com mensagens e schemas de ferramentas, orçamento de contexto, resposta estruturada, resultado de cada ferramenta, argumentos normalizados e duração.
+- `http_attempts`: tentativas HTTP, status, corpo JSON original ou eventos SSE recebidos, motivo de conclusão e consumo de tokens quando informado pelo servidor. Respostas inválidas e reasoning separado também ficam disponíveis no dump para diagnóstico.
+- `events`: atividade do agente; `final_answer` nas conclusões bem-sucedidas e `error` nas falhas/cancelamentos. Uma resposta parcial não vira uma resposta concluída no histórico.
+
+```bash
+# Execute na pasta que você abriu com codaro .
+python -m json.tool .codaro/prompt.json
+# Resumo, se tiver jq instalado
+jq '{run_id, model, status, duration_ms, error}' .codaro/prompt.json
+# Chamadas e resultados, preservando o vínculo por ID
+jq '.turns[] | {iteration, outcome, calls: .response.tool_calls, results: .tool_results}' .codaro/prompt.json
+```
+
+A gravação usa arquivo temporário e substituição atômica, com permissão `0600` em POSIX; links simbólicos e hard links no destino são bloqueados. Há checkpoints antes das requisições e após respostas/ferramentas, além da finalização em sucesso, erro ou cancelamento. Uma interrupção forçada do processo pode deixar o último checkpoint com status `running`. Em sessões simultâneas na mesma pasta, o arquivo corresponde à última gravação; confira `run_id` e a pergunta.
+
+Cabeçalhos de autorização não são registrados e a chave configurada é mascarada, incluindo formas escapadas em JSON. **O arquivo contém perguntas, histórico e código consultado**: a remoção da chave do provedor não remove outros segredos presentes nesses conteúdos. `.codaro` fica fora das buscas do agente e já está no `.gitignore` deste projeto; adicione `.codaro/` ao `.gitignore` de outros projetos em que usar o Codaro. Corpos HTTP de erro ficam limitados a 64 KB; os limites normais de respostas e streaming continuam valendo. Falhas de gravação geram aviso e preservam o resultado ou erro original da investigação.
+
+O formato segue o fluxo de diagnóstico do Thoth: requisições e respostas por iteração, resultados de ferramentas e fechamento atômico. No Thoth, planejamento usa chamadas sem streaming e a síntese tem uma etapa própria; o Codaro continua aceitando chamadas estruturadas durante SSE, com o mesmo contrato de mensagens no modo JSON e no streaming. O payload agora é construído pela mesma função usada para calcular o orçamento e registrar a requisição, evitando divergências entre essas representações.
 
 ## Como a recuperação funciona
 

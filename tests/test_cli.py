@@ -272,4 +272,4 @@ def test_doctor_tool_probe_is_explicit_and_supports_tls_flag(monkeypatch):
     result = runner.invoke(app, ["doctor", "--check-tools", "--tls-insecure"])
     assert result.exit_code == 0, result.output
     assert captured == [True]
-    assert "confirmada nesta chamada" in result.stdout
+    assert "resultado e resposta final confirmados" in result.stdout

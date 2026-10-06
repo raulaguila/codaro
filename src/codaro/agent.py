@@ -2,16 +2,24 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 from codaro.edits import EditManager
 from codaro.index import CodeIndex
-from codaro.provider import ModelError, OpenAICompatible, RequestCancelled, validate_message
+from codaro.provider import (
+    ModelError,
+    OpenAICompatible,
+    RequestCancelled,
+    build_payload,
+    validate_message,
+)
 from codaro.repository import Repository
+from codaro.trace import PromptFlow, current_flow
 
 SYSTEM = """Você é Codaro, um assistente de investigação de código. Responda em português,
 salvo pedido em outro idioma. Use ferramentas para investigar e cite caminho:linha nas conclusões.
@@ -296,22 +304,50 @@ class Agent:
         if self.edits.pending:
             self._lock.release()
             raise ValueError("Revise as propostas pendentes antes de iniciar outra pergunta.")
+        flow = PromptFlow(
+            self.repository.root,
+            question,
+            getattr(self.provider, "settings", None),
+            allow_edits=self.allow_edits,
+            limits={
+                "max_steps": self.max_steps,
+                "tool_budget": self.tool_budget,
+                "history_budget": self.history_budget,
+                "context_budget": self.context_budget,
+            },
+        )
+        token = current_flow.set(flow)
+
+        def record_detail(item: AgentEvent):
+            flow.data["events"].append(asdict(item))
+            if on_detail is not None:
+                on_detail(item)
+
         try:
             self.edits.observed.clear()
             self.edits.proposals.clear()
-            return self._ask(
+            answer = self._ask(
                 question,
                 on_event or (lambda _: None),
                 cancelled,
                 on_delta,
-                on_detail or (lambda _: None),
+                record_detail,
             )
-        except Exception:
+            flow.finish("success", answer=answer)
+            return answer
+        except BaseException as exc:
+            flow.finish(
+                "cancelled" if isinstance(exc, (RequestCancelled, KeyboardInterrupt)) else "error",
+                error=exc,
+            )
             for proposal in self.edits.pending:
                 self.edits.reject(proposal.id)
             raise
         finally:
+            current_flow.reset(token)
             self._lock.release()
+            if flow.write_error:
+                logging.getLogger(__name__).warning(flow.write_error)
 
     def _ask(
         self,
@@ -361,19 +397,15 @@ class Agent:
                     ]
                     if final:
                         messages.append({"role": "system", "content": FINAL_INSTRUCTION})
-                    payload = {
-                        "model": getattr(getattr(self.provider, "settings", None), "model", ""),
-                        "messages": messages,
-                        "temperature": 0.1,
-                        "max_tokens": 1400,
-                    }
-                    if tools:
-                        payload.update(tools=tools, tool_choice="auto")
                     streaming = on_delta is not None and callable(
                         getattr(self.provider, "stream", None)
                     )
-                    if streaming:
-                        payload["stream"] = True
+                    payload = build_payload(
+                        getattr(getattr(self.provider, "settings", None), "model", ""),
+                        messages,
+                        tools,
+                        streaming=streaming,
+                    )
                     size = len(serialize(payload))
                     if size <= self.context_budget:
                         break
@@ -385,10 +417,15 @@ class Agent:
                         )
                 event("Consultando modelo…")
                 detail(AgentEvent("model_start", "Consultando modelo", context_chars=size))
+                flow = current_flow.get()
+                if flow is not None:
+                    flow.add_turn(payload, {"context_chars": size, "tool_chars_used": used})
                 if streaming:
                     message = self.provider.stream(messages, tools, on_delta, cancelled)
                 else:
                     message = self.provider.complete(messages, tools)
+                if flow is not None:
+                    flow.response(message)
                 message = validate_message(message)
                 check_cancelled()
                 if not streaming and on_delta is not None and message.get("content"):
@@ -397,6 +434,10 @@ class Agent:
                 text_call = not calls and textual_tool_call(
                     message.get("content") or "", after_error=tool_error
                 )
+                if flow is not None and flow.turn is not None:
+                    flow.turn["outcome"] = (
+                        "tools" if calls else "protocol_repair" if text_call else "answer"
+                    )
                 detail(
                     AgentEvent(
                         "model_end",
@@ -447,6 +488,7 @@ class Agent:
                 if len(serialize(message)) > 16_000:
                     raise ModelError("Lote de ferramentas excede o limite de contexto permitido.")
                 turn.append(message)
+                tool_error = False
                 for call in calls:
                     check_cancelled()
                     function = call["function"]
@@ -456,6 +498,7 @@ class Agent:
                     started = time.monotonic()
                     title = TOOL_TITLES.get(name, name)
                     target = ""
+                    arguments = None
                     try:
                         arguments = json.loads(function["arguments"])
                         if not isinstance(arguments, dict):
@@ -510,7 +553,7 @@ class Agent:
                         # No extra bytes are charged to the payload budget after exhaustion.
                         output = ""
                     used += len(output)
-                    tool_error = "error" in result
+                    tool_error = tool_error or "error" in result
                     state, outcome = tool_outcome(result)
                     detail(
                         AgentEvent(
@@ -521,7 +564,20 @@ class Agent:
                             (time.monotonic() - started) * 1000,
                         )
                     )
-                    turn.append({"role": "tool", "tool_call_id": call["id"], "content": output})
+                    tool_message = {
+                        "role": "tool",
+                        "tool_call_id": call["id"],
+                        "name": name,
+                        "content": output,
+                    }
+                    turn.append(tool_message)
+                    if flow is not None:
+                        flow.tool_result(
+                            tool_message,
+                            arguments,
+                            result,
+                            (time.monotonic() - started) * 1000,
+                        )
             raise ModelError("O agente excedeu o limite de etapas.")
 
     @staticmethod

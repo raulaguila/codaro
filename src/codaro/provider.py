@@ -5,15 +5,38 @@ import json
 import os
 import threading
 import time
+import uuid
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
 import httpx
 
+from codaro.trace import current_flow
+
 MAX_RESPONSE_BYTES = 256_000
 MAX_MESSAGE_CHARS = 16_000
 MAX_STREAM_BYTES = 2_000_000
+
+
+def build_payload(model: str, messages: list[dict], tools: list[dict] | None, *, streaming=False):
+    """One wire format for requests, context accounting and debug dumps."""
+    payload = {"model": model, "messages": messages, "temperature": 0.1, "max_tokens": 1400}
+    if tools:
+        payload.update(tools=tools, tool_choice="auto")
+    if streaming:
+        payload["stream"] = True
+    return payload
+
+
+def capture_wire(kind: str, value):
+    flow = current_flow.get()
+    if flow is not None and flow.turn is not None and flow.turn["http_attempts"]:
+        attempt = flow.turn["http_attempts"][-1]
+        if kind == "sse":
+            attempt.setdefault("sse_events", []).append(value)
+        else:
+            attempt[kind] = value
 
 
 class ModelError(RuntimeError):
@@ -95,6 +118,10 @@ class Settings:
 def validate_message(message: object) -> dict:
     if not isinstance(message, dict) or message.get("role", "assistant") != "assistant":
         raise ModelError("Resposta incompatível: mensagem de assistente inválida.")
+    if message.get("function_call") is not None:
+        raise ModelError(
+            "O servidor retornou function_call legado; configure o protocolo tool_calls."
+        )
     content = message.get("content")
     if content is not None and (not isinstance(content, str) or len(content) > MAX_MESSAGE_CHARS):
         raise ModelError("Resposta textual inválida ou maior que o limite permitido.")
@@ -168,15 +195,16 @@ class OpenAICompatible:
                 },
             },
         }
-        message = self._request(
-            [
-                {
-                    "role": "user",
-                    "content": "Chame codaro_probe sem argumentos via tool_calls.",
-                }
-            ],
-            [probe],
-        )
+        messages = [
+            {
+                "role": "user",
+                "content": (
+                    "Chame codaro_probe sem argumentos via tool_calls. Depois de receber "
+                    "o resultado, responda somente com o valor de probe_result."
+                ),
+            }
+        ]
+        message = self._request(messages, [probe])
         calls = message.get("tool_calls") or []
         try:
             valid = (
@@ -191,6 +219,24 @@ class OpenAICompatible:
                 "O modelo/servidor não retornou tool_calls válidos no diagnóstico. "
                 "Escolha um modelo com ferramentas e confira o template do servidor."
             )
+        marker = "codaro_probe_ok_" + uuid.uuid4().hex
+        messages.extend(
+            [
+                message,
+                {
+                    "role": "tool",
+                    "name": "codaro_probe",
+                    "tool_call_id": calls[0]["id"],
+                    "content": json.dumps({"probe_result": marker}),
+                },
+            ]
+        )
+        answer = self.stream(messages)
+        if answer.get("tool_calls") or marker not in (answer.get("content") or ""):
+            raise ModelError(
+                "O modelo chamou a ferramenta, mas não concluiu o ciclo com o resultado. "
+                "Confira o suporte a role: tool e o template do servidor."
+            )
 
     def _request(
         self,
@@ -199,16 +245,9 @@ class OpenAICompatible:
         on_delta: Callable[[str], None] | None = None,
         cancelled: threading.Event | None = None,
     ) -> dict:
-        payload = {
-            "model": self.settings.model,
-            "messages": messages,
-            "temperature": 0.1,
-            "max_tokens": 1400,
-        }
-        if tools:
-            payload.update(tools=tools, tool_choice="auto")
-        if on_delta is not None:
-            payload["stream"] = True
+        payload = build_payload(
+            self.settings.model, messages, tools, streaming=on_delta is not None
+        )
         headers = {"Content-Type": "application/json"}
         if self.settings.api_key:
             headers["Authorization"] = f"Bearer {self.settings.api_key}"
@@ -220,13 +259,26 @@ class OpenAICompatible:
             ) as client:
                 for attempt in range(3):
                     check_cancelled(cancelled)
+                    flow = current_flow.get()
+                    if flow is not None and flow.turn is not None:
+                        flow.turn["http_attempts"].append({"attempt": attempt + 1})
                     with client.stream(
                         "POST",
                         f"{self.settings.base_url.rstrip('/')}/chat/completions",
                         headers=headers,
                         json=payload,
                     ) as response:
+                        capture_wire("status_code", response.status_code)
                         check_cancelled(cancelled)
+                        if response.is_error:
+                            # Keep a bounded body for local diagnosis; never expose it in the UI.
+                            raw_error = bytearray()
+                            for part in response.iter_bytes():
+                                check_cancelled(cancelled)
+                                raw_error.extend(part[: max(0, 64_000 - len(raw_error))])
+                                if len(raw_error) >= 64_000:
+                                    break
+                            capture_wire("error_body", raw_error.decode("utf-8", errors="replace"))
                         if response.status_code in {429, 502, 503, 504} and attempt < 2:
                             if cancelled is None:
                                 time.sleep(0.25 * 2**attempt)
@@ -264,17 +316,29 @@ class OpenAICompatible:
     @staticmethod
     def _read_json(response: httpx.Response, cancelled: threading.Event | None) -> dict:
         raw = bytearray()
-        for part in response.iter_bytes():
-            check_cancelled(cancelled)
-            raw.extend(part)
-            if len(raw) > MAX_RESPONSE_BYTES:
-                raise ModelError("Resposta da API excede o limite de 256 KB.")
+        try:
+            for part in response.iter_bytes():
+                check_cancelled(cancelled)
+                raw.extend(part)
+                if len(raw) > MAX_RESPONSE_BYTES:
+                    raise ModelError("Resposta da API excede o limite de 256 KB.")
+        finally:
+            capture_wire(
+                "response_body", raw[:MAX_RESPONSE_BYTES].decode("utf-8", errors="replace")
+            )
         data = json.loads(raw)
         choices = data["choices"]
         if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
             raise ValueError("invalid choices")
+        capture_wire("finish_reason", choices[0].get("finish_reason"))
+        capture_wire("usage", data.get("usage"))
         check_finish_reason(choices[0].get("finish_reason"))
-        return validate_message(choices[0]["message"])
+        message = validate_message(choices[0]["message"])
+        if choices[0].get("finish_reason") == "tool_calls" and not message.get("tool_calls"):
+            raise ModelError(
+                "O servidor finalizou com tool_calls sem enviar chamadas de ferramentas."
+            )
+        return message
 
     @staticmethod
     def _read_stream(
@@ -287,6 +351,7 @@ class OpenAICompatible:
         finished = False
         event_count = 0
         for data in sse_events(response, cancelled):
+            capture_wire("sse", data)
             check_cancelled(cancelled)
             event_count += 1
             if event_count > 10_000:
@@ -297,6 +362,8 @@ class OpenAICompatible:
             event = json.loads(data)
             if not isinstance(event, dict) or "error" in event:
                 raise ModelError("O servidor interrompeu o stream com uma resposta inválida.")
+            if "usage" in event:
+                capture_wire("usage", event["usage"])
             choices = event.get("choices")
             if choices == []:
                 continue  # Some servers send a final usage-only event.
@@ -356,7 +423,12 @@ class OpenAICompatible:
                             raise ModelError("Argumentos de ferramenta excedem o limite permitido.")
             reason = choice.get("finish_reason")
             if reason is not None:
+                capture_wire("finish_reason", reason)
                 check_finish_reason(reason)
+                if reason == "tool_calls" and not calls:
+                    raise ModelError(
+                        "O servidor finalizou com tool_calls sem enviar chamadas de ferramentas."
+                    )
                 finished = True
         if not finished:
             raise ModelError("Conexão interrompida antes de concluir a resposta.")
@@ -381,7 +453,11 @@ def check_finish_reason(reason: str | None):
         raise ModelError("O modelo atingiu o limite de saída. Faça uma pergunta menor.")
     if reason == "content_filter":
         raise ModelError("O provedor interrompeu a geração da resposta.")
-    if reason not in {None, "stop", "tool_calls", "function_call"}:
+    if reason == "function_call":
+        raise ModelError(
+            "O servidor retornou function_call legado; configure o protocolo tool_calls."
+        )
+    if reason not in {None, "stop", "tool_calls"}:
         raise ModelError("Motivo de conclusão incompatível com a API.")
 
 

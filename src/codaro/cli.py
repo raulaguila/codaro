@@ -280,7 +280,9 @@ def doctor(
         try:
             with console.status("Verificando protocolo de ferramentas…"):
                 OpenAICompatible(settings).check_tool_calling()
-            console.print("Tool-calling: resposta estruturada confirmada nesta chamada.")
+            console.print(
+                "Tool-calling: chamada estruturada, resultado e resposta final confirmados."
+            )
         except (ModelError, ValueError, OSError) as exc:
             fail(exc)
 

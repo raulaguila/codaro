@@ -216,6 +216,13 @@ def test_invalid_tls_values_are_rejected(monkeypatch):
 def test_tool_calling_probe_checks_structured_protocol():
     def handle(request):
         payload = json.loads(request.content)
+        if payload.get("stream"):
+            assert "tools" not in payload
+            message = payload["messages"][-1]
+            assert message["role"] == "tool"
+            assert message["tool_call_id"] == "probe"
+            marker = json.loads(message["content"])["probe_result"]
+            return httpx.Response(200, json=result({"content": marker}))
         assert payload["tool_choice"] == "auto"
         assert payload["tools"][0]["function"]["name"] == "codaro_probe"
         return httpx.Response(
@@ -245,3 +252,43 @@ def test_tool_calling_probe_rejects_json_written_as_text():
     )
     with pytest.raises(ModelError, match="tool_calls válidos"):
         model.check_tool_calling()
+
+
+def test_tool_probe_rejects_model_ignoring_tool_result():
+    def handle(request):
+        payload = json.loads(request.content)
+        if payload.get("stream"):
+            return httpx.Response(200, json=result({"content": "Vou chamar a ferramenta."}))
+        return httpx.Response(
+            200,
+            json=result(
+                {
+                    "tool_calls": [
+                        {
+                            "id": "probe",
+                            "type": "function",
+                            "function": {"name": "codaro_probe", "arguments": "{}"},
+                        }
+                    ]
+                }
+            ),
+        )
+
+    with pytest.raises(ModelError, match="não concluiu o ciclo"):
+        provider(handle).check_tool_calling()
+
+
+@pytest.mark.parametrize(
+    "message,reason",
+    [
+        (None, "tool_calls"),
+        ({"content": "Vou chamar uma ferramenta."}, "tool_calls"),
+        ({"content": "Olá", "function_call": {"name": "list_files", "arguments": "{}"}}, "stop"),
+        ({"content": "Olá"}, "function_call"),
+    ],
+)
+def test_missing_or_legacy_tool_protocol_is_not_accepted_as_an_answer(message, reason):
+    with pytest.raises(ModelError):
+        provider(
+            lambda _: httpx.Response(200, json=result(message, finish_reason=reason))
+        ).complete([])
