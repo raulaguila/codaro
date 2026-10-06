@@ -38,7 +38,7 @@ class UIModel:
     def complete(self, messages, tools=None):
         self.started.set()
         if self.blocked:
-            self.release.wait(3)
+            self.release.wait(10)
         if self.failure:
             self.failure = False
             raise ModelError("API indisponível.")
@@ -96,15 +96,13 @@ def test_chat_cancel_discards_inflight_response(tmp_path):
             await pilot.press("o", "i", "enter")
             # Submission starts a worker; indexing/debug writes precede the model call.
             # Synchronize on the call instead of assuming Enter has started it already.
-            for _ in range(100):
-                if model.started.is_set():
-                    break
-                await pilot.pause(0.01)
-            assert app.busy
-            assert model.started.is_set()
-            await pilot.press("ctrl+x")
-            assert app.cancelled.is_set()
-            model.release.set()
+            try:
+                assert await asyncio.to_thread(model.started.wait, 10)
+                assert app.busy
+                await pilot.press("ctrl+x")
+                assert app.cancelled.is_set()
+            finally:
+                model.release.set()
             await wait_ready(app, pilot)
             assert not agent.turns
             assert not app.query_one(Prompt).disabled
