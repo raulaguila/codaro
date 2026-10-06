@@ -155,7 +155,21 @@ A gravação usa arquivo temporário e substituição atômica, com permissão `
 
 Cabeçalhos de autorização não são registrados e a chave configurada é mascarada, incluindo formas escapadas em JSON. **O arquivo contém perguntas, histórico e código consultado**: a remoção da chave do provedor não remove outros segredos presentes nesses conteúdos. `.codaro` fica fora das buscas do agente e já está no `.gitignore` deste projeto; adicione `.codaro/` ao `.gitignore` de outros projetos em que usar o Codaro. Corpos HTTP de erro ficam limitados a 64 KB; os limites normais de respostas e streaming continuam valendo. Falhas de gravação geram aviso e preservam o resultado ou erro original da investigação.
 
-O formato segue o fluxo de diagnóstico do Thoth: requisições e respostas por iteração, resultados de ferramentas e fechamento atômico. No Thoth, planejamento usa chamadas sem streaming e a síntese tem uma etapa própria; o Codaro continua aceitando chamadas estruturadas durante SSE, com o mesmo contrato de mensagens no modo JSON e no streaming. O payload agora é construído pela mesma função usada para calcular o orçamento e registrar a requisição, evitando divergências entre essas representações.
+O formato segue o fluxo de diagnóstico do Thoth: requisições e respostas por iteração, resultados de ferramentas e fechamento atômico. No Thoth, planejamento usa chamadas sem streaming e a síntese tem uma etapa própria. No Codaro, perguntas reconhecidas sobre estrutura e pontos de entrada investigam em JSON até obter leituras de arquivos; depois podem usar streaming. O Codaro também aceita chamadas estruturadas durante SSE, com o mesmo contrato de mensagens no modo JSON e no streaming. O payload é construído pela mesma função usada para calcular o orçamento e registrar a requisição, evitando divergências entre essas representações.
+
+## Estrutura do projeto e evidências
+
+`get_repository_info` descreve a sessão do **Codaro**: pasta, capacidades e escopo. Essas capacidades não são módulos, scripts ou pontos de entrada do projeto explorado. O resultado identifica explicitamente esse escopo.
+
+Perguntas reconhecidas sobre estrutura, arquitetura e pontos de entrada têm uma verificação adicional: a explicação precisa citar `caminho:linha` de arquivos lidos com sucesso **naquela pergunta**. Listagens, previews de busca, metadados, leituras com erro e linhas parcialmente truncadas não satisfazem essa verificação. A investigação começa sem streaming até obter uma leitura válida; texto de chamadas de ferramentas não é emitido como resposta final.
+
+Se o modelo tentar concluir sem evidências, recebe uma única instrução para investigar. A explicação rejeitada permanece no JSON de diagnóstico, mas não é enviada novamente como fatos nem salva no histórico da conversa. Persistindo o problema ou terminando o orçamento, o Codaro informa a falha. Se o índice não encontrar nenhum arquivo permitido, o resultado explica a limitação do escopo. Consultas sobre pasta/ferramentas, listagens e perguntas conceituais gerais continuam sem exigir leituras de implementação.
+
+O reconhecimento desse tipo de pergunta usa padrões em português e inglês; não classifica toda intenção possível. A verificação confirma leitura e uma citação dentro das linhas lidas, sem garantir que todas as conclusões do modelo estejam corretas ou que a evidência escolhida seja suficiente para toda a pergunta.
+
+### Formato interno do Thoth versus API OpenAI
+
+O dump do Thoth representa definições como `{name, description, parameters}`. Seu adaptador OpenAI transforma essas definições em `{type: "function", function: {name, description, parameters}}` antes do envio a `/chat/completions`, como faz o Codaro. Veja [`openaiTools`](https://github.com/raulaguila/thoth-backend/blob/4375307787b535c3161dfae478282ab1cf8f3d3f/internal/adapter/outbound/llm/chat_helpers.go#L95). O formato do dump não deve ser confundido com o payload enviado pelo adaptador; APIs nativas de outros provedores podem ter contratos diferentes.
 
 ## Como a recuperação funciona
 

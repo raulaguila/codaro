@@ -433,3 +433,35 @@ def test_intermediate_tool_prose_is_removed_before_final_answer(tmp_path):
             assert len(app.query(".tool-card")) == 1
 
     run_ui(scenario())
+
+
+def test_project_overview_never_renders_rejected_session_explanation(tmp_path):
+    from test_agent import FakeModel, call
+
+    (tmp_path / "main.py").write_text("def main(): return 0\n")
+    model = FakeModel(
+        [
+            call("get_repository_info", {}),
+            {"content": "Os pontos de entrada são list_files e search_code."},
+            call("read_lines", {"path": "main.py", "start": 1, "end": 1}, "read"),
+            {"content": "main.py:1 define a função main."},
+        ]
+    )
+    model.settings = Settings("http://localhost:11434/v1", "test")
+    app = CodaroApp(Agent(Repository(tmp_path), model))
+
+    async def scenario():
+        async with app.run_test(size=(120, 35)) as pilot:
+            app.query_one(
+                Prompt
+            ).value = "Explique a estrutura deste projeto e seus pontos de entrada."
+            await pilot.press("enter")
+            await wait_ready(app, pilot)
+            await pilot.pause()
+            assert app.rendered_text == "main.py:1 define a função main."
+            assert len(app.query("Markdown")) == 1
+            assert len(app.query(".speaker")) == 1
+            assert "list_files e search_code" not in app.response_text
+            assert len(app.query(".tool-card")) == 2
+
+    run_ui(scenario())
