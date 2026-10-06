@@ -57,14 +57,14 @@ codaro ./examples/demo
 
 O agente recebe a raiz absoluta do projeto em cada consulta e pode confirmá-la com `get_repository_info`. No chat, `/pwd` mostra essa raiz diretamente, sem chamar o modelo; no terminal, use `codaro pwd --repo /caminho/do/projeto`. A pasta de instalação do Codaro não define a pasta explorada.
 
-O chat tem painéis de conversa, repositório/modelo e atividade; a lateral é ocultada em terminais menores que 90 colunas. `Ctrl+B` alterna a lateral, `Ctrl+L` limpa a conversa, `Ctrl+X` solicita cancelamento e `Ctrl+Q` encerra. O cancelamento é verificado entre fragmentos da resposta e chamadas de ferramentas; se o servidor estiver parado sem enviar dados, aguarda o próximo fragmento ou o timeout. O histórico usado na conversa fica na memória da sessão; o fluxo da última investigação também é registrado em `.codaro/prompt.json` para diagnóstico. O modelo deve suportar `tools` na API de chat completions; a confiabilidade das chamadas varia conforme modelo e servidor.
+O chat ocupa toda a largura do terminal. O cabeçalho mostra projeto, modelo, modo de edição e conexão; as atividades ficam na conversa e a barra de status mostra a ação em andamento. `Ctrl+L` limpa a conversa, `Ctrl+X` solicita cancelamento, `Ctrl+P` abre os comandos e `Ctrl+Q` encerra. O cancelamento é verificado entre fragmentos da resposta e chamadas de ferramentas; se o servidor estiver parado sem enviar dados, aguarda o próximo fragmento ou o timeout. O histórico usado na conversa fica na memória da sessão; o fluxo da última investigação também é registrado em `.codaro/prompt.json` para diagnóstico. O modelo deve suportar `tools` na API de chat completions; a confiabilidade das chamadas varia conforme modelo e servidor.
 
 ## Interface e streaming
 
 - `codaro chat` mostra a resposta enquanto ela chega, em Markdown, com títulos, listas, tabelas e destaque de sintaxe em blocos de código.
 - A abertura tem sugestões que preenchem um rascunho sem chamar o modelo. Enter envia; Alt+Enter insere uma nova linha (Shift+Enter também funciona quando reconhecido pelo terminal). A entrada cresce até seis linhas visíveis e preserva rascunhos acima de 8.000 caracteres para que você possa reduzi-los antes do envio.
 - Cada ação mostra consulta ou arquivo/símbolo, quantidade de resultados ou linhas, duração e indicação de leitura parcial ou reutilização de conteúdo. Os detalhes ficam recolhidos após a conclusão e podem ser expandidos; erros ficam abertos.
-- As ações também aparecem na conversa para ficarem visíveis em terminais estreitos. A lateral mantém o histórico de atividades e a ação em andamento; o painel de atividade aparece após o início da investigação.
+- As ações aparecem uma única vez, na conversa, e aproveitam a largura disponível em terminais estreitos e largos. A barra de status informa o arquivo ou consulta durante a execução.
 - A barra superior mostra pasta abreviada, modelo, modo de edição e conexão. A barra de status informa o estado atual. `/pwd` mostra o caminho completo.
 - Texto intermediário de fases de ferramentas é removido antes da resposta final. Campos separados de reasoning não são exibidos como resposta.
 - `codaro ask` também atualiza a resposta progressivamente no terminal e envia as informações de atividade para stderr.

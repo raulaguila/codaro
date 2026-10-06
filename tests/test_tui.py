@@ -112,14 +112,15 @@ def test_chat_cancel_discards_inflight_response(tmp_path):
     run_ui(scenario())
 
 
-def test_narrow_terminal_hides_sidebar(tmp_path):
+def test_narrow_terminal_uses_full_width_chat(tmp_path):
     async def scenario():
         app = CodaroApp(Agent(Repository(tmp_path), UIModel()))
         async with app.run_test(size=(70, 25)) as pilot:
             await pilot.pause()
-            assert app.screen.has_class("narrow")
-            assert not app.query_one("#sidebar").display
+            assert app.query_one("#conversation").region.width == 70
+            assert not app.query("#sidebar, #repository, #activity")
             assert app.query_one("#status", Static)
+            assert app.query_one("#session", Static).tooltip == str(tmp_path)
 
     run_ui(scenario())
 
@@ -191,7 +192,7 @@ def test_tool_cards_visible_on_narrow_terminal(tmp_path):
             )
             await pilot.pause()
             assert len(app.query(".tool-card")) == 1
-            assert app.screen.has_class("narrow")
+            assert app.query_one("#conversation").region.width == 70
 
     run_ui(scenario())
 
@@ -323,20 +324,23 @@ def test_multiline_composer_preserves_newlines_until_enter(tmp_path):
     run_ui(scenario())
 
 
-def test_sidebar_toggle_survives_terminal_resize(tmp_path):
+def test_full_width_chat_preserves_draft_and_messages_on_resize(tmp_path):
     app = CodaroApp(Agent(Repository(tmp_path), UIModel()))
 
     async def scenario():
         async with app.run_test(size=(120, 35)) as pilot:
-            assert app.query_one("#sidebar").display
-            assert not app.query_one("#activity").display
-            await pilot.press("ctrl+b")
-            assert not app.query_one("#sidebar").display
+            assert app.query_one("#conversation").region.width == 120
+            await pilot.press("/", "p", "w", "d", "enter")
+            app.query_one(Prompt).value = "Meu rascunho"
             await pilot.resize_terminal(70, 30)
+            await pilot.pause()
+            assert app.query_one("#conversation").region.width == 70
             await pilot.resize_terminal(120, 35)
-            assert not app.query_one("#sidebar").display
-            await pilot.press("ctrl+b")
-            assert app.query_one("#sidebar").display
+            await pilot.pause()
+            assert app.query_one("#conversation").region.width == 120
+            assert app.query_one(Prompt).value == "Meu rascunho"
+            assert str(tmp_path) in str(app.query_one(".question", Static).render())
+            assert not app.query("#sidebar, #repository, #activity")
 
     run_ui(scenario())
 
@@ -356,7 +360,7 @@ def test_starter_suggestion_fills_draft_without_calling_model(tmp_path):
             assert not app.query_one("#welcome").display
             await pilot.press("ctrl+l")
             assert app.query_one("#welcome").display
-            assert not app.query_one("#activity").display
+            assert not app.query(".tool-card")
 
     run_ui(scenario())
 
@@ -371,15 +375,15 @@ def test_tool_details_are_collapsed_and_can_be_expanded(tmp_path):
     async def scenario():
         async with app.run_test(size=(120, 35)) as pilot:
             app.activity(AgentEvent("tool_start", "Ler linhas", "code.py:1–3"))
-            assert app.query_one("#current-action").display
+            assert "Ler linhas… · code.py:1–3" in str(app.query_one("#status", Static).render())
             app.activity(
                 AgentEvent("tool_end", "Ler linhas", "code.py:1–3\n3 linhas", "success", 12)
             )
             await pilot.pause()
             card = app.query_one(".tool-card", Collapsible)
             assert card.collapsed
-            assert app.query_one("#activity").display
-            assert not app.query_one("#current-action").display
+            assert len(app.query(".tool-card")) == 1
+            assert "Ler linhas · 12 ms" in str(app.query_one("#status", Static).render())
             card.scroll_visible(animate=False)
             await pilot.pause()
             await pilot.click("CollapsibleTitle")

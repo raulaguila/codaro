@@ -6,14 +6,13 @@ import threading
 from pathlib import Path
 
 from rich.syntax import Syntax
-from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.screen import ModalScreen
-from textual.widgets import Button, Collapsible, Footer, Header, Markdown, RichLog, Static, TextArea
+from textual.widgets import Button, Collapsible, Footer, Header, Markdown, Static, TextArea
 
 from codaro.agent import Agent, AgentEvent, InvestigationCancelled
 from codaro.edits import EditProposal
@@ -140,13 +139,7 @@ class CodaroApp(App):
     Header { background: #111827; color: #f1f5f9; }
     #session { height: 1; margin: 0 2; color: #94a3b8; }
     #session.insecure { color: #fbbf24; }
-    #main { height: 1fr; }
-    #conversation { width: 1fr; border: round #334155; padding: 0 1; }
-    #sidebar { width: 32; max-width: 38; margin-left: 1; }
-    .narrow #sidebar, .sidebar-hidden #sidebar { display: none; }
-    #repository { height: auto; max-height: 17; border: round #334155; padding: 1; }
-    #activity { display: none; height: 1fr; border: round #334155; padding: 0 1; }
-    #current-action { display: none; height: auto; padding: 1; color: #38bdf8; }
+    #conversation { width: 100%; height: 1fr; border: round #334155; padding: 0 1; }
     #welcome { height: auto; max-width: 78; margin: 1; }
     #welcome-title { height: 2; color: #f1f5f9; text-style: bold; }
     #welcome-description { height: auto; margin-bottom: 1; color: #94a3b8; }
@@ -170,7 +163,6 @@ class CodaroApp(App):
         Binding("ctrl+q", "quit", "Sair", priority=True, key_display="Ctrl+Q"),
         Binding("ctrl+l", "clear_chat", "Limpar", priority=True, key_display="Ctrl+L"),
         Binding("ctrl+x", "cancel", "Cancelar", priority=True, key_display="Ctrl+X"),
-        Binding("ctrl+b", "toggle_sidebar", "Painel", priority=True, key_display="Ctrl+B"),
         Binding("ctrl+p", "command_palette", "Comandos", priority=True, key_display="Ctrl+P"),
     ]
 
@@ -185,8 +177,6 @@ class CodaroApp(App):
         self.speaker: Static | None = None
         self.context_chars = 0
         self.proposal_cards: dict[str, ProposalCard] = {}
-        self.sidebar_visible = True
-        self.has_activity = False
         self.prompt_too_long = False
 
     def welcome(self) -> Vertical:
@@ -207,13 +197,8 @@ class CodaroApp(App):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Static("", id="session", markup=False)
-        with Horizontal(id="main"):
-            with VerticalScroll(id="conversation"):
-                yield self.welcome()
-            with Vertical(id="sidebar"):
-                yield Static("", id="repository", markup=False)
-                yield Static("", id="current-action", markup=False)
-                yield RichLog(id="activity", wrap=True, markup=False, max_lines=1000)
+        with VerticalScroll(id="conversation"):
+            yield self.welcome()
         yield Static("Pronto", id="status")
         yield Prompt(
             placeholder="Pergunte ou peça uma mudança…",
@@ -227,7 +212,6 @@ class CodaroApp(App):
         yield Footer(show_command_palette=False)
 
     def on_mount(self):
-        self.update_layout()
         settings = self.agent.provider.settings
         mode = "Com aprovação" if self.agent.allow_edits else "Somente leitura"
         tls = "TLS sem verificação" if settings.tls_insecure else "TLS verificação ativa"
@@ -236,41 +220,16 @@ class CodaroApp(App):
         root = short_path(self.agent.repository.root)
         summary = f"{root} · {settings.model} · {mode}"
         summary = f"{tls} · {summary}" if settings.tls_insecure else f"{summary} · {tls}"
-        self.query_one("#session", Static).update(safe_preview(summary))
-        self.query_one("#session", Static).set_class(settings.tls_insecure, "insecure")
-        repository = self.query_one("#repository", Static)
-        repository.border_title = "Sessão"
-        repository.tooltip = str(self.agent.repository.root)
-        repository.update(
-            safe_preview(
-                f"PROJETO\n{root}\n\nMODELO\n{settings.model}\n\nEDIÇÃO\n{mode}\n\nCONEXÃO\n{tls}"
-            )
-        )
-        self.query_one("#activity", RichLog).border_title = "Atividade"
+        session = self.query_one("#session", Static)
+        session.update(safe_preview(summary))
+        session.set_class(settings.tls_insecure, "insecure")
+        session.tooltip = safe_preview(str(self.agent.repository.root))
         self.set_interval(0.08, self.flush_response)
         self.query_one(Prompt).focus()
-
-    def update_layout(self):
-        screen = self.screen_stack[0]
-        screen.set_class(self.size.width < 90, "narrow")
-        screen.set_class(not self.sidebar_visible, "sidebar-hidden")
-
-    def on_resize(self):
-        self.update_layout()
-
-    def action_toggle_sidebar(self):
-        self.sidebar_visible = not self.sidebar_visible
-        self.update_layout()
 
     def hide_welcome(self):
         for welcome in self.query("#welcome"):
             welcome.display = False
-
-    def log_activity(self, message):
-        self.has_activity = True
-        log = self.query_one("#activity", RichLog)
-        log.display = True
-        log.write(message)
 
     def on_text_area_changed(self, event: TextArea.Changed):
         if event.text_area.id != "prompt":
@@ -381,24 +340,12 @@ class CodaroApp(App):
             else:
                 self.discard_response()
         elif event.kind == "tool_start":
-            action = self.query_one("#current-action", Static)
-            action.update(safe_preview(f"Em andamento\n{event.title}\n{event.detail}"))
-            action.display = True
-            self.query_one("#status", Static).update(f"{event.title}…")
+            self.query_one("#status", Static).update(
+                safe_preview(f"{event.title}… · {event.detail}".rstrip(" ·"))
+            )
         elif event.kind == "tool_end":
             duration = f"{event.elapsed_ms:.0f} ms" if event.elapsed_ms is not None else ""
             text = safe_preview(f"{event.title} · {duration}\n{event.detail}")
-            color = (
-                "red"
-                if event.state == "error"
-                else "yellow"
-                if event.state == "pending"
-                else "green"
-            )
-            log = Text(event.title + " · " + duration, style=color)
-            log.append("\n" + safe_preview(event.detail) + "\n", style="dim")
-            self.query_one("#current-action", Static).display = False
-            self.log_activity(log)
             outcome = event.detail.split("\n")[-1]
             self.mount_message(
                 Collapsible(
@@ -410,8 +357,9 @@ class CodaroApp(App):
             )
             self.query_one("#status", Static).update(f"{event.title} · {duration}")
         else:
-            self.log_activity(safe_preview(f"{event.title} · {event.detail}".rstrip(" ·")))
-            self.query_one("#status", Static).update(safe_preview(event.title))
+            self.query_one("#status", Static).update(
+                safe_preview(f"{event.title} · {event.detail}".rstrip(" ·"))
+            )
 
     def append_delta(self, delta: str):
         self.response_text += safe_preview(delta)
@@ -457,7 +405,6 @@ class CodaroApp(App):
                 card = ProposalCard(proposal)
                 self.proposal_cards[proposal.id] = card
                 self.mount_message(card)
-        self.query_one("#current-action", Static).display = False
         self.busy = False
         prompt = self.query_one(Prompt)
         prompt.disabled = False
@@ -479,10 +426,6 @@ class CodaroApp(App):
         conversation = self.query_one("#conversation", VerticalScroll)
         await conversation.remove_children()
         await conversation.mount(self.welcome())
-        self.has_activity = False
-        self.query_one("#current-action", Static).display = False
-        self.query_one("#activity", RichLog).clear()
-        self.query_one("#activity", RichLog).display = False
         self.query_one(Prompt).focus()
         self.query_one("#status", Static).update("Pronto · conversa limpa")
 
@@ -538,7 +481,6 @@ class CodaroApp(App):
             self.agent.turns[-1][-1]["content"] += (
                 f"\n\nResultado da revisão: {card.proposal.path}: {message}"
             )
-        self.query_one("#current-action", Static).display = False
         self.busy = False
         prompt = self.query_one(Prompt)
         prompt.disabled = False
