@@ -94,6 +94,12 @@ def test_chat_cancel_discards_inflight_response(tmp_path):
         app = CodaroApp(agent)
         async with app.run_test(size=(120, 35)) as pilot:
             await pilot.press("o", "i", "enter")
+            # Submission starts a worker; indexing/debug writes precede the model call.
+            # Synchronize on the call instead of assuming Enter has started it already.
+            for _ in range(100):
+                if model.started.is_set():
+                    break
+                await pilot.pause(0.01)
             assert app.busy
             assert model.started.is_set()
             await pilot.press("ctrl+x")
