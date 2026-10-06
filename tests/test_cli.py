@@ -218,3 +218,58 @@ def test_shortcut_can_read_files_and_exposes_root_to_model(tmp_path, monkeypatch
     assert str(tmp_path.resolve()) in model.requests[0][0][0]["content"]
     tool = next(item for item in model.requests[-1][0] if item["role"] == "tool")
     assert "selected_directory = True" in json.loads(tool["content"])["content"]
+
+
+def test_chat_tls_flag_and_secure_override_reach_settings(tmp_path, monkeypatch):
+    captured = []
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "codaro.tui.CodaroApp.run", lambda self: captured.append(self.agent.provider.settings)
+    )
+    monkeypatch.delenv("CODARO_TLS_INSECURE", raising=False)
+    result = runner.invoke(app, [".", "--tls-insecure"])
+    assert result.exit_code == 0, result.output
+    assert captured[-1].tls_insecure
+    monkeypatch.setenv("CODARO_TLS_INSECURE", "true")
+    result = runner.invoke(app, ["chat", "--repo", str(tmp_path), "--tls-verify"])
+    assert result.exit_code == 0, result.output
+    assert not captured[-1].tls_insecure
+
+
+def test_tls_flag_applies_to_ask_and_edit(tmp_path, monkeypatch):
+    captured = []
+
+    def stream(self, messages, tools=None, on_delta=None, cancelled=None):
+        captured.append(self.settings.tls_insecure)
+        on_delta("OK")
+        return {"content": "OK"}
+
+    monkeypatch.setattr("codaro.cli.OpenAICompatible.stream", stream)
+    for command in ("ask", "edit"):
+        result = runner.invoke(app, [command, "Teste.", "--repo", str(tmp_path), "--tls-insecure"])
+        assert result.exit_code == 0, result.output
+    assert captured == [True, True]
+
+
+def test_doctor_shows_effective_tls_setting(monkeypatch):
+    monkeypatch.setenv("CODARO_TLS_INSECURE", "true")
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 0
+    assert "TLS: sem verificação" in result.stdout
+    result = runner.invoke(app, ["doctor", "--tls-verify"])
+    assert "TLS: verificação ativa" in result.stdout
+
+
+def test_doctor_tool_probe_is_explicit_and_supports_tls_flag(monkeypatch):
+    captured = []
+
+    def probe(self):
+        captured.append(self.settings.tls_insecure)
+
+    monkeypatch.setattr("codaro.cli.OpenAICompatible.check_tool_calling", probe)
+    assert runner.invoke(app, ["doctor"]).exit_code == 0
+    assert captured == []
+    result = runner.invoke(app, ["doctor", "--check-tools", "--tls-insecure"])
+    assert result.exit_code == 0, result.output
+    assert captured == [True]
+    assert "confirmada nesta chamada" in result.stdout

@@ -57,14 +57,16 @@ codaro ./examples/demo
 
 O agente recebe a raiz absoluta do projeto em cada consulta e pode confirmá-la com `get_repository_info`. No chat, `/pwd` mostra essa raiz diretamente, sem chamar o modelo; no terminal, use `codaro pwd --repo /caminho/do/projeto`. A pasta de instalação do Codaro não define a pasta explorada.
 
-O chat tem painéis de conversa, repositório/modelo e atividade; a lateral é ocultada em terminais menores que 90 colunas. `Ctrl+L` limpa a conversa, `Ctrl+X` solicita cancelamento e `Ctrl+Q` encerra. O cancelamento é verificado entre fragmentos da resposta e chamadas de ferramentas; se o servidor estiver parado sem enviar dados, aguarda o próximo fragmento ou o timeout. O histórico fica apenas na memória da sessão. O modelo deve suportar `tools` na API de chat completions; a confiabilidade das chamadas varia conforme modelo e servidor.
+O chat tem painéis de conversa, repositório/modelo e atividade; a lateral é ocultada em terminais menores que 90 colunas. `Ctrl+B` alterna a lateral, `Ctrl+L` limpa a conversa, `Ctrl+X` solicita cancelamento e `Ctrl+Q` encerra. O cancelamento é verificado entre fragmentos da resposta e chamadas de ferramentas; se o servidor estiver parado sem enviar dados, aguarda o próximo fragmento ou o timeout. O histórico fica apenas na memória da sessão. O modelo deve suportar `tools` na API de chat completions; a confiabilidade das chamadas varia conforme modelo e servidor.
 
 ## Interface e streaming
 
 - `codaro chat` mostra a resposta enquanto ela chega, em Markdown, com títulos, listas, tabelas e destaque de sintaxe em blocos de código.
-- Cada ação mostra consulta ou arquivo/símbolo, quantidade de resultados ou linhas, duração e indicação de leitura parcial ou reutilização de conteúdo.
-- As ações também aparecem na conversa para ficarem visíveis em terminais estreitos. A lateral mantém o histórico de atividades.
-- A barra de status mostra o volume de contexto enviado em caracteres, não tokens.
+- A abertura tem sugestões que preenchem um rascunho sem chamar o modelo. Enter envia; Alt+Enter insere uma nova linha (Shift+Enter também funciona quando reconhecido pelo terminal). A entrada cresce até seis linhas visíveis e preserva rascunhos acima de 8.000 caracteres para que você possa reduzi-los antes do envio.
+- Cada ação mostra consulta ou arquivo/símbolo, quantidade de resultados ou linhas, duração e indicação de leitura parcial ou reutilização de conteúdo. Os detalhes ficam recolhidos após a conclusão e podem ser expandidos; erros ficam abertos.
+- As ações também aparecem na conversa para ficarem visíveis em terminais estreitos. A lateral mantém o histórico de atividades e a ação em andamento; o painel de atividade aparece após o início da investigação.
+- A barra superior mostra pasta abreviada, modelo, modo de edição e conexão. A barra de status informa o estado atual. `/pwd` mostra o caminho completo.
+- Texto intermediário de fases de ferramentas é removido antes da resposta final. Campos separados de reasoning não são exibidos como resposta.
 - `codaro ask` também atualiza a resposta progressivamente no terminal e envia as informações de atividade para stderr.
 - O provedor usa SSE da API OpenAI-compatible. Se o servidor responder com JSON comum, a resposta é exibida de uma vez.
 - Uma resposta interrompida ou cancelada não é salva no histórico. O chat remove o bloco parcial e informa a interrupção.
@@ -98,6 +100,36 @@ codaro chat --repo /caminho/do/projeto
 ```
 
 Na investigação com IA, a raiz absoluta do projeto, a pergunta, o histórico e os trechos lidos são enviados ao endpoint configurado. Os comandos locais `index`, `search` e `read` não chamam modelos por padrão. Não coloque chaves no código ou no Git.
+
+## TLS e protocolo de ferramentas
+
+A verificação do certificado e do hostname HTTPS fica **ativa por padrão**. Para um endpoint com certificado não confiável, você pode desativá-la explicitamente:
+
+```bash
+codaro . --tls-insecure
+codaro ask 'Quais arquivos existem?' --repo examples/demo --tls-insecure
+codaro edit 'Proponha uma validação de entrada' --repo examples/demo --tls-insecure
+# Configuração equivalente por ambiente
+export CODARO_TLS_INSECURE=true
+# Sobrescreve o ambiente e reativa a verificação nesta execução
+codaro . --tls-verify
+```
+
+As flags ficam depois do caminho ou subcomando. `CODARO_TLS_INSECURE` aceita `true/false`, `1/0`, `yes/no` e `on/off`; valores inválidos são rejeitados. `--tls-insecure` desativa a validação de certificado e hostname, portanto use-o apenas quando confiar no endpoint. O modo aparece no chat e em `codaro doctor`. Em URLs HTTP não há TLS a verificar.
+
+O agente envia `tools` e `tool_choice: auto` para `/chat/completions`, recebe `tool_calls`, executa as ferramentas locais e envia cada resultado com `role: tool` e o `tool_call_id` correspondente. O modelo é consultado novamente para responder com os resultados. Apenas essas chamadas estruturadas executam ferramentas; JSON escrito na resposta nunca é executado como chamada.
+
+Inteiros decimais canônicos enviados como strings, como `"10"` e `"0"`, são normalizados antes da validação de limites. Booleanos, floats, expressões, formatos ambíguos e valores fora dos limites continuam bloqueados. Uma tentativa reconhecida de chamar uma ferramenta em texto recebe uma correção de protocolo, limitada a uma tentativa por pergunta; se persistir, o agente informa incompatibilidade e não salva uma resposta falsa no histórico.
+
+Para verificar o modelo/servidor configurado:
+
+```bash
+codaro doctor --check-tools
+# Com TLS explicitamente sem verificação
+codaro doctor --check-tools --tls-insecure
+```
+
+Esse diagnóstico faz uma chamada real ao provedor, pede uma ferramenta de teste sem argumentos e verifica a resposta estruturada; nenhuma ferramenta de arquivo é executada. Um resultado positivo confirma essa chamada, não garante a qualidade de toda investigação. `codaro doctor` sem a flag continua sem chamar a API.
 
 ## Como a recuperação funciona
 

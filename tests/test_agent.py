@@ -268,7 +268,7 @@ def test_detailed_tool_events_include_target_outcome_and_duration(tmp_path):
     assert len(endings) == 2
     assert endings[0].title == "Buscar código"
     assert "Consulta: f" in endings[0].detail
-    assert "resultados" in endings[0].detail
+    assert "1 resultado" in endings[0].detail
     assert "x.py" in endings[1].detail
     assert endings[1].elapsed_ms >= 0
     assert all(event.state == "success" for event in endings)
@@ -427,3 +427,78 @@ def test_repository_context_survives_stale_answer_and_final_no_tools(tmp_path):
     assert str(tmp_path.resolve()) in messages[0]["content"]
     assert "get_repository_info" in messages[0]["content"]
     assert "propose_edit_with_approval" in messages[0]["content"]
+
+
+def test_decimal_string_arguments_are_normalized_before_tool_execution(tmp_path):
+    (tmp_path / "auth.py").write_text("x = 1\n")
+    model = FakeModel(
+        [
+            call("list_files", {"limit": "10", "offset": "0"}),
+            {"content": "O diretório contém auth.py."},
+        ]
+    )
+    agent = Agent(Repository(tmp_path), model)
+    assert "auth.py" in agent.ask("Quais arquivos existem?")
+    output = next(item for item in model.requests[-1][0] if item["role"] == "tool")
+    assert json.loads(output["content"])["files"] == ["auth.py"]
+
+
+def test_integer_normalization_keeps_validation_and_bounds():
+    import pytest
+
+    for invalid in (True, 10.0, "1e1", "10.0", " 10 ", "01", "1; code", "9" * 100, "61", "-1"):
+        with pytest.raises(ValueError):
+            Agent.validate_arguments("list_files", {"limit": invalid})
+
+
+def test_text_tool_call_is_repaired_via_protocol_not_executed(tmp_path):
+    (tmp_path / "auth.py").write_text("x = 1\n")
+    faux = 'Vou tentar novamente.\n{"name":"list_files","parameters":{"limit":"10","offset":"0"}}'
+    model = FakeModel(
+        [
+            {"content": faux},
+            call("list_files", {"limit": "10", "offset": "0"}),
+            {"content": "Arquivo encontrado: auth.py."},
+        ]
+    )
+    events = []
+    agent = Agent(Repository(tmp_path), model)
+    answer = agent.ask("Quais arquivos existem?", on_detail=events.append)
+    assert answer == "Arquivo encontrado: auth.py."
+    assert any(event.state == "retry" for event in events)
+    assert "A chamada em texto não foi executada" in model.requests[1][0][-1]["content"]
+    tools = [item for item in model.requests[-1][0] if item["role"] == "tool"]
+    assert len(tools) == 1
+    assert tools[0]["tool_call_id"] == "call-1"
+    assert json.loads(tools[0]["content"])["files"] == ["auth.py"]
+    assert faux not in json.dumps(agent.turns)
+
+
+def test_repeated_text_tool_call_fails_without_saving_false_answer(tmp_path):
+    import pytest
+
+    from codaro.provider import ModelError
+
+    faux = '{"name":"list_files","parameters":{}}'
+    model = FakeModel([{"content": faux}, {"content": faux}])
+    agent = Agent(Repository(tmp_path), model)
+    with pytest.raises(ModelError, match="doctor --check-tools"):
+        agent.ask("Liste arquivos.")
+    assert not agent.turns
+    assert len(model.requests) == 2
+    assert not any(item["role"] == "tool" for messages, _ in model.requests for item in messages)
+
+
+def test_documentation_example_is_not_executed_or_repaired(tmp_path):
+    example = 'Exemplo da estrutura de chamada:\n{"name":"list_files","parameters":{"limit":10}}'
+    model = FakeModel([{"content": example}])
+    agent = Agent(Repository(tmp_path), model)
+    assert agent.ask("Explique o formato de uma chamada de ferramenta.") == example
+    assert len(model.requests) == 1
+
+
+def test_malformed_json_as_content_does_not_break_protocol_detector():
+    from codaro.agent import textual_tool_call
+
+    assert not textual_tool_call('{"name":[],"parameters":{}}')
+    assert not textual_tool_call('{"name":"list_files","parameters":')

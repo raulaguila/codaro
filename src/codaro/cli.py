@@ -47,6 +47,13 @@ app = typer.Typer(
 console = Console()
 errors = Console(stderr=True)
 Root = Annotated[Path, typer.Option("--repo", "-r", help="Diretório do repositório.")]
+TLSInsecure = Annotated[
+    bool | None,
+    typer.Option(
+        "--tls-insecure/--tls-verify",
+        help="Desativa/ativa a verificação de certificados TLS do modelo.",
+    ),
+]
 
 
 def fail(exc: Exception):
@@ -142,25 +149,33 @@ def read(
 
 
 @app.command()
-def ask(question: str, repo: Root = Path(".")):
+def ask(question: str, repo: Root = Path("."), tls_insecure: TLSInsecure = None):
     """Investiga uma pergunta usando ferramentas e o modelo configurado (somente leitura)."""
-    run_question(question, repo, allow_edits=False)
+    run_question(question, repo, allow_edits=False, tls_insecure=tls_insecure)
 
 
 @app.command()
-def edit(question: str, repo: Root = Path(".")):
+def edit(question: str, repo: Root = Path("."), tls_insecure: TLSInsecure = None):
     """Propõe mudanças e solicita aprovação para cada diff antes de aplicar."""
-    run_question(question, repo, allow_edits=True)
+    run_question(question, repo, allow_edits=True, tls_insecure=tls_insecure)
 
 
-def run_question(question: str, repo: Path, *, allow_edits: bool):
+def run_question(question: str, repo: Path, *, allow_edits: bool, tls_insecure: bool | None = None):
     try:
         agent = Agent(
-            Repository(repo), OpenAICompatible(Settings.from_env()), allow_edits=allow_edits
+            Repository(repo),
+            OpenAICompatible(Settings.from_env(tls_insecure=tls_insecure)),
+            allow_edits=allow_edits,
         )
         parts: list[str] = []
 
         def detail(event: AgentEvent):
+            if event.kind == "model_start":
+                parts.clear()
+                live.update(Markdown("Consultando modelo…"))
+            elif event.kind == "model_end" and event.state != "answer":
+                parts.clear()
+                live.update(Markdown("Investigando…"))
             if event.kind in {"status", "tool_end"}:
                 duration = f" · {event.elapsed_ms:.0f} ms" if event.elapsed_ms is not None else ""
                 errors.print(
@@ -206,6 +221,7 @@ def chat(
     read_only: Annotated[
         bool, typer.Option("--read-only", help="Desabilita propostas de edição.")
     ] = False,
+    tls_insecure: TLSInsecure = None,
 ):
     """Abre o chat interativo com painéis de conversa e atividade."""
     from codaro.tui import CodaroApp
@@ -213,7 +229,9 @@ def chat(
     try:
         CodaroApp(
             Agent(
-                Repository(repo), OpenAICompatible(Settings.from_env()), allow_edits=not read_only
+                Repository(repo),
+                OpenAICompatible(Settings.from_env(tls_insecure=tls_insecure)),
+                allow_edits=not read_only,
             )
         ).run()
     except (ValueError, OSError, sqlite3.Error) as exc:
@@ -221,10 +239,18 @@ def chat(
 
 
 @app.command()
-def doctor():
+def doctor(
+    tls_insecure: TLSInsecure = None,
+    check_tools: Annotated[
+        bool,
+        typer.Option(
+            "--check-tools", help="Faz uma chamada ao modelo para verificar tool-calling."
+        ),
+    ] = False,
+):
     """Mostra configuração e disponibilidade do ripgrep sem expor a chave."""
     try:
-        settings = Settings.from_env()
+        settings = Settings.from_env(tls_insecure=tls_insecure)
     except ValueError as exc:
         fail(exc)
     sqlite_ready = True
@@ -241,6 +267,7 @@ def doctor():
                 f"SQLite FTS5: {'disponível' if sqlite_ready else 'ausente'}\n"
                 f"modelo: {settings.model}\n"
                 f"timeout: {settings.timeout:g}s\n"
+                f"TLS: {'sem verificação' if settings.tls_insecure else 'verificação ativa'}\n"
                 f"credencial: {'configurada' if settings.api_key else 'não configurada'}\n"
                 "Configuração: CODARO_BASE_URL, CODARO_MODEL, CODARO_API_KEY"
             ),
@@ -249,6 +276,13 @@ def doctor():
     )
     if not rg_ready or not sqlite_ready:
         raise typer.Exit(1)
+    if check_tools:
+        try:
+            with console.status("Verificando protocolo de ferramentas…"):
+                OpenAICompatible(settings).check_tool_calling()
+            console.print("Tool-calling: resposta estruturada confirmada nesta chamada.")
+        except (ModelError, ValueError, OSError) as exc:
+            fail(exc)
 
 
 if __name__ == "__main__":

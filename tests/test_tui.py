@@ -1,12 +1,12 @@
 import asyncio
 import threading
 
-from textual.widgets import Input, Static
+from textual.widgets import Static
 
 from codaro.agent import Agent
 from codaro.provider import ModelError, Settings
 from codaro.repository import Repository
-from codaro.tui import CodaroApp
+from codaro.tui import CodaroApp, Prompt
 
 
 def run_ui(coroutine):
@@ -62,7 +62,7 @@ def test_chat_submission_and_clear(tmp_path):
             await pilot.press("o", "i", "enter")
             await wait_ready(app, pilot)
             assert agent.turns
-            assert not app.query_one(Input).disabled
+            assert not app.query_one(Prompt).disabled
             await pilot.press("ctrl+l")
             assert not agent.turns
 
@@ -78,7 +78,7 @@ def test_chat_recovers_from_provider_error(tmp_path):
             await pilot.press("o", "i", "enter")
             await wait_ready(app, pilot)
             assert not agent.turns
-            assert not app.query_one(Input).disabled
+            assert not app.query_one(Prompt).disabled
             await pilot.press("o", "i", "enter")
             await wait_ready(app, pilot)
             assert agent.turns
@@ -101,7 +101,7 @@ def test_chat_cancel_discards_inflight_response(tmp_path):
             model.release.set()
             await wait_ready(app, pilot)
             assert not agent.turns
-            assert not app.query_one(Input).disabled
+            assert not app.query_one(Prompt).disabled
 
     run_ui(scenario())
 
@@ -248,7 +248,7 @@ def test_chat_review_conflict_preserves_new_content(tmp_path):
             await wait_ready(app, pilot)
             assert proposal.state == "conflict"
             assert path.read_text() == "x = 99\n"
-            assert not app.query_one(Input).disabled
+            assert not app.query_one(Prompt).disabled
 
     run_ui(scenario())
 
@@ -284,15 +284,152 @@ def test_chat_pwd_is_local_and_reports_real_root(tmp_path):
 
     async def scenario():
         async with app.run_test(size=(70, 30)) as pilot:
-            app.query_one(Input).value = "/pwd"
+            app.query_one(Prompt).value = "/pwd"
             await pilot.press("enter")
             await pilot.pause()
             assert not model.started.is_set()
             assert not app.busy
             assert not agent.turns
-            assert app.query_one(Input).value == ""
+            assert app.query_one(Prompt).value == ""
             assert any(
                 str(tmp_path.resolve()) in str(widget.render()) for widget in app.query(".question")
             )
+
+    run_ui(scenario())
+
+
+def test_multiline_composer_preserves_newlines_until_enter(tmp_path):
+    model = UIModel()
+    agent = Agent(Repository(tmp_path), model)
+    app = CodaroApp(agent)
+
+    async def scenario():
+        async with app.run_test(size=(110, 35)) as pilot:
+            await pilot.press("o", "i", "alt+enter", "x")
+            assert app.query_one(Prompt).text == "oi\nx"
+            assert not model.started.is_set()
+            assert app.query_one(Prompt).size.height >= 2
+            await pilot.press("enter")
+            await wait_ready(app, pilot)
+            assert agent.turns[-1][0]["content"] == "oi\nx"
+            assert app.query_one(Prompt).text == ""
+
+    run_ui(scenario())
+
+
+def test_sidebar_toggle_survives_terminal_resize(tmp_path):
+    app = CodaroApp(Agent(Repository(tmp_path), UIModel()))
+
+    async def scenario():
+        async with app.run_test(size=(120, 35)) as pilot:
+            assert app.query_one("#sidebar").display
+            assert not app.query_one("#activity").display
+            await pilot.press("ctrl+b")
+            assert not app.query_one("#sidebar").display
+            await pilot.resize_terminal(70, 30)
+            await pilot.resize_terminal(120, 35)
+            assert not app.query_one("#sidebar").display
+            await pilot.press("ctrl+b")
+            assert app.query_one("#sidebar").display
+
+    run_ui(scenario())
+
+
+def test_starter_suggestion_fills_draft_without_calling_model(tmp_path):
+    model = UIModel()
+    app = CodaroApp(Agent(Repository(tmp_path), model, allow_edits=True))
+
+    async def scenario():
+        async with app.run_test(size=(120, 35)) as pilot:
+            await pilot.click("#suggest-explore")
+            assert "estrutura" in app.query_one(Prompt).text
+            assert app.focused is app.query_one(Prompt)
+            assert not model.started.is_set()
+            await pilot.press("enter")
+            await wait_ready(app, pilot)
+            assert not app.query_one("#welcome").display
+            await pilot.press("ctrl+l")
+            assert app.query_one("#welcome").display
+            assert not app.query_one("#activity").display
+
+    run_ui(scenario())
+
+
+def test_tool_details_are_collapsed_and_can_be_expanded(tmp_path):
+    from textual.widgets import Collapsible
+
+    from codaro.agent import AgentEvent
+
+    app = CodaroApp(Agent(Repository(tmp_path), UIModel()))
+
+    async def scenario():
+        async with app.run_test(size=(120, 35)) as pilot:
+            app.activity(AgentEvent("tool_start", "Ler linhas", "code.py:1–3"))
+            assert app.query_one("#current-action").display
+            app.activity(
+                AgentEvent("tool_end", "Ler linhas", "code.py:1–3\n3 linhas", "success", 12)
+            )
+            await pilot.pause()
+            card = app.query_one(".tool-card", Collapsible)
+            assert card.collapsed
+            assert app.query_one("#activity").display
+            assert not app.query_one("#current-action").display
+            card.scroll_visible(animate=False)
+            await pilot.pause()
+            await pilot.click("CollapsibleTitle")
+            assert not card.collapsed
+
+    run_ui(scenario())
+
+
+def test_tls_insecure_is_visible_in_session(tmp_path):
+    model = UIModel()
+    model.settings = Settings("https://example.test/v1", "test", tls_insecure=True)
+    app = CodaroApp(Agent(Repository(tmp_path), model))
+
+    async def scenario():
+        async with app.run_test(size=(120, 35)):
+            session = app.query_one("#session", Static)
+            assert "TLS sem verificação" in str(session.render())
+            assert session.has_class("insecure")
+
+    run_ui(scenario())
+
+
+def test_oversized_draft_is_preserved_and_not_sent(tmp_path):
+    model = UIModel()
+    app = CodaroApp(Agent(Repository(tmp_path), model))
+
+    async def scenario():
+        async with app.run_test(size=(120, 35)) as pilot:
+            app.query_one(Prompt).value = "x" * 8001
+            await pilot.press("enter")
+            assert not model.started.is_set()
+            assert len(app.query_one(Prompt).text) == 8001
+            assert "8.000" in str(app.query_one("#status", Static).render())
+
+    run_ui(scenario())
+
+
+def test_intermediate_tool_prose_is_removed_before_final_answer(tmp_path):
+    from test_agent import FakeModel, call
+
+    from codaro.provider import Settings
+
+    message = call("list_files", {})
+    message["content"] = "Vou pensar e chamar uma ferramenta."
+    model = FakeModel([message, {"content": "Não há arquivos permitidos."}])
+    model.settings = Settings("http://localhost:11434/v1", "test")
+    app = CodaroApp(Agent(Repository(tmp_path), model))
+
+    async def scenario():
+        async with app.run_test(size=(120, 35)) as pilot:
+            await pilot.press("o", "i", "enter")
+            await wait_ready(app, pilot)
+            await pilot.pause()
+            assert app.rendered_text == "Não há arquivos permitidos."
+            assert len(app.query(".speaker")) == 1
+            assert len(app.query("Markdown")) == 1
+            assert len(app.query(".tool-card")) == 1
 
     run_ui(scenario())

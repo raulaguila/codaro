@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 dependencies = [
   "typer>=0.15,<1",
   "rich>=13.9,<15",
-  "textual>=1,<7",
+  "textual>=6.12,<7",
   "httpx>=0.28,<1",
   "tree-sitter>=0.25,<0.26",
   "tree-sitter-python>=0.25,<0.26",

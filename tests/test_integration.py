@@ -112,3 +112,53 @@ def test_agent_streaming_tool_roundtrip(tmp_path):
     assert "auth.py:2" in answer
     assert len(requests) == 2
     assert agent.turns[-1][-1]["content"] == answer
+
+
+def test_quoted_integer_tool_call_roundtrip_returns_actual_files(tmp_path):
+    (tmp_path / "auth.py").write_text("x = 1\n")
+    requests = []
+
+    def handle(request):
+        payload = json.loads(request.content)
+        requests.append(payload)
+        if len(requests) == 1:
+            assert payload["tool_choice"] == "auto"
+            return httpx.Response(
+                200,
+                json={
+                    "choices": [
+                        {
+                            "message": {
+                                "content": "Vou listar os arquivos.",
+                                "tool_calls": [
+                                    {
+                                        "id": "list-1",
+                                        "type": "function",
+                                        "function": {
+                                            "name": "list_files",
+                                            "arguments": '{"limit":"10","offset":"0"}',
+                                        },
+                                    }
+                                ],
+                            }
+                        }
+                    ]
+                },
+            )
+        tool = payload["messages"][-1]
+        assert tool["role"] == "tool"
+        assert tool["tool_call_id"] == "list-1"
+        assert json.loads(tool["content"])["files"] == ["auth.py"]
+        return httpx.Response(
+            200, json={"choices": [{"message": {"content": "Arquivo: auth.py."}}]}
+        )
+
+    provider = OpenAICompatible(
+        Settings("https://example.test/v1", "test"), httpx.MockTransport(handle)
+    )
+    agent = Agent(Repository(tmp_path), provider)
+    assert (
+        agent.ask("Quais arquivos estão no diretório atual?", on_delta=lambda _: None)
+        == "Arquivo: auth.py."
+    )
+    assert len(requests) == 2

@@ -165,3 +165,83 @@ def test_deeply_nested_remote_json_fails_cleanly():
     payload = b'{"choices":' + b"[" * 1500 + b"]" * 1500 + b"}"
     with pytest.raises(ModelError):
         provider(lambda request: httpx.Response(200, content=payload)).complete([])
+
+
+@pytest.mark.parametrize("insecure", [False, True])
+@pytest.mark.parametrize("streaming", [False, True])
+def test_tls_setting_reaches_http_client_for_both_response_modes(monkeypatch, insecure, streaming):
+    captured = []
+    original_client = httpx.Client
+
+    def client(**kwargs):
+        captured.append(kwargs["verify"])
+        return original_client(**kwargs)
+
+    monkeypatch.setattr("codaro.provider.httpx.Client", client)
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(200, json=result({"content": "OK"}))
+    )
+    model = OpenAICompatible(
+        Settings("https://example.test/v1", "test", tls_insecure=insecure), transport
+    )
+    answer = model.stream([]) if streaming else model.complete([])
+    assert answer["content"] == "OK"
+    assert captured == [not insecure]
+
+
+def test_tls_is_secure_by_default_and_env_override_is_explicit(monkeypatch):
+    monkeypatch.delenv("CODARO_TLS_INSECURE", raising=False)
+    assert not Settings.from_env().tls_insecure
+    monkeypatch.setenv("CODARO_TLS_INSECURE", "true")
+    assert Settings.from_env().tls_insecure
+    assert not Settings.from_env(tls_insecure=False).tls_insecure
+    monkeypatch.setenv("CODARO_TLS_INSECURE", "false")
+    assert Settings.from_env(tls_insecure=True).tls_insecure
+
+
+@pytest.mark.parametrize("raw", ["false", "0", "off", "no", "TRUE", "1", "on", "yes"])
+def test_tls_boolean_env_is_parsed(monkeypatch, raw):
+    monkeypatch.setenv("CODARO_TLS_INSECURE", raw)
+    assert Settings.from_env().tls_insecure == (raw.lower() in {"true", "1", "on", "yes"})
+
+
+def test_invalid_tls_values_are_rejected(monkeypatch):
+    monkeypatch.setenv("CODARO_TLS_INSECURE", "perhaps")
+    with pytest.raises(ValueError, match="CODARO_TLS_INSECURE"):
+        Settings.from_env()
+    with pytest.raises(ValueError, match="booleano"):
+        Settings("https://example.test/v1", "model", tls_insecure="false")
+
+
+def test_tool_calling_probe_checks_structured_protocol():
+    def handle(request):
+        payload = json.loads(request.content)
+        assert payload["tool_choice"] == "auto"
+        assert payload["tools"][0]["function"]["name"] == "codaro_probe"
+        return httpx.Response(
+            200,
+            json=result(
+                {
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "probe",
+                            "type": "function",
+                            "function": {"name": "codaro_probe", "arguments": "{}"},
+                        }
+                    ],
+                }
+            ),
+        )
+
+    provider(handle).check_tool_calling()
+
+
+def test_tool_calling_probe_rejects_json_written_as_text():
+    model = provider(
+        lambda request: httpx.Response(
+            200, json=result({"content": '{"name":"codaro_probe","parameters":{}}'})
+        )
+    )
+    with pytest.raises(ModelError, match="tool_calls válidos"):
+        model.check_tool_calling()

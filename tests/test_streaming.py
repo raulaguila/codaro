@@ -274,3 +274,21 @@ def test_stream_disconnect_is_not_retried_after_partial_output():
         provider.stream([], on_delta=received.append)
     assert len(attempts) == 1
     assert received == ["partial"]
+
+
+def test_reasoning_channel_is_not_rendered_as_answer():
+    provider, _ = model(
+        [
+            encode(
+                [
+                    chunk({"reasoning_content": "Internal model analysis"}),
+                    chunk({"content": "Resposta final."}),
+                    chunk(reason="stop"),
+                ]
+            )
+        ]
+    )
+    received = []
+    answer = provider.stream([], on_delta=received.append)
+    assert answer["content"] == "Resposta final."
+    assert "".join(received) == "Resposta final."

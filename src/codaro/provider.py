@@ -30,8 +30,11 @@ class Settings:
     model: str
     api_key: str = ""
     timeout: float = 90.0
+    tls_insecure: bool = False
 
     def __post_init__(self):
+        if type(self.tls_insecure) is not bool:
+            raise ValueError("TLS insecure deve ser booleano.")
         try:
             parsed = urlsplit(self.base_url)
             valid_port = parsed.port is None or 0 < parsed.port < 65536
@@ -60,7 +63,22 @@ class Settings:
             raise ValueError("Credencial contém caracteres inválidos.")
 
     @classmethod
-    def from_env(cls) -> Settings:
+    def from_env(cls, *, tls_insecure: bool | None = None) -> Settings:
+        if tls_insecure is None:
+            raw = os.getenv("CODARO_TLS_INSECURE", "false").strip().lower()
+            values = {
+                "1": True,
+                "true": True,
+                "yes": True,
+                "on": True,
+                "0": False,
+                "false": False,
+                "no": False,
+                "off": False,
+            }
+            if raw not in values:
+                raise ValueError("CODARO_TLS_INSECURE deve ser true/false ou 1/0.")
+            tls_insecure = values[raw]
         try:
             timeout = float(os.getenv("CODARO_TIMEOUT", "90"))
         except ValueError as exc:
@@ -70,6 +88,7 @@ class Settings:
             model=os.getenv("CODARO_MODEL", "qwen2.5:7b").strip(),
             api_key=os.getenv("CODARO_API_KEY", "").strip(),
             timeout=timeout,
+            tls_insecure=tls_insecure,
         )
 
 
@@ -135,6 +154,44 @@ class OpenAICompatible:
             messages, tools, on_delta=on_delta or (lambda _: None), cancelled=cancelled
         )
 
+    def check_tool_calling(self):
+        probe = {
+            "type": "function",
+            "function": {
+                "name": "codaro_probe",
+                "description": "Confirma o protocolo de ferramentas.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                    "additionalProperties": False,
+                },
+            },
+        }
+        message = self._request(
+            [
+                {
+                    "role": "user",
+                    "content": "Chame codaro_probe sem argumentos via tool_calls.",
+                }
+            ],
+            [probe],
+        )
+        calls = message.get("tool_calls") or []
+        try:
+            valid = (
+                len(calls) == 1
+                and calls[0]["function"]["name"] == "codaro_probe"
+                and json.loads(calls[0]["function"]["arguments"]) == {}
+            )
+        except (ValueError, KeyError, TypeError, RecursionError):
+            valid = False
+        if not valid:
+            raise ModelError(
+                "O modelo/servidor não retornou tool_calls válidos no diagnóstico. "
+                "Escolha um modelo com ferramentas e confira o template do servidor."
+            )
+
     def _request(
         self,
         messages: list[dict],
@@ -157,7 +214,9 @@ class OpenAICompatible:
             headers["Authorization"] = f"Bearer {self.settings.api_key}"
         try:
             with httpx.Client(
-                timeout=httpx.Timeout(self.settings.timeout, connect=10), transport=self.transport
+                timeout=httpx.Timeout(self.settings.timeout, connect=10),
+                transport=self.transport,
+                verify=not self.settings.tls_insecure,
             ) as client:
                 for attempt in range(3):
                     check_cancelled(cancelled)
