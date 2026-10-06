@@ -275,3 +275,24 @@ def test_chat_review_enter_returns_and_clear_rejects(tmp_path):
             assert not agent.edits.pending
 
     run_ui(scenario())
+
+
+def test_chat_pwd_is_local_and_reports_real_root(tmp_path):
+    model = UIModel()
+    agent = Agent(Repository(tmp_path), model)
+    app = CodaroApp(agent)
+
+    async def scenario():
+        async with app.run_test(size=(70, 30)) as pilot:
+            app.query_one(Input).value = "/pwd"
+            await pilot.press("enter")
+            await pilot.pause()
+            assert not model.started.is_set()
+            assert not app.busy
+            assert not agent.turns
+            assert app.query_one(Input).value == ""
+            assert any(
+                str(tmp_path.resolve()) in str(widget.render()) for widget in app.query(".question")
+            )
+
+    run_ui(scenario())

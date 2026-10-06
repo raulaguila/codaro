@@ -183,3 +183,38 @@ def test_directory_shortcut_help_does_not_launch_chat():
     result = runner.invoke(app, [".", "--help"])
     assert result.exit_code == 0
     assert "--read-only" in Text.from_ansi(result.stdout).plain
+
+
+def test_pwd_reports_selected_root_without_provider(tmp_path, monkeypatch):
+    def unavailable(*args, **kwargs):
+        raise AssertionError("pwd não deve chamar o modelo")
+
+    monkeypatch.setattr("codaro.cli.OpenAICompatible", unavailable)
+    project = tmp_path / "project"
+    project.mkdir()
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["pwd", "--repo", "project"])
+    assert result.exit_code == 0, result.output
+    assert result.stdout.strip() == str(project.resolve())
+    result = runner.invoke(app, ["pwd"])
+    assert result.stdout.strip() == str(tmp_path.resolve())
+
+
+def test_shortcut_can_read_files_and_exposes_root_to_model(tmp_path, monkeypatch):
+    from test_agent import FakeModel, call
+
+    (tmp_path / "current.py").write_text("selected_directory = True\n")
+    model = FakeModel(
+        [
+            call("read_lines", {"path": "current.py", "start": 1, "end": 1}),
+            {"content": "Arquivo da pasta atual lido."},
+        ]
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("codaro.cli.OpenAICompatible", lambda settings: model)
+    monkeypatch.setattr("codaro.tui.CodaroApp.run", lambda self: self.agent.ask("Leia current.py."))
+    result = runner.invoke(app, ["."])
+    assert result.exit_code == 0, result.output
+    assert str(tmp_path.resolve()) in model.requests[0][0][0]["content"]
+    tool = next(item for item in model.requests[-1][0] if item["role"] == "tool")
+    assert "selected_directory = True" in json.loads(tool["content"])["content"]

@@ -55,6 +55,8 @@ codaro ./examples/demo
 
 `codaro .` equivale a `codaro chat --repo .`: o diretório de trabalho do terminal se torna a raiz do projeto. O atalho também aceita caminhos relativos/absolutos e opções do chat, por exemplo `codaro . --read-only`.
 
+O agente recebe a raiz absoluta do projeto em cada consulta e pode confirmá-la com `get_repository_info`. No chat, `/pwd` mostra essa raiz diretamente, sem chamar o modelo; no terminal, use `codaro pwd --repo /caminho/do/projeto`. A pasta de instalação do Codaro não define a pasta explorada.
+
 O chat tem painéis de conversa, repositório/modelo e atividade; a lateral é ocultada em terminais menores que 90 colunas. `Ctrl+L` limpa a conversa, `Ctrl+X` solicita cancelamento e `Ctrl+Q` encerra. O cancelamento é verificado entre fragmentos da resposta e chamadas de ferramentas; se o servidor estiver parado sem enviar dados, aguarda o próximo fragmento ou o timeout. O histórico fica apenas na memória da sessão. O modelo deve suportar `tools` na API de chat completions; a confiabilidade das chamadas varia conforme modelo e servidor.
 
 ## Interface e streaming
@@ -95,7 +97,7 @@ export CODARO_API_KEY='sua-chave'
 codaro chat --repo /caminho/do/projeto
 ```
 
-Na investigação com IA, a pergunta, o histórico e os trechos lidos são enviados ao endpoint configurado. Os comandos locais `index`, `search` e `read` não chamam modelos por padrão. Não coloque chaves no código ou no Git.
+Na investigação com IA, a raiz absoluta do projeto, a pergunta, o histórico e os trechos lidos são enviados ao endpoint configurado. Os comandos locais `index`, `search` e `read` não chamam modelos por padrão. Não coloque chaves no código ou no Git.
 
 ## Como a recuperação funciona
 

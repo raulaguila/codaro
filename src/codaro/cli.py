@@ -59,6 +59,15 @@ def fail(exc: Exception):
     raise typer.Exit(1) from exc
 
 
+@app.command()
+def pwd(repo: Root = Path(".")):
+    """Mostra a raiz absoluta do projeto sem consultar IA."""
+    try:
+        typer.echo(str(Repository(repo).root))
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
 @app.command("index")
 def build_index(repo: Root = Path(".")):
     """Atualiza o índice, reutilizando arquivos que não mudaram."""

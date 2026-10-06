@@ -142,7 +142,8 @@ class CodaroApp(App):
                         if self.agent.allow_edits
                         else "Modo somente leitura.\n\n"
                     )
-                    + "O chat envia a pergunta e os trechos consultados ao modelo configurado.",
+                    + "Use `/pwd` para conferir o diretório da sessão sem consultar IA.\n\n"
+                    "O chat envia a pergunta e os trechos consultados ao modelo configurado.",
                     classes="assistant",
                     open_links=False,
                 )
@@ -176,6 +177,16 @@ class CodaroApp(App):
     def on_input_submitted(self, event: Input.Submitted):
         question = event.value.strip()
         if not question or self.busy:
+            return
+        if question == "/pwd":
+            event.input.value = ""
+            self.mount_message(
+                Static(
+                    f"Diretório da sessão\n{safe_preview(str(self.agent.repository.root))}",
+                    classes="question",
+                    markup=False,
+                )
+            )
             return
         if self.agent.edits.pending:
             self.mount_message(

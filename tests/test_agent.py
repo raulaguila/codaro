@@ -375,3 +375,55 @@ def test_cancelled_proposal_is_discarded(tmp_path):
         agent.ask("Edite.", cancelled=cancelled, on_detail=detail)
     assert not agent.edits.pending
     assert not agent.turns
+
+
+def test_repository_context_and_tools_use_selected_root_not_process_cwd(tmp_path, monkeypatch):
+    install = tmp_path / "installed-codaro"
+    selected = tmp_path / "meu projeto"
+    install.mkdir()
+    selected.mkdir()
+    (install / "decoy.py").write_text("wrong = True\n")
+    (selected / "selected.py").write_text("value = 'from selected project'\n")
+    monkeypatch.chdir(install)
+    model = FakeModel(
+        [
+            call("get_repository_info", {}),
+            call("list_files", {}, "files"),
+            call("read_lines", {"path": "selected.py", "start": 1, "end": 1}, "read"),
+            {"content": "Código lido da pasta selecionada."},
+        ]
+    )
+    agent = Agent(Repository(selected), model)
+    agent.ask("Em qual diretório está? Leia selected.py.")
+    for messages, _ in model.requests:
+        context = next(
+            line
+            for line in messages[0]["content"].splitlines()
+            if line.startswith('{"repository_root"')
+        )
+        assert json.loads(context)["repository_root"] == str(selected.resolve())
+    outputs = {
+        item["tool_call_id"]: json.loads(item["content"])
+        for item in model.requests[-1][0]
+        if item["role"] == "tool"
+    }
+    assert outputs["call-1"]["repository_root"] == str(selected.resolve())
+    assert outputs["files"]["files"] == ["selected.py"]
+    assert "from selected project" in outputs["read"]["content"]
+
+
+def test_repository_context_survives_stale_answer_and_final_no_tools(tmp_path):
+    model = FakeModel([{"content": "Resposta."}])
+    agent = Agent(Repository(tmp_path), model, max_steps=0, allow_edits=True)
+    agent.turns = [
+        [
+            {"role": "user", "content": "Onde estamos?"},
+            {"role": "assistant", "content": "/home/user/codigo"},
+        ]
+    ]
+    agent.ask("Confira o diretório atual.")
+    messages, tools = model.requests[0]
+    assert tools is None
+    assert str(tmp_path.resolve()) in messages[0]["content"]
+    assert "get_repository_info" in messages[0]["content"]
+    assert "propose_edit_with_approval" in messages[0]["content"]
