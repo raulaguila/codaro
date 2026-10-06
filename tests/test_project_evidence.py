@@ -107,21 +107,25 @@ def test_partial_line_does_not_qualify_as_complete_evidence(tmp_path):
         Agent(Repository(tmp_path), model, max_steps=1).ask(QUESTION)
 
 
-def test_previous_turn_read_does_not_authorize_uninvestigated_followup(tmp_path):
+def test_followup_recovers_fresh_source_before_accepting_a_citation(tmp_path):
     project(tmp_path)
     model = FakeModel(
         [
             call("read_lines", {"path": "pyproject.toml", "start": 1, "end": 2}),
             {"content": "pyproject.toml:2 inicia codaro."},
             {"content": "pyproject.toml:2 inicia codaro."},
-            {"content": "pyproject.toml:2 inicia codaro."},
+            {"content": "pyproject.toml:2 inicia new.cli:app."},
         ]
     )
     agent = Agent(Repository(tmp_path), model)
     agent.ask(QUESTION)
-    with pytest.raises(ModelError, match="sem citar arquivos"):
-        agent.ask(QUESTION)
-    assert len(agent.turns) == 1
+    (tmp_path / "pyproject.toml").write_text('[project.scripts]\ncodaro = "new.cli:app"\n')
+    assert "new.cli:app" in agent.ask(QUESTION)
+    assert len(agent.turns) == 2
+    assert "new.cli:app" in model.requests[-1][0][0]["content"]
+    flow = json.loads((tmp_path / ".codaro/prompt.json").read_text())
+    assert flow["turns"][0]["outcome"] == "evidence_repair"
+    assert "new.cli:app" in flow["local_retrievals"][0]["calls"][0]["result"]["content"]
 
 
 @pytest.mark.parametrize(

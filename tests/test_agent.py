@@ -466,7 +466,7 @@ def test_text_tool_call_is_repaired_via_protocol_not_executed(tmp_path):
     answer = agent.ask("Quais arquivos existem?", on_detail=events.append)
     assert answer == "Arquivo encontrado: auth.py."
     assert any(event.state == "retry" for event in events)
-    assert "A chamada em texto não foi executada" in model.requests[1][0][-1]["content"]
+    assert "A chamada em texto não foi executada" in model.requests[1][0][0]["content"]
     tools = [item for item in model.requests[-1][0] if item["role"] == "tool"]
     assert len(tools) == 1
     assert tools[0]["tool_call_id"] == "call-1"

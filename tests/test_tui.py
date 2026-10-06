@@ -462,6 +462,6 @@ def test_project_overview_never_renders_rejected_session_explanation(tmp_path):
             assert len(app.query("Markdown")) == 1
             assert len(app.query(".speaker")) == 1
             assert "list_files e search_code" not in app.response_text
-            assert len(app.query(".tool-card")) == 2
+            assert len(app.query(".tool-card")) == 3
 
     run_ui(scenario())

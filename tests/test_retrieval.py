@@ -52,7 +52,7 @@ def test_ignores_apply_to_search_and_direct_read(project):
     for name in ["ignored.py", "private.py", ".env", "credentials.json"]:
         (project / name).write_text("confidential")
     repository = Repository(project)
-    assert [path.name for path in repository.files()] == ["auth.py"]
+    assert [path.name for path in repository.files()] == [".codaroignore", ".gitignore", "auth.py"]
     for name in ["ignored.py", "private.py", ".env", "credentials.json"]:
         with pytest.raises(ValueError):
             repository.read_lines(name)

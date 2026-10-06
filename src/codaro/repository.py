@@ -39,6 +39,30 @@ SOURCE_EXTENSIONS = {
     ".vue",
     ".svelte",
 }
+# Common manifests, build files and ignore rules do not have a source extension.
+SOURCE_NAMES = {
+    ".gitignore",
+    ".gitattributes",
+    ".dockerignore",
+    ".codaroignore",
+    ".editorconfig",
+    "dockerfile",
+    "containerfile",
+    "makefile",
+    "gnumakefile",
+    "justfile",
+    "procfile",
+    "go.mod",
+    "go.sum",
+    "cargo.lock",
+    "gemfile",
+    "rakefile",
+    "jenkinsfile",
+    "cmakelists.txt",
+    "readme",
+    "license",
+}
+IGNORE_RULE_FILES = {".gitignore", ".dockerignore", ".codaroignore", ".gitattributes"}
 EXCLUDED_DIRS = {
     ".git",
     ".codaro",
@@ -94,7 +118,7 @@ class Repository:
             return False
         if any(word in name for word in ("credential", "secret", "id_rsa", "id_ed25519")):
             return False
-        return relative.suffix.lower() in SOURCE_EXTENSIONS
+        return relative.suffix.lower() in SOURCE_EXTENSIONS or name in SOURCE_NAMES
 
     def files(self) -> list[Path]:
         args = ["rg", "--files", "--null", "--hidden", "--no-require-git"]
@@ -143,10 +167,14 @@ class Repository:
     def resolve_file(self, name: str) -> Path:
         path = self.root / self._relative(self.root / name)
         if not self.allowed(path):
-            raise RepositoryError("Arquivo fora do projeto ou não permitido.")
+            raise RepositoryError(
+                "Arquivo bloqueado pela política de tipos, diretórios ou links. "
+                "Use list_files para escolher um caminho permitido."
+            )
         if path not in set(self.files()):
             raise RepositoryError(
-                "Arquivo inexistente, grande demais ou excluído pelas regras de ignore."
+                "Arquivo inexistente, grande demais ou excluído pelas regras de ignore. "
+                "Use list_files para descobrir arquivos disponíveis; não adivinhe caminhos."
             )
         return path
 
