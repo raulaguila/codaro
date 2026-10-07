@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 
-def private_read(path: Path, maximum: int) -> bytes:
+def private_read(path: Path, maximum: int, *, require_private=False) -> bytes:
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
     directory = None
     if path.parent.is_symlink() or path.is_symlink():
@@ -26,6 +26,8 @@ def private_read(path: Path, maximum: int) -> bytes:
             info = os.fstat(stream.fileno())
             if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
                 raise ValueError("Armazenamento deve ser regular, sem links.")
+            if require_private and os.name == "posix" and info.st_mode & 0o077:
+                raise ValueError("Credenciais devem ter permissões privadas (chmod 600).")
             data = stream.read(maximum + 1)
         if len(data) > maximum:
             raise ValueError("Armazenamento excede o limite.")
@@ -35,9 +37,9 @@ def private_read(path: Path, maximum: int) -> bytes:
             os.close(directory)
 
 
-def private_json(path: Path, maximum: int):
+def private_json(path: Path, maximum: int, *, require_private=False):
     try:
-        return json.loads(private_read(path, maximum))
+        return json.loads(private_read(path, maximum, require_private=require_private))
     except (UnicodeError, ValueError, RecursionError) as exc:
         raise ValueError("Armazenamento JSON inválido.") from exc
 

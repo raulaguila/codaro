@@ -576,6 +576,30 @@ class Agent:
             else 96_000
         )
 
+    def set_provider(self, provider):
+        if self._lock.locked() or self.edits.pending:
+            raise ValueError("Conclua/cancele a ação atual antes de trocar de provedor/modelo.")
+        self.provider = provider
+        settings = provider.settings
+        self.context_window, self.max_output_tokens = (
+            settings.context_window,
+            settings.max_output_tokens,
+        )
+        self.input_limit = self.context_window - self.max_output_tokens - 512
+        self.adaptive_input_limit = self.input_limit
+        self.local_read_budget = min(6000, max(1200, self.input_limit // 3))
+        self.counter = TokenCounter(settings.token_encoding)
+        self._calibration_key = ""
+        from codaro.sessions import SessionStore
+
+        previous, current = (
+            self.memory.redact,
+            SessionStore(self.repository.root, settings.api_key).redact,
+        )
+        self.memory.redact = lambda value: current(previous(value))
+        self.tasks.redact = self.memory.redact
+        self.policy.reset()
+
     def repository_info(self) -> dict:
         return {
             "repository_root": str(self.repository.root),
@@ -932,9 +956,14 @@ class Agent:
                 )
 
             def fits(payload, ratio=1.0):
+                payload = wire(payload)
                 return len(serialize(payload)) <= int(
                     self.context_budget * ratio
                 ) and self.counter.count(payload) <= int(self.adaptive_input_limit * ratio)
+
+            def wire(payload):
+                convert = getattr(self.provider, "wire_payload", None)
+                return convert(payload) if callable(convert) else payload
 
             def refresh_evidence():
                 # A discarded excerpt no longer qualifies as proof or as an observed edit.
@@ -982,8 +1011,8 @@ class Agent:
                         refresh_evidence()
                     after = request(extra)
                     record.update(
-                        input_tokens_before=self.counter.count(before),
-                        input_tokens_after=self.counter.count(after),
+                        input_tokens_before=self.counter.count(wire(before)),
+                        input_tokens_after=self.counter.count(wire(after)),
                         input_limit=self.adaptive_input_limit,
                     )
                     flow = current_flow.get()
@@ -1029,7 +1058,7 @@ class Agent:
                             "disponível. Reduza a pergunta/referências ou configure "
                             "CODARO_CONTEXT_WINDOW conforme a janela real do servidor."
                         )
-                    size, tokens = len(serialize(payload)), self.counter.count(payload)
+                    size, tokens = len(serialize(wire(payload))), self.counter.count(wire(payload))
                     event("Consultando modelo…")
                     detail(
                         AgentEvent(
@@ -1044,7 +1073,7 @@ class Agent:
                     flow = current_flow.get()
                     if flow is not None:
                         flow.add_turn(
-                            payload,
+                            wire(payload),
                             {
                                 "context_chars": size,
                                 "tool_chars_used": used,

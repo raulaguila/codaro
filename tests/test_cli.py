@@ -56,7 +56,7 @@ def test_cli_native_command_requires_approval_before_execution(tmp_path, monkeyp
             assert not target.exists() if len(messages) == 2 else True
             return next(responses)
 
-        monkeypatch.setattr("codaro.cli.OpenAICompatible.stream", stream)
+        monkeypatch.setattr("codaro.provider.OpenAICompatible.stream", stream)
         result = runner.invoke(app, ["edit", "Execute.", "--repo", str(tmp_path)], input=answer)
         assert result.exit_code == 0, result.output
         assert target.exists() == answer.startswith("y")
@@ -123,8 +123,8 @@ def test_ask_reports_provider_failure(tmp_path, monkeypatch):
     def fail(*args, **kwargs):
         raise ModelError("API indisponível.")
 
-    monkeypatch.setattr("codaro.cli.OpenAICompatible.complete", fail)
-    monkeypatch.setattr("codaro.cli.OpenAICompatible.stream", fail)
+    monkeypatch.setattr("codaro.provider.OpenAICompatible.complete", fail)
+    monkeypatch.setattr("codaro.provider.OpenAICompatible.stream", fail)
     result = runner.invoke(app, ["ask", "Explique.", "--repo", str(tmp_path)])
     assert result.exit_code == 1
     assert "API indisponível" in result.stderr
@@ -143,7 +143,7 @@ def test_ask_stream_renders_answer_and_tools_without_duplicate_output(tmp_path, 
         on_delta("resposta final.")
         return {"content": "**Resultado:** resposta final."}
 
-    monkeypatch.setattr("codaro.cli.OpenAICompatible.stream", stream)
+    monkeypatch.setattr("codaro.provider.OpenAICompatible.stream", stream)
     result = runner.invoke(app, ["ask", "Investigue.", "--repo", str(tmp_path)])
     assert result.exit_code == 0
     assert result.stdout.count("resposta final.") == 1
@@ -169,7 +169,7 @@ def install_edit_model(monkeypatch):
             on_delta(response["content"])
         return response
 
-    monkeypatch.setattr("codaro.cli.OpenAICompatible.stream", stream)
+    monkeypatch.setattr("codaro.provider.OpenAICompatible.stream", stream)
 
 
 def test_edit_cli_approval_applies_only_after_diff(tmp_path, monkeypatch):
@@ -255,7 +255,7 @@ def test_pwd_reports_selected_root_without_provider(tmp_path, monkeypatch):
     def unavailable(*args, **kwargs):
         raise AssertionError("pwd não deve chamar o modelo")
 
-    monkeypatch.setattr("codaro.cli.OpenAICompatible", unavailable)
+    monkeypatch.setattr("codaro.cli.create_provider", unavailable)
     project = tmp_path / "project"
     project.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -277,7 +277,7 @@ def test_shortcut_can_read_files_and_exposes_root_to_model(tmp_path, monkeypatch
         ]
     )
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr("codaro.cli.OpenAICompatible", lambda settings: model)
+    monkeypatch.setattr("codaro.cli.create_provider", lambda settings: model)
     monkeypatch.setattr("codaro.tui.CodaroApp.run", lambda self: self.agent.ask("Leia current.py."))
     result = runner.invoke(app, ["."])
     assert result.exit_code == 0, result.output
@@ -310,7 +310,7 @@ def test_tls_flag_applies_to_ask_and_edit(tmp_path, monkeypatch):
         on_delta("OK")
         return {"content": "OK"}
 
-    monkeypatch.setattr("codaro.cli.OpenAICompatible.stream", stream)
+    monkeypatch.setattr("codaro.provider.OpenAICompatible.stream", stream)
     for command in ("ask", "edit"):
         result = runner.invoke(app, [command, "Teste.", "--repo", str(tmp_path), "--tls-insecure"])
         assert result.exit_code == 0, result.output
@@ -332,7 +332,7 @@ def test_doctor_tool_probe_is_explicit_and_supports_tls_flag(monkeypatch):
     def probe(self):
         captured.append(self.settings.tls_insecure)
 
-    monkeypatch.setattr("codaro.cli.OpenAICompatible.check_tool_calling", probe)
+    monkeypatch.setattr("codaro.provider.OpenAICompatible.check_tool_calling", probe)
     assert runner.invoke(app, ["doctor"]).exit_code == 0
     assert captured == []
     result = runner.invoke(app, ["doctor", "--check-tools", "--tls-insecure"])
@@ -426,7 +426,7 @@ def test_cli_task_scope_requires_confirmation_before_calling_model(tmp_path, mon
         calls.append(True)
         return {"content": "Sem alterações necessárias."}
 
-    monkeypatch.setattr("codaro.cli.OpenAICompatible.stream", stream)
+    monkeypatch.setattr("codaro.provider.OpenAICompatible.stream", stream)
     args = [
         "execute",
         "Ajustar código",

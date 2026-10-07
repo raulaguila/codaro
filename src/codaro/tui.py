@@ -25,7 +25,7 @@ from codaro.edits import EditProposal
 from codaro.index import CodeIndex, safe_preview
 from codaro.interaction import COMMANDS, InputHistory, completions
 from codaro.policies import ApprovalPolicy, Mode
-from codaro.provider import MAX_MESSAGE_CHARS, ModelError, OpenAICompatible
+from codaro.provider import MAX_MESSAGE_CHARS, ModelError, Settings, create_provider
 from codaro.sessions import SessionStore
 from codaro.storage import private_lock
 
@@ -671,7 +671,10 @@ class CodaroApp(App):
         }:
             self.mount_message(Static("Este comando não recebe argumentos.", classes="notice"))
             return
-        if name in {"/resume", "/compact", "/model", "/undo"} and self.agent.edits.pending:
+        if (
+            name in {"/resume", "/compact", "/model", "/models", "/providers", "/undo"}
+            and self.agent.edits.pending
+        ):
             self.mount_message(Static("Revise as edições pendentes primeiro.", classes="notice"))
             return
         self.query_one(Prompt).value = ""
@@ -792,15 +795,39 @@ class CodaroApp(App):
                 text = json.dumps(value, ensure_ascii=False, indent=2)
             except (ValueError, OSError, sqlite3.Error) as exc:
                 text = str(exc)
-        elif name == "/model":
+        elif name in {"/providers", "/models", "/model"}:
+            from codaro.provider_ui import ModelPicker, ProviderSetup
+            from codaro.providers import ProviderStore
+
+            store = ProviderStore()
+            try:
+                configured = store.load()
+            except (ValueError, OSError) as exc:
+                self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
+                return
+            if name == "/providers":
+                self.push_screen(
+                    ProviderSetup(store), lambda name: self.provider_registered(name, store)
+                )
+                return
+            if not argument and configured["profiles"]:
+                self.push_screen(ModelPicker(store), self.activate_provider)
+                return
+            if name == "/models":
+                self.push_screen(
+                    ProviderSetup(store), lambda name: self.provider_registered(name, store)
+                )
+                return
             if argument:
                 try:
-                    settings = replace(self.agent.provider.settings, model=argument)
-                    self.agent.provider = OpenAICompatible(
-                        settings, transport=getattr(self.agent.provider, "transport", None)
+                    current = self.agent.provider.settings
+                    settings = (
+                        await asyncio.to_thread(store.select, current.provider_id, argument)
+                        if current.provider_id
+                        else replace(current, model=argument)
                     )
-                    self.update_session_header()
-                except ValueError as exc:
+                    self.activate_provider(settings)
+                except (ValueError, OSError, ModelError) as exc:
                     self.mount_message(
                         Static(safe_preview(str(exc)), classes="notice", markup=False)
                     )
@@ -826,6 +853,7 @@ class CodaroApp(App):
                 f"caracteres / limite {self.agent.context_budget}\n"
                 f"Entrada estimada: {self.context_tokens} / {self.context_limit} tokens\n"
                 f"Janela configurada: {self.agent.context_window} tokens · "
+                f"origem: {self.agent.provider.settings.context_source}\n"
                 f"reserva de saída: {self.agent.max_output_tokens} · margem: 512\n"
                 f"Contagem: {self.agent.counter.method}\n"
                 f"Tokens informados pelo servidor: {self.reported_tokens}\n"
@@ -834,6 +862,47 @@ class CodaroApp(App):
                 f"Sessão: {self.session.path}\nDebug: .codaro/prompt.json"
             )
         self.mount_message(Static(safe_preview(text), classes="question", markup=False))
+
+    def provider_registered(self, name, store=None):
+        if name is not None:
+            from codaro.provider_ui import ModelPicker
+
+            self.push_screen(ModelPicker(store, profile=name), self.activate_provider)
+
+    def activate_provider(self, settings: Settings | None):
+        if settings is None:
+            return
+        try:
+            current = self.agent.provider.settings
+            if (
+                current.provider_id == settings.provider_id
+                and current.base_url == settings.base_url
+            ):
+                settings = replace(
+                    settings,
+                    tls_insecure=current.tls_insecure,
+                    timeout=current.timeout,
+                    token_encoding=current.token_encoding,
+                )
+            self.agent.set_provider(create_provider(settings))
+            self.session.secret = settings.api_key
+            self.context_limit = self.agent.adaptive_input_limit
+            self.context_chars = self.context_tokens = 0
+            self.reported_tokens = None
+            self.update_session_header()
+            self.mount_message(
+                Static(
+                    safe_preview(
+                        f"Modelo selecionado: {settings.provider_id or 'ambiente'} / "
+                        f"{settings.model}\n"
+                        f"Contexto: {settings.context_window} tokens · {settings.context_source}"
+                    ),
+                    classes="notice",
+                    markup=False,
+                )
+            )
+        except (ValueError, OSError) as exc:
+            self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
 
     def save_session(self):
         try:

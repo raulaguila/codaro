@@ -217,7 +217,10 @@ def test_chat_keeps_streaming_preview_separate_from_final_markdown(tmp_path):
             assert preview.content.visible
             model.release.set()
             await wait_ready(app, pilot)
-            await pilot.pause(0.1)
+            for _ in range(100):
+                await pilot.pause(0.02)
+                if not preview.content.display:
+                    break
             assert len(app.query("MarkdownFence")) == 1
             assert app.rendered_text.count("Parcial") == 1
             assert not preview.collapsed

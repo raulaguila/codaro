@@ -7,7 +7,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
 import httpx
@@ -76,6 +76,8 @@ def is_context_error(body: str) -> bool:
             "exceeds context",
             "input length exceeds",
             "too many tokens",
+            "prompt is too long",
+            "too many input tokens",
             "context_length_exceeded",
         )
     )
@@ -89,14 +91,22 @@ class RequestCancelled(RuntimeError):
 class Settings:
     base_url: str
     model: str
-    api_key: str = ""
+    api_key: str = field(default="", repr=False)
     timeout: float = 90.0
     tls_insecure: bool = False
     context_window: int = 16_384
     max_output_tokens: int = 1400
     token_encoding: str | None = None
+    provider_id: str = ""
+    context_source: str = "configuração padrão/ambiente"
+    api_style: str = "openai"
+    model_max_output_tokens: int | None = None
 
     def __post_init__(self):
+        if self.api_style not in {"openai", "anthropic"}:
+            raise ValueError("API do provedor inválida.")
+        if len(self.api_key) > 16384:
+            raise ValueError("Credencial excede o limite permitido.")
         if (
             type(self.context_window) is not int
             or not 4096 <= self.context_window <= 2_000_000
@@ -140,8 +150,23 @@ class Settings:
     def from_env(
         cls, *, tls_insecure: bool | None = None, context_window: int | None = None
     ) -> Settings:
+        from codaro.providers import ProviderStore
+
+        store, selected = ProviderStore(), os.getenv("CODARO_PROVIDER", "").strip()
+        configured = None
+        if selected or not any(
+            os.getenv(name) for name in ("CODARO_BASE_URL", "CODARO_MODEL", "CODARO_API_KEY")
+        ):
+            if selected or store.load()["active"]:
+                configured = store.active_settings(selected or None)
         if tls_insecure is None:
-            raw = os.getenv("CODARO_TLS_INSECURE", "false").strip().lower()
+            raw = (
+                os.getenv(
+                    "CODARO_TLS_INSECURE", str(configured.tls_insecure) if configured else "false"
+                )
+                .strip()
+                .lower()
+            )
             values = {
                 "1": True,
                 "true": True,
@@ -163,22 +188,48 @@ class Settings:
             window = (
                 context_window
                 if context_window is not None
-                else int(os.getenv("CODARO_CONTEXT_WINDOW", "16384"))
+                else int(
+                    os.getenv(
+                        "CODARO_CONTEXT_WINDOW",
+                        str(configured.context_window) if configured else "16384",
+                    )
+                )
             )
-            output = int(os.getenv("CODARO_MAX_OUTPUT_TOKENS", "1400"))
+            output = int(
+                os.getenv(
+                    "CODARO_MAX_OUTPUT_TOKENS",
+                    str(configured.max_output_tokens) if configured else "1400",
+                )
+            )
         except ValueError as exc:
             raise ValueError(
                 "CODARO_CONTEXT_WINDOW e CODARO_MAX_OUTPUT_TOKENS: use inteiros."
             ) from exc
+        if configured and configured.model_max_output_tokens:
+            output = min(output, configured.model_max_output_tokens, 32768)
         return cls(
-            base_url=os.getenv("CODARO_BASE_URL", "http://localhost:11434/v1").strip().rstrip("/"),
-            model=os.getenv("CODARO_MODEL", "qwen2.5:7b").strip(),
-            api_key=os.getenv("CODARO_API_KEY", "").strip(),
+            base_url=configured.base_url
+            if configured
+            else os.getenv("CODARO_BASE_URL", "http://localhost:11434/v1").strip().rstrip("/"),
+            model=configured.model
+            if configured
+            else os.getenv("CODARO_MODEL", "qwen2.5:7b").strip(),
+            api_key=configured.api_key if configured else os.getenv("CODARO_API_KEY", "").strip(),
             timeout=timeout,
             tls_insecure=tls_insecure,
             context_window=window,
             max_output_tokens=output,
             token_encoding=os.getenv("CODARO_TOKEN_ENCODING", "").strip() or None,
+            provider_id=configured.provider_id if configured else "",
+            api_style=configured.api_style if configured else "openai",
+            model_max_output_tokens=configured.model_max_output_tokens if configured else None,
+            context_source=(
+                "configuração do usuário"
+                if context_window is not None or os.getenv("CODARO_CONTEXT_WINDOW")
+                else configured.context_source
+                if configured
+                else "configuração padrão/ambiente"
+            ),
         )
 
 
@@ -230,6 +281,10 @@ def validate_message(message: object) -> dict:
 
 
 class OpenAICompatible:
+    @staticmethod
+    def wire_payload(payload):
+        return payload
+
     def __init__(self, settings: Settings, transport: httpx.BaseTransport | None = None):
         self.settings = settings
         self.transport = transport
@@ -561,6 +616,14 @@ class OpenAICompatible:
 def check_cancelled(cancelled: threading.Event | None):
     if cancelled is not None and cancelled.is_set():
         raise RequestCancelled("Investigação cancelada.")
+
+
+def create_provider(settings, *, transport=None):
+    if settings.api_style == "anthropic":
+        from codaro.anthropic import Anthropic
+
+        return Anthropic(settings, transport)
+    return OpenAICompatible(settings, transport)
 
 
 def check_finish_reason(reason: str | None):

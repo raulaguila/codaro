@@ -152,6 +152,36 @@ O chat detecta o sistema onde o processo está rodando. No macOS, o rodapé e `/
 
 Chamadas de ferramentas devem chegar no campo nativo `tool_calls`, com nomes e argumentos do catálogo enviado ao servidor. Se o modelo escrever uma chamada JSON como texto — inclusive com um nome inventado como `read_file` — o agente pede uma correção pelo protocolo uma vez. Esse texto não é executado nem aceito como resposta final; se o erro persistir, a tarefa fica bloqueada e o fluxo é preservado em `.codaro/prompt.json`. Exemplos acompanhados de explicação continuam permitidos. Use `codaro doctor --check-tools` para verificar o ciclo de chamada, resultado e resposta com seu modelo/servidor.
 
+## Provedores e BYOK
+
+No chat, `/providers` abre o cadastro: escolha **OpenAI Compatible, OpenAI, Ollama, Anthropic, Gemini ou Groq**, informe a chave com entrada oculta e clique em **Cadastrar e listar modelos**. Os provedores conhecidos já têm URL preenchida; OpenAI Compatible precisa da URL base do seu servidor. O formulário inclui **TLS Insecure**, também disponível como flag na CLI. Ollama local não exige chave. Depois do cadastro, escolha um modelo na lista recebida da API. `/models` ou `/model` reabre a seleção; **Atualizar API** consulta novamente o catálogo.
+
+Também funciona sem abrir o chat:
+
+```bash
+codaro providers add openai
+codaro providers add anthropic
+codaro providers add gemini
+codaro providers add groq
+codaro providers add ollama
+codaro providers add openai-compatible --base-url https://meu-servidor/v1 --tls-insecure
+# A API key é solicitada com entrada oculta; em seguida aparece o catálogo.
+codaro providers list
+codaro models list --provider openai --refresh
+codaro models use ID_DO_MODELO --provider openai
+codaro .
+```
+
+`--name` permite vários perfis do mesmo provedor. Para automação, `--key-env NOME_DA_VARIAVEL` lê a chave dessa variável, sem colocar seu valor nos argumentos do processo. `codaro providers remove PERFIL` remove o perfil e sua credencial local. O provedor/modelo selecionado passa a ser o padrão global; a troca no chat preserva a conversa, atualiza imediatamente janela, reserva de saída e contagem de contexto, e revoga aprovações por tarefa.
+
+**Metadados vêm da API, quando disponíveis.** Gemini usa `/v1beta/models`, incluindo `inputTokenLimit`/`outputTokenLimit`, e conversa pelo endpoint OpenAI-compatible. Anthropic usa `/v1/models`, incluindo `max_input_tokens`/`max_tokens` quando informados, e `/v1/messages` nativo para ferramentas, resultados e streaming. Groq e servidores compatíveis usam `/models` e seus campos de limites. Ollama lista `/api/tags` e consulta `/api/show` ao selecionar: `parameters.num_ctx` configura o orçamento; o limite arquitetural em `model_info` não comprova a janela ativa do servidor. A seleção consulta os metadados novamente. O catálogo mostra ID, nome, limites, origem e suporte a ferramentas quando informado.
+
+Algumas APIs, incluindo a listagem padrão da OpenAI, não informam contexto. Nesses casos, o catálogo mostra **não informado pela API** e o cliente usa **fallback de 16.384 tokens**, identificado em `/status`, no diagnóstico e na seleção. Isso não é o limite oficial do modelo. É possível definir um limite conhecido com `codaro models use ID --provider PERFIL --context-window 8192`; essa configuração é preservada ao atualizar o catálogo. Limites de entrada de Gemini/Anthropic são tratados conservadoramente como orçamento total, reservando saída e margem; o cliente mantém seu teto de 2.000.000 tokens e reserva padrão de até 1.400 tokens, limitada pelo máximo de saída informado. APIs indisponíveis não apagam a configuração anterior. A abertura do chat usa o último catálogo salvo, sem exigir conexão para carregar a configuração.
+
+Os perfis e chaves ficam em `$XDG_CONFIG_HOME/codaro/provider-credentials.json` (padrão `~/.config/codaro/provider-credentials.json`), fora dos projetos. A gravação é atômica e, em POSIX, usa diretório privado e arquivo `0600`; links, arquivos compartilhados e permissões públicas são rejeitados. O arquivo contém as chaves em texto local, sem criptografia/keychain nesta versão. Seu nome é excluído pela política de arquivos do agente, inclusive ao analisar a pasta que contém a configuração. As chaves do formulário não são mensagens do chat, não entram no histórico e não aparecem no cadastro/listagem/diagnóstico. Em Windows, a proteção depende das permissões do diretório do usuário.
+
+A configuração antiga continua disponível: `CODARO_BASE_URL`, `CODARO_MODEL` ou `CODARO_API_KEY` definidos selecionam o modo de ambiente. `CODARO_PROVIDER=PERFIL` seleciona explicitamente um perfil cadastrado. As opções `--context-window`, `--tls-insecure/--tls-verify`, `CODARO_CONTEXT_WINDOW`, `CODARO_MAX_OUTPUT_TOKENS` e `CODARO_TIMEOUT` podem ajustar os limites/configuração do perfil. `codaro doctor --check-tools` verifica o ciclo real de ferramenta e resposta no provedor ativo, incluindo Anthropic.
+
 ## Comandos, referências e histórico
 
 Digite `/` para ver sugestões; ↑/↓ escolhem e Tab completa. Os comandos abaixo são locais e não consultam a IA:
@@ -162,6 +192,8 @@ Digite `/` para ver sugestões; ↑/↓ escolhem e Tab completa. Os comandos aba
 | `/pwd` | Diretório completo da sessão |
 | `/status` | Modelo, modo, turnos, último contexto enviado em caracteres e seu limite |
 | `/model` ou `/model nome` | Ver ou trocar o modelo para as próximas perguntas, preservando endpoint e TLS |
+| `/models` | Selecionar provedor/modelo do catálogo e atualizar metadados da API |
+| `/providers` | Cadastrar provedor e API key com entrada oculta |
 | `/clear` | Limpar o chat e descartar propostas pendentes |
 | `/resume` | Recuperar a última conversa salva no projeto |
 | `/compact` | Reduzir o contexto ativo aos quatro turnos mais recentes, preservando a conversa salva |
