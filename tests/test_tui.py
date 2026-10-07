@@ -728,3 +728,53 @@ def test_saved_conversation_survives_context_pruning(tmp_path):
             assert len(app.session.load()) == 2
 
     run_ui(scenario())
+
+
+def test_memory_map_and_history_ui_commands_do_not_consult_model(tmp_path):
+    (tmp_path / "main.py").write_text("def main(): return True\n")
+    model = UIModel()
+    app = CodaroApp(Agent(Repository(tmp_path), model))
+
+    async def scenario():
+        async with app.run_test(size=(110, 35)) as pilot:
+            await app.local_command("/memory decision Usar SQLite.")
+            await pilot.pause()
+            await app.local_command("/history SQLite")
+            await pilot.pause()
+            await app.local_command("/map")
+            await pilot.pause()
+            assert not model.started.is_set()
+            assert app.agent.memory.task()["items"][0]["text"] == "Usar SQLite."
+            content = "\n".join(str(widget.render()) for widget in app.query(".question"))
+            assert "SQLite" in content and "main.py" in content
+
+    run_ui(scenario())
+
+
+def test_ui_undo_reviews_inverse_diff_and_default_enter_does_not_apply(tmp_path):
+    from test_edits import manager_for, propose
+
+    from codaro.tui import EditReview
+
+    manager, path = manager_for(tmp_path)
+    proposal = propose(manager)
+    manager.apply(proposal.id)
+    app = CodaroApp(Agent(Repository(tmp_path), UIModel(), allow_edits=True))
+
+    async def scenario():
+        async with app.run_test(size=(110, 35)) as pilot:
+            await app.local_command("/undo")
+            await pilot.pause(0.1)
+            assert isinstance(app.screen, EditReview)
+            assert path.read_bytes() == proposal.after
+            await pilot.press("enter")
+            await pilot.pause()
+            assert not isinstance(app.screen, EditReview)
+            assert path.read_bytes() == proposal.after
+            pending = app.agent.edits.pending[0]
+            app.review_decision(pending.id, "apply")
+            await wait_ready(app, pilot)
+            assert path.read_bytes() == proposal.before
+            assert not app.agent.edits.pending
+
+    run_ui(scenario())

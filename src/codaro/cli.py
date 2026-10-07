@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import shutil
 import sqlite3
@@ -272,10 +273,14 @@ def run_question(
                 raise typer.Exit(1) from None
             if approved:
                 agent.edits.apply(proposal.id)
-                console.print("Edição aplicada. Testes não foram executados.")
+                message = f"Edição aplicada. Checkpoint: {proposal.checkpoint_id}. "
+                message += "Testes não foram executados. " + proposal.checkpoint_warning
+                console.print(message)
+                save_review(agent, proposal, message)
             else:
                 agent.edits.reject(proposal.id)
                 console.print("Edição rejeitada; arquivo preservado.")
+                save_review(agent, proposal, "Edição rejeitada; arquivo preservado.")
     except (ModelError, ValueError, OSError, sqlite3.Error) as exc:
         fail(exc)
 
@@ -327,9 +332,15 @@ def doctor(
     except ValueError as exc:
         fail(exc)
     sqlite_ready = True
+    snapshot_ready = False
     try:
         with sqlite3.connect(":memory:") as db:
             db.execute("CREATE VIRTUAL TABLE diagnostic USING fts5(content)")
+            if callable(getattr(db, "serialize", None)) and callable(
+                getattr(db, "deserialize", None)
+            ):
+                db.deserialize(db.serialize())
+                snapshot_ready = True
     except sqlite3.Error:
         sqlite_ready = False
     rg_ready = bool(shutil.which("rg"))
@@ -338,6 +349,7 @@ def doctor(
             Text(
                 f"ripgrep: {'disponível' if rg_ready else 'ausente'}\n"
                 f"SQLite FTS5: {'disponível' if sqlite_ready else 'ausente'}\n"
+                f"SQLite snapshots: {'disponível' if snapshot_ready else 'ausente'}\n"
                 f"modelo: {settings.model}\n"
                 f"timeout: {settings.timeout:g}s\n"
                 f"janela configurada: {settings.context_window} tokens\n"
@@ -350,7 +362,7 @@ def doctor(
             title="Diagnóstico",
         )
     )
-    if not rg_ready or not sqlite_ready:
+    if not rg_ready or not sqlite_ready or not snapshot_ready:
         raise typer.Exit(1)
     if check_tools:
         try:
@@ -361,6 +373,132 @@ def doctor(
             )
         except (ModelError, ValueError, OSError) as exc:
             fail(exc)
+
+
+@app.command("history")
+def conversation_history(query: str, repo: Root = Path(".")):
+    """Busca mensagens antigas do projeto, sem consultar IA."""
+    from codaro.memory import ConversationMemory
+
+    try:
+        result = ConversationMemory(Repository(repo).root, os.getenv("CODARO_API_KEY", "")).search(
+            query
+        )
+        typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("memory")
+def task_memory(
+    action: Annotated[str, typer.Argument()] = "show",
+    text: Annotated[str, typer.Argument()] = "",
+    repo: Root = Path("."),
+):
+    """Ver memória da tarefa ou registrar decision, constraint, pending, clear."""
+    from codaro.memory import ConversationMemory
+
+    try:
+        memory = ConversationMemory(Repository(repo).root, os.getenv("CODARO_API_KEY", ""))
+        if action == "clear":
+            memory.clear_task()
+        elif action != "show":
+            memory.remember(action, text)
+        typer.echo(json.dumps(memory.task(), ensure_ascii=False, indent=2))
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("map")
+def repository_map(repo: Root = Path(".")):
+    """Mostra módulos, manifestos e candidatos a pontos de entrada atuais."""
+    from codaro.project_map import ProjectMap
+
+    try:
+        with CodeIndex(Repository(repo)) as index:
+            typer.echo(json.dumps(ProjectMap().build(index), ensure_ascii=False, indent=2))
+    except (ValueError, OSError, sqlite3.Error) as exc:
+        fail(exc)
+
+
+@app.command("changes")
+def changes(repo: Root = Path(".")):
+    """Lista checkpoints com status e possibilidade de desfazer."""
+    from codaro.checkpoints import Checkpoints
+
+    try:
+        typer.echo(json.dumps(Checkpoints(Repository(repo)).list(), ensure_ascii=False, indent=2))
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("undo")
+def undo(checkpoint: Annotated[str | None, typer.Argument()] = None, repo: Root = Path(".")):
+    """Revisa e desfaz uma edição se o arquivo não mudou; aprovação obrigatória."""
+    from codaro.edits import EditManager
+
+    try:
+        manager = EditManager(Repository(repo))
+        proposal = manager.propose_undo(checkpoint)
+        console.print(Syntax(safe_preview(proposal.diff), "diff", word_wrap=True))
+        if typer.confirm(f"Desfazer a edição em {proposal.path}?", default=False):
+            manager.apply(proposal.id)
+            message = "Edição desfeita. " + proposal.checkpoint_warning
+            console.print(message)
+            from codaro.memory import ConversationMemory
+
+            try:
+                memory = ConversationMemory(
+                    manager.repository.root, os.getenv("CODARO_API_KEY", "")
+                )
+                memory.record_change(proposal, message)
+            except (ValueError, OSError) as exc:
+                errors.print(f"Alteração concluída; memória não salva: {exc}", markup=False)
+        else:
+            manager.reject(proposal.id)
+            console.print("Desfazer rejeitado; arquivo preservado.")
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("evaluate")
+def evaluate_command(
+    cases: Annotated[Path, typer.Argument()] = Path("evaluations/cases.json"),
+    agent_mode: Annotated[
+        bool,
+        typer.Option(
+            "--agent", help="Avalia respostas com o modelo real; envia código ao endpoint."
+        ),
+    ] = False,
+    output: Annotated[Path, typer.Option("--output", "-o", help="Relatório JSON.")] = Path(
+        ".codaro/evaluation.json"
+    ),
+):
+    """Avalia recuperação local; --agent também mede respostas e consumo de contexto."""
+    from codaro.evaluation import evaluate
+    from codaro.trace import atomic_write
+
+    try:
+        provider = OpenAICompatible(Settings.from_env()) if agent_mode else None
+        report = evaluate(
+            cases.resolve(), provider=provider, mode="agent" if agent_mode else "retrieval"
+        )
+        atomic_write(output.resolve(), json.dumps(report, ensure_ascii=False, indent=2).encode())
+        console.print(
+            f"Avaliação {report['mode']}: {report['passed']}/{report['total']} · {output}"
+        )
+        if report["passed"] != report["total"]:
+            raise typer.Exit(1)
+    except (ValueError, OSError, ModelError) as exc:
+        fail(exc)
+
+
+def save_review(agent, proposal, message):
+    try:
+        agent.memory.review(f"{proposal.path}: {message}")
+        agent.memory.record_change(proposal, message)
+    except (ValueError, OSError) as exc:
+        errors.print(f"Revisão concluída; memória não salva: {exc}", markup=False)
 
 
 if __name__ == "__main__":

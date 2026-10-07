@@ -14,6 +14,11 @@ COMMANDS = {
     "/clear": "Limpar a conversa atual",
     "/resume": "Retomar a última conversa salva neste projeto",
     "/compact": "Reduzir o contexto aos quatro turnos mais recentes",
+    "/history": "Buscar conversa com /history termos",
+    "/memory": "Ver memória ou registrar decision/constraint/pending texto",
+    "/map": "Mapa atualizado do projeto",
+    "/changes": "Alterações e checkpoints locais",
+    "/undo": "Revisar diff para desfazer a última edição ou um checkpoint",
 }
 
 

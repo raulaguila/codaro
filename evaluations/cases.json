@@ -1,0 +1,26 @@
+[
+  {
+    "id": "codaro-native-tools",
+    "repo": "..",
+    "question": "Como o Codaro envia ferramentas na API OpenAI compatible e trata rejeição de contexto? Cite os arquivos e linhas reais.",
+    "query": "build_payload ContextLimitError",
+    "expected_paths": ["src/codaro/provider.py"],
+    "answer_contains": ["tool_calls", "contexto"]
+  },
+  {
+    "id": "codaro-edit-safety",
+    "repo": "..",
+    "question": "Como a aplicação verifica se um arquivo mudou antes de aplicar uma edição? Cite a implementação.",
+    "query": "EditManager _apply",
+    "expected_paths": ["src/codaro/edits.py"],
+    "answer_contains": ["mudou"]
+  },
+  {
+    "id": "demo-authorization",
+    "repo": "../examples/demo",
+    "question": "Quem pode editar neste projeto? Leia a implementação e cite as linhas.",
+    "query": "can_edit",
+    "expected_paths": ["auth.py"],
+    "answer_contains": ["admin"]
+  }
+]

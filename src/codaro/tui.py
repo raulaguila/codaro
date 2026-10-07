@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import shlex
 import sqlite3
@@ -18,7 +20,7 @@ from textual.widgets import Button, Collapsible, Footer, Markdown, Static, TextA
 
 from codaro.agent import Agent, AgentEvent, InvestigationCancelled
 from codaro.edits import EditProposal
-from codaro.index import safe_preview
+from codaro.index import CodeIndex, safe_preview
 from codaro.interaction import COMMANDS, InputHistory, completions
 from codaro.provider import ModelError, OpenAICompatible
 from codaro.sessions import SessionStore
@@ -305,6 +307,7 @@ class CodaroApp(App):
         self.speaker: Static | None = None
         self.context_chars = 0
         self.context_tokens = 0
+        self.reported_tokens: int | None = None
         self.context_limit = agent.adaptive_input_limit
         self.proposal_cards: dict[str, ProposalCard] = {}
         self.prompt_too_long = False
@@ -456,10 +459,10 @@ class CodaroApp(App):
         if name not in COMMANDS:
             self.mount_message(Static("Comando desconhecido. Use /help.", classes="notice"))
             return
-        if argument and name != "/model":
+        if argument and name not in {"/model", "/history", "/memory", "/undo"}:
             self.mount_message(Static("Este comando não recebe argumentos.", classes="notice"))
             return
-        if name in {"/resume", "/compact", "/model"} and self.agent.edits.pending:
+        if name in {"/resume", "/compact", "/model", "/undo"} and self.agent.edits.pending:
             self.mount_message(Static("Revise as edições pendentes primeiro.", classes="notice"))
             return
         self.query_one(Prompt).value = ""
@@ -477,6 +480,41 @@ class CodaroApp(App):
             text += "Ctrl+X cancela · Ctrl+L limpa · Ctrl+P comandos · Ctrl+Q sai"
         elif name == "/pwd":
             text = f"Diretório da sessão\n{self.agent.repository.root}"
+        elif name in {"/memory", "/history", "/map", "/changes", "/undo"}:
+            try:
+                if name == "/history":
+                    value = self.agent.memory.search(argument)
+                elif name == "/memory":
+                    if argument == "clear":
+                        self.agent.memory.clear_task()
+                    elif argument:
+                        kind, _, content = argument.partition(" ")
+                        self.agent.memory.remember(kind, content)
+                    value = self.agent.memory.task()
+                elif name == "/map":
+
+                    def build_map():
+                        with CodeIndex(self.agent.repository) as index:
+                            return self.agent.project_map.build(index)
+
+                    value = await asyncio.to_thread(build_map)
+                elif name == "/changes":
+                    value = self.agent.edits.checkpoints.list()
+                else:
+                    if not self.agent.allow_edits:
+                        raise ValueError("Desfazer desabilitado no modo somente leitura.")
+                    proposal = self.agent.edits.propose_undo(argument or None)
+                    card = ProposalCard(proposal)
+                    self.proposal_cards[proposal.id] = card
+                    self.mount_message(card)
+                    self.push_screen(
+                        EditReview(proposal),
+                        lambda decision: self.review_decision(proposal.id, decision),
+                    )
+                    return
+                text = json.dumps(value, ensure_ascii=False, indent=2)
+            except (ValueError, OSError, sqlite3.Error) as exc:
+                text = str(exc)
         elif name == "/model":
             if argument:
                 try:
@@ -513,6 +551,9 @@ class CodaroApp(App):
                 f"Janela configurada: {self.agent.context_window} tokens · "
                 f"reserva de saída: {self.agent.max_output_tokens} · margem: 512\n"
                 f"Contagem: {self.agent.counter.method}\n"
+                f"Tokens informados pelo servidor: {self.reported_tokens}\n"
+                f"Calibração: {self.agent.counter.scale:.2f} · "
+                f"amostras: {len(self.agent.counter.samples)}\n"
                 f"Sessão: {self.session.path}\nDebug: .codaro/prompt.json"
             )
         self.mount_message(Static(safe_preview(text), classes="question", markup=False))
@@ -703,11 +744,15 @@ class CodaroApp(App):
             self.speaker = None
             self.context_chars = event.context_chars or 0
             self.context_tokens = event.context_tokens or 0
+            self.reported_tokens = None
             self.context_limit = event.context_limit or self.agent.adaptive_input_limit
             self.query_one("#status", Static).update(
                 f"Consultando modelo… · contexto ≈ {self.context_tokens:,} / "
                 f"{self.context_limit:,} tokens"
             )
+        elif event.reported_tokens is not None:
+            self.reported_tokens = event.reported_tokens
+            self.query_one("#status", Static).update(safe_preview(event.detail))
         elif event.kind == "model_end":
             if event.state == "answer":
                 self.flush_response()
@@ -861,7 +906,11 @@ class CodaroApp(App):
     def apply_edit(self, identifier: str):
         try:
             self.agent.edits.apply(identifier)
-            message = "Edição aplicada. Testes não foram executados."
+            proposal = self.agent.edits.proposals[identifier]
+            message = (
+                "Edição aplicada. Testes não foram executados. "
+                f"Checkpoint: {proposal.checkpoint_id}. " + proposal.checkpoint_warning
+            )
         except (ValueError, OSError) as exc:
             message = f"Edição bloqueada: {exc} Faça uma nova proposta sobre o arquivo atual."
         except Exception:
@@ -877,6 +926,11 @@ class CodaroApp(App):
             self.refresh_reference_paths()
         # Save the actual approval outcome alongside the answer for follow-up questions.
         review = f"\n\nResultado da revisão: {card.proposal.path}: {message}"
+        try:
+            self.agent.memory.review(review)
+            self.agent.memory.record_change(card.proposal, message)
+        except (ValueError, OSError) as exc:
+            self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
         if self.agent.turns:
             self.agent.turns[-1][-1]["content"] += review
         if self.session_turns:

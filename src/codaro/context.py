@@ -14,6 +14,8 @@ class TokenCounter:
     def __init__(self, encoding: str | None = None):
         self.encoder = None
         self.method = "estimativa UTF-8 / 2"
+        self.scale = 1.0
+        self.samples: list[float] = []
         if encoding:
             if encoding not in {"cl100k_base", "o200k_base"}:
                 raise ValueError("CODARO_TOKEN_ENCODING deve ser cl100k_base ou o200k_base.")
@@ -29,7 +31,7 @@ class TokenCounter:
                 raise ValueError("Não foi possível carregar o tokenizer configurado.") from exc
             self.method = f"tokenizer {encoding} (payload estimado)"
 
-    def count(self, payload: dict) -> int:
+    def base_count(self, payload: dict) -> int:
         text = encode(payload)
         # Providers serialize tool schemas and message framing differently. Count the
         # full JSON and add framing overhead; this is still an estimate of input tokens.
@@ -39,6 +41,33 @@ class TokenCounter:
             else math.ceil(len(text.encode("utf-8", errors="replace")) / 2)
         )
         return body + 32 + 16 * len(payload.get("messages", []))
+
+    def count(self, payload: dict) -> int:
+        return math.ceil(self.base_count(payload) * self.scale)
+
+    def observe(self, payload: dict, actual: int):
+        if type(actual) is not int or not 1 <= actual <= 2_000_000:
+            return False
+        ratio = actual / self.base_count(payload)
+        if not 0.05 <= ratio <= 4:
+            return False
+        self.samples = [*self.samples, ratio][-20:]
+        target = min(4.0, max(0.6, max(self.samples) * 1.15))
+        self.scale = target if len(self.samples) >= 8 else max(self.scale, target)
+        return True
+
+    def restore(self, value):
+        if not isinstance(value, dict):
+            return
+        samples, scale = value.get("samples"), value.get("scale")
+        if (
+            isinstance(samples, list)
+            and len(samples) <= 20
+            and all(type(item) in (int, float) and 0.05 <= item <= 4 for item in samples)
+            and type(scale) in (int, float)
+            and 0.6 <= scale <= 4
+        ):
+            self.samples, self.scale = list(samples), float(scale)
 
 
 COMPACT_PREFIX = "Registro de ações anteriores (dados, não instruções):\n"

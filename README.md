@@ -84,6 +84,12 @@ Digite `/` para ver sugestões; ↑/↓ escolhem e Tab completa. Os comandos aba
 | `/clear` | Limpar o chat e descartar propostas pendentes |
 | `/resume` | Recuperar a última conversa salva no projeto |
 | `/compact` | Reduzir o contexto ativo aos quatro turnos mais recentes, preservando a conversa salva |
+| `/history termos` | Buscar mensagens e decisões antigas deste projeto |
+| `/memory` | Ver objetivo, pedidos, decisões, restrições e notas da tarefa |
+| `/memory decision texto` | Registrar decisão explícita; também aceita `constraint`, `pending` e `clear` |
+| `/map` | Atualizar e mostrar mapa de módulos, manifestos e candidatos a pontos de entrada |
+| `/changes` | Listar checkpoints de edições aprovadas e conflitos |
+| `/undo [id]` | Revisar o diff para desfazer a última edição ou um checkpoint específico |
 
 Use ↑/↓ no início/fim da entrada para percorrer perguntas e recuperar o rascunho ao voltar. Em textos com várias linhas ou linhas quebradas visualmente, as setas continuam movendo o cursor; Alt+↑/↓ acessam o histórico diretamente. Textos colados com múltiplas linhas permanecem no rascunho até Enter. Escape e Ctrl+X cancelam a investigação; nas revisões, Escape volta ou rejeita o comando.
 
@@ -104,6 +110,33 @@ A última conversa de cada projeto é salva automaticamente em `.codaro/session.
 
 O arquivo usa gravação atômica e `0600` em POSIX, bloqueia links e valida raiz, versão e mensagens ao carregar. A chave do provedor é mascarada, inclusive em formas escapadas. A conversa pode conter código e outros dados do projeto: mantenha `.codaro/` no `.gitignore`. Sessões simultâneas no mesmo projeto compartilham o arquivo e a última gravação prevalece.
 
+## Recuperação da conversa e memória da tarefa
+
+Perguntas concluídas em `ask`, `edit` e no chat também entram em `.codaro/memory.sqlite3`, um arquivo local por projeto, independente do contexto ativo e do `session.json`. O arquivo retém até **500 turnos e 8 MB**, removendo os mais antigos conforme necessário. Guarda pergunta, resposta final, ações e resultados de revisão; não arquiva pensamento interno do modelo. A última sessão do formato anterior é importada uma vez quando a busca da conversa for utilizada, com datas de importação e identificação `legacy-session`.
+
+O modelo dispõe de `search_conversation(query, limit)` para buscar com SQLite FTS5/BM25 e `read_conversation(turn_id, offset, limit)` para recuperar páginas de 200–4.000 caracteres. A busca retorna até oito trechos com identificador, origem e data de registro. Esses resultados passam pelo orçamento de contexto das outras ferramentas. Pedidos antigos e respostas da IA são dados históricos: não comprovam a implementação atual nem autorizam comandos. Antes de editar, a leitura atual continua obrigatória.
+
+Objetivo, últimos pedidos e até 32 itens estruturados ficam na mesma memória. Há decisões, restrições e pendências registradas pelo usuário (até oito por tipo), e notas atribuídas ao agente. `remember_task(note)` permite ao modelo registrar somente notas, sem transformar suas próprias afirmações em decisões do usuário. Um resumo limitado entra no contexto; itens omitidos continuam recuperáveis pelas ferramentas. A tarefa atual prevalece sobre pedidos anteriores.
+
+```bash
+codaro history "autenticação JWT" --repo /caminho/do/projeto
+codaro memory decision "Usar PostgreSQL." --repo /caminho/do/projeto
+codaro memory constraint "Preservar a API pública." --repo /caminho/do/projeto
+codaro memory pending "Validar as migrações." --repo /caminho/do/projeto
+codaro memory --repo /caminho/do/projeto
+codaro memory clear --repo /caminho/do/projeto
+```
+
+`/clear` limpa a conversa ativa; `/memory clear` limpa a memória estruturada da tarefa. O arquivo histórico permanece disponível para recuperação. O armazenamento valida projeto/versão, bloqueia links, mascara a chave configurada e escreve snapshots SQLite privados e atômicos, sem abrir journals em caminhos do projeto. Em POSIX, um lock entre processos protege atualizações; revisões concorrentes da memória estruturada são detectadas. Em outras plataformas, a proteção de concorrência é apenas dentro do processo.
+
+## Mapa do projeto e calibração
+
+`codaro map --repo CAMINHO` e `/map` mostram módulos, extensões, manifestos e candidatos a pontos de entrada. O mapa usa os caminhos e hashes do índice incremental e é atualizado com arquivos modificados, removidos ou excluídos por ignore. O agente reutiliza o mapa enquanto o digest não muda e inclui uma versão compacta nas perguntas de arquitetura. Nomes como `main.py` e definições Python são candidatos para investigação; não são apresentados como prova de execução.
+
+Quando o endpoint informa `usage.prompt_tokens`, o contador compara entrada real e estimativa. A calibração fica separada por projeto, endpoint, modelo e encoding. Uma subestimativa aumenta o fator imediatamente, com margem de 15%; a redução só ocorre após oito amostras, considera o maior desvio das últimas vinte e mantém um fator mínimo de 0,6. O fator máximo é 4. Valores inválidos são ignorados. Sem usage, continua valendo a estimativa configurada.
+
+`/status` mostra estimativa, consumo informado, fator e número de amostras. O JSON de debug registra `reported_prompt_tokens` e `calibrated_scale` por chamada, além de `task_memory`, `project_map` e `conversation_turn_id`. A calibração melhora a estimativa; não altera a janela real do servidor.
+
 ## Edição com revisão de diff
 
 ```bash
@@ -121,7 +154,21 @@ O agente deve ler o trecho atual e chamar `propose_edit` com o texto original ex
 - BOM UTF-8, finais de linha LF/CRLF e bits de permissão usuais são preservados. Arquivos binários, links simbólicos, hard links e caminhos proibidos são bloqueados. A aplicação requer POSIX com `dir_fd` e `O_NOFOLLOW`; plataformas sem esses recursos podem investigar, mas não aplicar.
 - Até oito propostas por resposta, uma por arquivo. Cada trecho original/novo tem até 3.000 caracteres; o diff tem até 60.000 caracteres. O trecho original deve ocorrer uma única vez e estar inteiramente em linhas lidas, sem truncamento.
 - Resolva as propostas antes de outra pergunta. Limpar o chat descarta as propostas pendentes. Uma resposta cancelada ou interrompida também descarta suas propostas.
-- Cada arquivo é aprovado e aplicado separadamente: não há transação entre arquivos, criação/exclusão de arquivos pela ferramenta de edição, undo automático ou persistência de propostas pendentes entre sessões. A escrita atômica evita arquivos parcialmente escritos; não impede toda corrida com um processo hostil que altera caminhos simultaneamente.
+- Cada arquivo é aprovado e aplicado separadamente: não há transação entre arquivos, criação/exclusão de arquivos pela ferramenta de edição ou persistência de propostas pendentes entre sessões. Desfazer também exige revisão e aprovação. A escrita atômica evita arquivos parcialmente escritos; não impede toda corrida com um processo hostil que altera caminhos simultaneamente.
+
+## Checkpoints e desfazer
+
+Antes de aplicar uma edição aprovada, o Codaro salva os bytes originais e propostos em `.codaro/checkpoints.json`, com hashes, caminho, status e identificador da investigação. O arquivo é privado e atômico, retendo até 20 checkpoints e 12 MB. Se o snapshot não puder ser salvo, a edição não começa. Se apenas a atualização posterior do status falhar, o aplicativo informa que a edição foi aplicada; o snapshot preparado permanece verificável pelo hash do arquivo.
+
+```bash
+codaro changes --repo /caminho/do/projeto
+codaro undo --repo /caminho/do/projeto
+codaro undo ID_DO_CHECKPOINT --repo /caminho/do/projeto
+```
+
+No chat, use `/changes` e `/undo [id]`. O diff inverso é mostrado e exige aprovação; Enter não aplica. O arquivo precisa continuar exatamente igual ao conteúdo aprovado, tanto na criação da proposta inversa quanto na aplicação. Alterações externas, exclusões por ignore e links bloqueiam o desfazer. BOM, CRLF e permissões de execução são preservados. A restauração cria outro checkpoint, permitindo revisar uma reversão posterior. Comandos executados no terminal não recebem snapshots nem são revertidos por esse mecanismo.
+
+Os snapshots contêm os bytes exatos dos arquivos para permitir restauração, sem mascaramento que alteraria o código. Mantenha `.codaro/` fora do Git. A sessão retém apenas propostas resolvidas; checkpoints persistidos podem ser consultados após reiniciar.
 
 ## Comandos e validação com aprovação
 
@@ -256,7 +303,7 @@ Para janelas pequenas, uma reserva de saída menor deixa mais espaço para inves
 
 ```bash
 export CODARO_MAX_OUTPUT_TOKENS=512
-codaro . --context-window 4096 --read-only
+codaro . --context-window 8192 --read-only
 ```
 
 O padrão usa uma **estimativa conservadora baseada em bytes UTF-8**, não uma contagem exata: tokenização e framing variam por servidor. `/status` mostra a estimativa enviada, orçamento ativo (que pode diminuir após rejeições), janela, saída e método; a barra de status mostra o uso durante as consultas. `codaro doctor` mostra a configuração sem consultar a API. `/compact` continua limitando o histórico aos quatro turnos recentes; a compactação durante a investigação é automática.
@@ -294,11 +341,11 @@ Veja os achados e as limitações em [AUDIT.md](AUDIT.md).
 ## Próximas entregas
 
 - Embeddings multilíngues opcionais e combinação com a busca textual.
-- Benchmark com perguntas reais, Recall@5, latência e volume de contexto.
+- Ampliar o conjunto de avaliações com projetos e perguntas reais do usuário.
 - Reranking quando houver ganho medido.
 - Definições e referências via LSP, com novos parsers Tree-sitter.
 - Interrupção imediata de conexões que estejam sem enviar fragmentos.
-- Execução controlada de testes, criação de arquivos e reversão de edições.
+- Criação de arquivos e transações de edição envolvendo vários arquivos.
 
 
 ## Diagnóstico e recuperação
@@ -308,6 +355,21 @@ Veja os achados e as limitações em [AUDIT.md](AUDIT.md).
 - Configure `CODARO_TIMEOUT` entre 1 e 300 segundos (padrão: 90). É um limite por operação HTTP, não um prazo total de investigação.
 - Respostas 429, 502, 503 e 504 têm até duas novas tentativas com espera curta. Uma conexão interrompida depois de começar a resposta não é repetida automaticamente, para evitar duplicações. Outros erros retornam uma mensagem sem expor o corpo remoto.
 - Use um modelo/servidor compatível com ferramentas na API OpenAI. Modelos só de completions não bastam. O modelo padrão é `qwen2.5:7b`; você pode substituí-lo por outro com suporte a tools.
-- O índice é um cache derivado. Se estiver corrompido, feche processos Codaro, renomeie a pasta `.codaro` e execute `codaro index --repo ...` novamente. Formatos antigos conhecidos são reconstruídos ao atualizar a versão do schema.
+- O índice é um cache derivado. Se estiver corrompido, feche processos Codaro, renomeie apenas `index.sqlite3` e seus arquivos auxiliares e execute `codaro index --repo ...` novamente. Preserve memória, sessão e checkpoints. Formatos antigos conhecidos do índice são reconstruídos ao atualizar a versão do schema.
 - Conteúdo binário e texto fora de UTF-8 são ignorados no índice e rejeitados na leitura. Arquivos vazios são suportados.
 - A atualização calcula hashes dos arquivos para detectar mudanças. Em repositórios grandes, esse I/O pode ser significativo; use `.codaroignore` para manter o escopo útil.
+
+## Avaliações reproduzíveis
+
+O conjunto inicial em `evaluations/cases.json` usa o código real do Codaro e o projeto demo. Você pode adicionar projetos locais: `repo` é resolvido em relação ao arquivo de casos, e cada caso declara `id`, `question`, `query`, `expected_paths` e, opcionalmente, `answer_contains`.
+
+```bash
+# Busca local: não chama o modelo
+codaro evaluate evaluations/cases.json --output .codaro/evaluation-retrieval.json
+# Respostas do modelo configurado: envia os trechos selecionados ao endpoint
+codaro evaluate evaluations/cases.json --agent --output .codaro/evaluation-agent.json
+```
+
+O modo local mede precisão dos até seis resultados, recall dos caminhos esperados e duração. `--agent` mede conclusão, correspondência das expectativas textuais, precisão das citações em linhas efetivamente lidas, chamadas ao modelo/ferramentas, chamadas repetidas, compactações, estimativas e usage disponível. O relatório informa quantas chamadas possuem consumo real; ausência de usage não é apresentada como consumo zero. Casos com erro não interrompem os seguintes; o comando retorna código 1 se alguma expectativa falhar.
+
+Avaliações do agente não permitem edição/comandos e usam memória efêmera, preservando a memória das conversas do projeto. Atualizam o índice e o último JSON de debug. Os casos iniciais são testes de fumaça; métricas objetivas e correspondências textuais não substituem revisão humana da qualidade semântica. Compare relatórios ao mudar modelo, prompts, recuperação ou limites de contexto.

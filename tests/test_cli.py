@@ -341,3 +341,52 @@ def test_context_window_flag_reaches_chat_and_overrides_environment(tmp_path, mo
     assert result.exit_code == 0, result.output
     assert "8192 tokens" in result.output
     assert runner.invoke(app, [str(tmp_path), "--context-window", "100"]).exit_code != 0
+
+
+def test_memory_history_and_map_commands_are_local(tmp_path):
+    (tmp_path / "main.py").write_text("def main(): return True\n")
+    result = runner.invoke(app, ["memory", "decision", "Usar SQLite.", "--repo", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["items"][0]["source"] == "user"
+    result = runner.invoke(app, ["history", "SQLite", "--repo", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["results"][0]["kind"] == "decision"
+    result = runner.invoke(app, ["map", "--repo", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["definitions"][0]["symbol"] == "main"
+
+
+def test_cli_undo_requires_explicit_approval_and_reports_conflicts(tmp_path):
+    from test_edits import manager_for, propose
+
+    manager, path = manager_for(tmp_path)
+    proposal = propose(manager)
+    manager.apply(proposal.id)
+    result = runner.invoke(app, ["undo", "--repo", str(tmp_path)], input="\n")
+    assert result.exit_code == 0, result.output
+    assert path.read_bytes() == proposal.after
+    result = runner.invoke(app, ["undo", "--repo", str(tmp_path)], input="y\n")
+    assert result.exit_code == 0, result.output
+    assert path.read_bytes() == proposal.before
+    path.write_bytes(b"Changed externally\n")
+    result = runner.invoke(app, ["undo", "--repo", str(tmp_path)], input="y\n")
+    assert result.exit_code == 1
+    assert path.read_bytes() == b"Changed externally\n"
+    result = runner.invoke(app, ["changes", "--repo", str(tmp_path)])
+    assert result.exit_code == 0
+    assert len(json.loads(result.output)) == 2
+
+
+def test_evaluate_command_exports_report_and_fails_unmet_expectations(tmp_path):
+    from test_evaluation import dataset
+
+    cases = dataset(tmp_path)
+    output = tmp_path / ".codaro/report.json"
+    result = runner.invoke(app, ["evaluate", str(cases), "--output", str(output)])
+    assert result.exit_code == 0, result.output
+    assert json.loads(output.read_text())["passed"] == 1
+    case = json.loads(cases.read_text())[0]
+    cases.write_text(json.dumps([{**case, "query": "unfindable_identifier"}]))
+    result = runner.invoke(app, ["evaluate", str(cases), "--output", str(output)])
+    assert result.exit_code == 1
+    assert json.loads(output.read_text())["passed"] == 0

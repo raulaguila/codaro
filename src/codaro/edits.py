@@ -8,6 +8,7 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 
+from codaro.checkpoints import Checkpoints
 from codaro.repository import MAX_FILE_BYTES, Repository, RepositoryError
 
 
@@ -20,6 +21,10 @@ class EditProposal:
     after: bytes
     diff: str
     state: str = "pending"
+    checkpoint_id: str | None = None
+    undo_of: str | None = None
+    checkpoint_warning: str = ""
+    task_id: str = ""
 
 
 class EditManager:
@@ -30,6 +35,7 @@ class EditManager:
         self.proposals: dict[str, EditProposal] = {}
         self.observed: dict[str, tuple[bytes, list[tuple[int, int]]]] = {}
         self._lock = threading.Lock()
+        self.checkpoints = Checkpoints(repository)
 
     @property
     def pending(self) -> list[EditProposal]:
@@ -131,11 +137,32 @@ class EditManager:
             if proposal.state != "pending":
                 raise ValueError("A proposta já foi resolvida.")
             try:
+                proposal.checkpoint_id = self.checkpoints.prepare(proposal)
                 self._apply(proposal)
             except (ValueError, OSError):
                 proposal.state = "conflict"
+                if proposal.checkpoint_id:
+                    try:
+                        self.checkpoints.mark(proposal.checkpoint_id, "failed")
+                    except (ValueError, OSError):
+                        pass
                 raise
             proposal.state = "applied"
+            try:
+                self.checkpoints.mark(proposal.checkpoint_id, "applied")
+                if proposal.undo_of:
+                    self.checkpoints.mark(proposal.undo_of, "undone")
+            except (ValueError, OSError):
+                proposal.checkpoint_warning = (
+                    "Edição aplicada; status do checkpoint não atualizado. Confira /changes."
+                )
+
+    def propose_undo(self, identifier: str | None = None):
+        if self.pending:
+            raise ValueError("Revise as propostas pendentes antes de desfazer.")
+        proposal = self.checkpoints.proposal(identifier)
+        self.proposals[proposal.id] = proposal
+        return proposal
 
     def _apply(self, proposal: EditProposal):
         if os.open not in os.supports_dir_fd or not hasattr(os, "O_NOFOLLOW"):
