@@ -1212,7 +1212,8 @@ def test_inline_diff_review_continues_same_agent_loop_then_validates(tmp_path):
     async def wait_screen(pilot, screen):
         for _ in range(100):
             await pilot.pause(0.02)
-            if isinstance(app.screen, screen):
+            # The screen is current before on_mount assigns the safe default focus.
+            if isinstance(app.screen, screen) and app.screen.focused is not None:
                 return
         raise AssertionError(f"Review did not appear: {screen}")
 
