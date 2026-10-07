@@ -220,6 +220,14 @@ A interface detecta macOS e aceita Command via `super` do protocolo de teclado e
 
 Corrigida a detecção de JSON de chamada escrito em `content`: nomes não anunciados, como `read_file`, agora também disparam a tentativa limitada de correção nativa. Listas, envelopes `tool_calls`, blocos JSON e tags `tool_call` são reconhecidos. Não há execução de texto como ferramenta. Repetição bloqueia a tarefa e preserva o erro no JSON local; exemplos explicados permanecem respostas permitidas. Regressões verificam correção para `read_lines`, conteúdo real lido, ausência de resposta falsa no histórico e estado bloqueado. Suíte completa local: **403 testes aprovados**; Ruff, formatação e diff sem problemas. O endpoint do usuário não foi acessado.
 
+## Teste de conexão e recuperação automática de contexto — 7 de outubro de 2026
+
+Ollama normaliza URLs raiz, `/api` e `/v1` para a conversa compatível, inclusive em perfis já salvos. Sem `num_ctx` informado, o fallback conservador é de 4.096 tokens. O formulário oferece teste do catálogo sem persistência e um teste explícito do ciclo de ferramenta/resposta por modelo, com duas chamadas curtas e aviso de possível custo. Durante o teste os campos ficam bloqueados para impedir resultado atribuído a uma configuração diferente.
+
+Recuperação reconhecida de contexto usa até seis retries, extrai limites explícitos do erro, reduz o orçamento e preserva a redução por projeto/endpoint/modelo/configuração. Contexto inicial recuperável, histórico e lotes completos podem ser compactados; janelas pequenas usam prompt e ferramentas por demanda. `get_context_status`, `compact_context` e `request_tools` permitem cooperação do modelo. Carregar ferramentas não concede permissão, conjuntos excessivos são rejeitados e trechos descartados não autorizam edição. A calibração Anthropic usa o payload nativo. A truncagem silenciosa de servidores continua sendo uma limitação explicitamente documentada.
+
+Suíte final local: **451 testes aprovados**. Casos novos cobrem URLs Ollama e perfis antigos, catálogo disponível com chat 404, teste do formulário sem salvar credenciais, protocolo de ferramenta completo, orçamento após reinício, recuperação após três rejeições, carga de ferramentas em janela pequena, preservação do protocolo e bloqueio de comandos no modo Perguntar. Ruff, formatação e diff aprovados. Inferência e catálogos são simulados; o servidor do usuário não foi acessado.
+
 ## Streaming visível e cadastro BYOK — 7 de outubro de 2026
 
 Geração visível fora do resumo de atividades, com promoção do mesmo bloco à resposta final e raciocínio externo separado quando informado pelo servidor. Etapas intermediárias/rejeitadas/interrompidas continuam identificadas; somente respostas aceitas são persistidas. A promoção aguarda montagem do Markdown, conservando o texto anterior durante a transição. Streaming publicado e aprovado no CI em Python 3.11–3.13.

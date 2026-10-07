@@ -25,6 +25,13 @@ PRESETS = {
 MAX_CONFIG_BYTES = 4_000_000
 
 
+def provider_base_url(kind, base_url):
+    base = (base_url or PRESETS.get(kind, "")).strip().rstrip("/")
+    if kind == "ollama" and not base.endswith("/v1"):
+        base = base.removesuffix("/api") + "/v1"
+    return base
+
+
 def positive(value):
     return value if type(value) is int and 1 <= value <= 20_000_000 else None
 
@@ -285,7 +292,7 @@ class ProviderStore:
         if name in self.load()["profiles"]:
             raise ValueError("Perfil já cadastrado; remova-o antes de substituir a credencial.")
         settings = Settings(
-            (base_url or PRESETS[kind]).rstrip("/"), "unselected", key, tls_insecure=tls_insecure
+            provider_base_url(kind, base_url), "unselected", key, tls_insecure=tls_insecure
         )
         if kind not in {"ollama", "custom", "openai-compatible"} and not key:
             raise ValueError("Informe a API key do provedor.")
@@ -306,6 +313,40 @@ class ProviderStore:
 
         self.mutate(add)
         return profile["models"]
+
+    def test_connection(self, kind, key, *, base_url=None, tls_insecure=False, model_id=None):
+        """Check the form without saving; selected models get a complete tool round trip."""
+        if kind not in PRESETS:
+            raise ValueError("Provedor desconhecido.")
+        settings = Settings(
+            provider_base_url(kind, base_url),
+            model_id or "unselected",
+            key,
+            tls_insecure=tls_insecure,
+        )
+        if kind not in {"ollama", "custom", "openai-compatible"} and not key:
+            raise ValueError("Informe a API key do provedor.")
+        profile = {
+            "kind": kind,
+            "base_url": settings.base_url,
+            "api_key": key,
+            "tls_insecure": tls_insecure,
+        }
+        catalog = ModelCatalog(profile, transport=self.transport)
+        models = catalog.list()
+        if model_id:
+            model = next((item for item in models if item["id"] == model_id), None)
+            if model is None:
+                raise ValueError("Modelo não está no catálogo consultado.")
+            model = catalog.details(model)
+            if model["tools"] is False:
+                raise ValueError("A API informa que este modelo não suporta ferramentas/chat.")
+            from codaro.provider import create_provider
+
+            create_provider(
+                self.settings_for("teste", profile, model), transport=self.transport
+            ).check_tool_calling()
+        return models
 
     def models(self, name=None, *, refresh=False):
         name, profile = self.profile(name)
@@ -352,10 +393,11 @@ class ProviderStore:
 
     def settings_for(self, name, profile, model):
         override = profile.get("context_overrides", {}).get(model["id"])
-        window = min(override or model["context_window"] or 16_384, 2_000_000)
+        fallback = 4096 if profile["kind"] == "ollama" else 16_384
+        window = min(override or model["context_window"] or fallback, 2_000_000)
         output = min(1400, model["max_output_tokens"] or 1400, window - 513)
         return Settings(
-            profile["base_url"],
+            provider_base_url(profile["kind"], profile["base_url"]),
             model["id"],
             profile["api_key"],
             tls_insecure=profile["tls_insecure"],
@@ -368,7 +410,7 @@ class ProviderStore:
             if override
             else model["context_source"]
             if model["context_window"]
-            else "fallback: 16.384 tokens",
+            else f"fallback: {fallback:,} tokens".replace(",", "."),
         )
 
     def active_settings(self, name=None):

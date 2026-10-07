@@ -3,6 +3,7 @@ from __future__ import annotations
 import codecs
 import json
 import os
+import re
 import threading
 import time
 import uuid
@@ -47,6 +48,38 @@ class ModelError(RuntimeError):
 
 class ContextLimitError(ModelError):
     """Recognized context rejection; retry only the model, never executed tools."""
+
+    def __init__(self, message, *, context_window=None):
+        super().__init__(message)
+        self.context_window = context_window
+
+
+def reported_context_window(body):
+    """Extract only explicit token limits, never the requested token count."""
+    try:
+        value = json.loads(body)
+    except (ValueError, RecursionError):
+        return None
+    error = value.get("error") if isinstance(value, dict) else None
+    if isinstance(error, dict):
+        for field in ("max_context_length", "context_window", "context_length", "max_input_tokens"):
+            limit = error.get(field)
+            if type(limit) is int and 1024 <= limit <= 2_000_000:
+                return limit
+        error = error.get("message", "")
+    if not isinstance(error, str):
+        return None
+    match = re.search(
+        r"(?:maximum context length(?: is)?|context (?:window|length)(?: is| of)?|"
+        r"maximum(?: number of)? (?:input )?tokens(?: is)?)\s*[:=]?\s*(\d[\d,]{0,12})\b",
+        error,
+        re.I,
+    )
+    if match:
+        limit = int(match[1].replace(",", ""))
+        if 1024 <= limit <= 2_000_000:
+            return limit
+    return None
 
 
 def is_context_error(body: str) -> bool:
@@ -417,7 +450,10 @@ class OpenAICompatible:
                             ):
                                 raise ContextLimitError(
                                     "O servidor rejeitou o contexto. Confira CODARO_CONTEXT_WINDOW "
-                                    "e a janela realmente configurada no modelo."
+                                    "e a janela realmente configurada no modelo.",
+                                    context_window=reported_context_window(
+                                        raw_error.decode("utf-8", errors="replace")
+                                    ),
                                 )
                         if response.status_code in {429, 502, 503, 504} and attempt < 2:
                             if cancelled is None:
@@ -514,9 +550,10 @@ class OpenAICompatible:
                 finished = True
                 break
             event = json.loads(data)
-            if not content and not calls and is_context_error(data):
+            if is_context_error(data):
                 raise ContextLimitError(
-                    "O servidor rejeitou o contexto. Confira CODARO_CONTEXT_WINDOW."
+                    "O servidor rejeitou o contexto. Confira CODARO_CONTEXT_WINDOW.",
+                    context_window=reported_context_window(data),
                 )
             if not isinstance(event, dict) or "error" in event:
                 raise ModelError("O servidor interrompeu o stream com uma resposta inválida.")

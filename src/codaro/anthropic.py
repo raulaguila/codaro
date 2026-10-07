@@ -17,6 +17,7 @@ from codaro.provider import (
     capture_wire,
     check_cancelled,
     is_context_error,
+    reported_context_window,
     sse_events,
     validate_message,
 )
@@ -155,7 +156,8 @@ class Anthropic(OpenAICompatible):
                             capture_wire("error_body", body)
                             if response.status_code in {400, 413, 422} and is_context_error(body):
                                 raise ContextLimitError(
-                                    "A Anthropic rejeitou o contexto da tarefa."
+                                    "A Anthropic rejeitou o contexto da tarefa.",
+                                    context_window=reported_context_window(body),
                                 )
                             if response.status_code in {429, 502, 503, 504, 529} and attempt < 2:
                                 event = cancelled or threading.Event()
@@ -215,6 +217,11 @@ class Anthropic(OpenAICompatible):
                 raise ModelError("Stream Anthropic contém eventos demais.")
             capture_wire("sse", raw)
             event = json.loads(raw)
+            if is_context_error(raw):
+                raise ContextLimitError(
+                    "A Anthropic rejeitou o contexto do stream.",
+                    context_window=reported_context_window(raw),
+                )
             if not isinstance(event, dict) or event.get("type") == "error":
                 raise ModelError("A Anthropic interrompeu o stream.")
             kind = event.get("type")

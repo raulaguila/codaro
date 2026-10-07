@@ -22,7 +22,7 @@ class ProviderSetup(ModalScreen[str | None]):
         background: #111827; border: round #38bdf8; }
     #provider-form Input, #provider-form Select { margin-bottom: 1; }
     #provider-form Static { height: auto; }
-    #provider-actions { height: auto; }
+    #provider-actions, .provider-test-actions { height: auto; }
     """
     BINDINGS = [Binding("escape", "back", "Voltar")]
 
@@ -48,6 +48,12 @@ class ProviderSetup(ModalScreen[str | None]):
                 id="provider-key",
             )
             yield Checkbox("TLS Insecure · ignorar validação do certificado", id="provider-tls")
+            yield Select([], id="provider-test-model", prompt="Modelo para testar (opcional)")
+            yield Static(
+                "Sem modelo: testa o catálogo. Com modelo: testa ferramentas e resposta "
+                "com duas chamadas curtas de IA (pode haver custo).",
+                markup=False,
+            )
             yield Static(
                 "Credencial local fora do projeto, com permissões privadas.",
                 markup=False,
@@ -55,6 +61,8 @@ class ProviderSetup(ModalScreen[str | None]):
             yield Static("", id="provider-error", markup=False)
             with Horizontal(id="provider-actions"):
                 yield Button("Cadastrar e listar modelos", id="provider-save", variant="primary")
+            with Horizontal(classes="provider-test-actions"):
+                yield Button("Testar conexão", id="provider-test")
                 yield Button("Voltar", id="provider-back")
 
     def on_select_changed(self, event: Select.Changed):
@@ -62,12 +70,52 @@ class ProviderSetup(ModalScreen[str | None]):
             kind = event.value
             if isinstance(kind, str):
                 self.query_one("#provider-url", Input).value = PRESETS[kind]
+                self.query_one("#provider-test-model", Select).set_options([])
+
+    async def test_connection(self):
+        self.saving = True
+        for control in self.query("Input, Select, Checkbox, Button"):
+            control.disabled = True
+        status = self.query_one("#provider-error", Static)
+        status.update("Testando conexão…")
+        model = self.query_one("#provider-test-model", Select).value
+        try:
+            models = await asyncio.to_thread(
+                self.store.test_connection,
+                str(self.query_one("#provider-kind", Select).value),
+                self.query_one("#provider-key", Input).value.strip(),
+                base_url=self.query_one("#provider-url", Input).value.strip(),
+                tls_insecure=self.query_one("#provider-tls", Checkbox).value,
+                model_id=model if isinstance(model, str) else None,
+            )
+            if not self.is_attached:
+                return
+            self.query_one("#provider-test-model", Select).set_options(
+                [(item["id"], item["id"]) for item in models if item["tools"] is not False]
+            )
+            if isinstance(model, str):
+                self.query_one("#provider-test-model", Select).value = model
+            status.update(
+                "Conexão, ferramentas e resposta do modelo verificadas. Nenhum perfil salvo."
+                if isinstance(model, str)
+                else f"Catálogo acessível: {len(models)} modelos. Selecione um modelo e teste "
+                "novamente para verificar ferramentas e resposta. Nenhum perfil salvo."
+            )
+        except (ValueError, OSError, ModelError) as exc:
+            status.update(str(exc))
+        finally:
+            self.saving = False
+            for control in self.query("Input, Select, Checkbox, Button"):
+                control.disabled = False
 
     def action_back(self):
         if not self.saving:
             self.dismiss(None)
 
     async def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "provider-test" and not self.saving:
+            await self.test_connection()
+            return
         if event.button.id == "provider-back":
             self.action_back()
         elif event.button.id == "provider-save" and not self.saving:
@@ -161,11 +209,13 @@ class ModelPicker(ModalScreen[Settings | None]):
                 (item for item in self.store.models(name) if item["id"] == event.value), None
             )
             if model:
+                profile = self.store.profile(name)[1]
+                settings = self.store.settings_for(name, profile, model)
                 self.query_one("#model-info", Static).update(
-                    f"{model['name']}\nContexto: {model['context_window'] or 'não informado'} · "
-                    f"{model['context_source']}\n"
+                    f"{model['name']}\nContexto usado: {settings.context_window} · "
+                    f"{settings.context_source}\n"
                     f"Saída máxima: {model['max_output_tokens'] or 'não informada'}\n"
-                    "Sem limite informado, o cliente usa fallback de 16.384 tokens."
+                    "Limites aprendidos após rejeição ajustam o orçamento automaticamente."
                 )
 
     def action_back(self):

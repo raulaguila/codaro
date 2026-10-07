@@ -291,6 +291,7 @@ def test_compacted_read_no_longer_authorizes_an_edit(tmp_path):
     model = configured_model(
         [
             call("read_lines", {"path": "x.py", "start": 1, "end": 1}, "read"),
+            call("compact_context", {}, "compact"),
             call(
                 "propose_edit",
                 {"path": "x.py", "old_text": old_text, "new_text": "x = 'b'", "reason": "Ajuste."},
@@ -304,7 +305,7 @@ def test_compacted_read_no_longer_authorizes_an_edit(tmp_path):
     flow = json.loads((tmp_path / ".codaro/prompt.json").read_text())
     assert flow["compactions"]
     assert not agent.edits.pending
-    result = flow["turns"][1]["tool_results"][0]["result"]
+    result = flow["turns"][2]["tool_results"][0]["result"]
     assert "novamente" in result["error"] or "espaço" in result["error"]
     assert (tmp_path / "x.py").read_text().strip() == old_text
 
