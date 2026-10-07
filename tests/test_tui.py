@@ -226,7 +226,8 @@ def test_chat_keeps_streaming_preview_separate_from_final_markdown(tmp_path):
             assert not preview.collapsed
             assert preview.state == "accepted"
             assert "resposta final" in preview.title
-            assert app.reply.parent.parent is preview
+            assert app.reply.parent is app.query_one("#conversation")
+            assert not preview.display
             assert not preview.content.display
             assert app.session_turns[-1][-1]["content"] == app.response_text
 
@@ -234,8 +235,6 @@ def test_chat_keeps_streaming_preview_separate_from_final_markdown(tmp_path):
 
 
 def test_final_answer_promotion_survives_children_pruned_during_mount(tmp_path, monkeypatch):
-    from textual.widgets import Collapsible
-
     from codaro.tui import GenerationPreview
 
     async def scenario():
@@ -243,8 +242,8 @@ def test_final_answer_promotion_survives_children_pruned_during_mount(tmp_path, 
         async with app.run_test(size=(120, 35)) as pilot:
             preview = GenerationPreview()
             await app.query_one("#conversation").mount(preview)
-            contents = preview.query_one(Collapsible.Contents)
-            original_mount = contents.mount
+            conversation = app.query_one("#conversation")
+            original_mount = conversation.mount
             started = asyncio.Event()
             release = asyncio.Event()
             resumed = asyncio.Event()
@@ -260,15 +259,14 @@ def test_final_answer_promotion_survives_children_pruned_during_mount(tmp_path, 
 
                 return wait_for_teardown()
 
-            monkeypatch.setattr(contents, "mount", delayed_mount)
+            monkeypatch.setattr(conversation, "mount", delayed_mount)
             preview.accept("Resposta final.")
             try:
                 await asyncio.wait_for(started.wait(), 5)
                 # Removal prunes children before detaching their container. Force
                 # that intermediate state while Markdown mounting is suspended.
-                await preview.remove_children()
-                assert preview.is_attached
-                assert not preview.query("CollapsibleTitle")
+                await conversation.remove_children()
+                assert not preview.is_attached
             finally:
                 release.set()
             await asyncio.wait_for(resumed.wait(), 5)
@@ -516,6 +514,12 @@ def test_reasoning_and_live_answer_have_distinct_visible_blocks(tmp_path):
             await wait_ready(app, pilot)
             await pilot.pause()
             assert reasoning.collapsed
+            assert reasoning.has_class("reasoning-preview")
+            assert reasoning.content.styles.color != answer.content.styles.color
+            assert app.reply.parent is app.query_one("#conversation")
+            assert not reasoning.query("Markdown")
+            assert not answer.display
+            assert app.query_one(".speaker").render().plain == "Codaro"
             assert answer.state == "accepted" and not answer.collapsed
             assert len(app.query(GenerationPreview)) == 2
             assert "Nota provisória" not in str(app.agent.turns)

@@ -345,7 +345,9 @@ class GenerationPreview(Collapsible):
                 if reasoning
                 else "Texto em geração · não validado"
             ),
-            classes="generation-preview",
+            classes="generation-preview reasoning-preview"
+            if reasoning
+            else "generation-preview response-preview",
             collapsed=False,
         )
 
@@ -399,20 +401,18 @@ class GenerationPreview(Collapsible):
         reply = Markdown(answer, classes="assistant", open_links=False)
 
         async def mount_answer():
-            if not self.is_attached:
+            parent = self.parent
+            if not self.is_attached or parent is None:
                 return
-            contents = self.query(Collapsible.Contents)
-            titles = self.query("CollapsibleTitle")
-            if not contents or not titles:
-                return
-            title = titles.first()
-            await contents.first().mount(reply)
-            # Clearing the chat can prune descendants while this await yields,
-            # even before the preview itself becomes detached.
-            if not all(widget.is_attached for widget in (self, reply, self.content, title)):
+            speaker = Static("Codaro", classes="speaker", markup=False)
+            # The final answer is a sibling in the conversation, never a child
+            # of a reasoning or provisional-generation card.
+            await parent.mount(speaker, reply, before=self)
+            # Clear/new conversation may remove widgets while mounting yields.
+            if not all(widget.is_attached for widget in (self, reply, speaker)):
                 return
             self.content.display = False
-            title.add_class("speaker")
+            self.display = False
 
         self.call_after_refresh(mount_answer)
         return reply
@@ -527,7 +527,13 @@ class CodaroApp(App):
     .generation-previews { height: auto; }
     .generation-preview { height: auto; border: none; padding: 0; }
     .generation-preview > Contents { padding: 0 1; }
-    .generation-text { height: auto; color: $text-muted; }
+    .generation-text { height: auto; color: $text; }
+    .generation-preview CollapsibleTitle { color: $text-muted; }
+    .reasoning-preview { margin: 0 1 1 1; }
+    .reasoning-preview .generation-text { color: $text-muted; text-style: italic;
+                                         max-height: 8; overflow-y: auto; }
+    .response-preview { margin: 1 0; }
+
     .notice { height: auto; margin: 1; color: $warning; }
     """
     BINDINGS = [

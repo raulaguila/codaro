@@ -18,7 +18,7 @@ Os 17 achados da auditoria de 7 de outubro de 2026 foram tratados nos fluxos do 
 | U12 Recuperação de erros | Perfil/modelo identificados; Repetir, Configurar e Outro modelo | Pergunta original recuperada e enviada novamente |
 | U13 Modelo incompatível | Modelos sem ferramentas ocultos; capacidade desconhecida informada | Catálogo com chat e embedding |
 | U14 Contexto invisível | Indicador persistente de estimativa, orçamento e origem | Geração, término e compactação |
-| U15 Ruído no streaming | Prévia Markdown estável, raciocínio recolhível e resumo vazio oculto | Texto parcial, ferramenta, falha, cancelamento e resposta final única |
+| U15 Ruído no streaming | Resposta final fora dos cards; raciocínio discreto, recolhível e limitado a oito linhas visíveis; prévia Markdown estável e resumo vazio oculto | Texto parcial, ferramenta, falha, cancelamento e resposta final única |
 | U16 Idioma inconsistente | Paleta e ações principais em português, aliases técnicos mantidos | Placeholder e comandos localizados |
 | U17 Rascunho bloqueado | Redação durante execução, envio simultâneo bloqueado | Rascunho permanece após término e só um turno é executado |
 
