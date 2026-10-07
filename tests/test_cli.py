@@ -8,6 +8,60 @@ from codaro.cli import app
 runner = CliRunner()
 
 
+def test_resume_flag_opens_current_or_selected_project(tmp_path, monkeypatch):
+    captured = []
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("codaro.tui.CodaroApp.run", lambda self: captured.append(self))
+    for args in (["--resume"], [".", "--resume"], ["chat", "--resume"]):
+        result = runner.invoke(app, args)
+        assert result.exit_code == 0, result.output
+        assert captured[-1].resume_requested
+        assert captured[-1].agent.repository.root == tmp_path.resolve()
+
+
+def test_cli_native_command_requires_approval_before_execution(tmp_path, monkeypatch):
+    import sys
+
+    from test_agent import call
+
+    for answer in ("n\n", "y\n"):
+        target = tmp_path / "ran.txt"
+        target.unlink(missing_ok=True)
+        responses = iter(
+            [
+                call(
+                    "run_command",
+                    {
+                        "argv": [
+                            sys.executable,
+                            "-c",
+                            "from pathlib import Path; Path('ran.txt').write_text('yes')",
+                        ]
+                    },
+                ),
+                {"content": "Comando finalizado."},
+            ]
+        )
+
+        def stream(
+            self,
+            messages,
+            tools=None,
+            on_delta=None,
+            cancelled=None,
+            responses=responses,
+            target=target,
+        ):
+            assert not target.exists() if len(messages) == 2 else True
+            return next(responses)
+
+        monkeypatch.setattr("codaro.cli.OpenAICompatible.stream", stream)
+        result = runner.invoke(app, ["edit", "Execute.", "--repo", str(tmp_path)], input=answer)
+        assert result.exit_code == 0, result.output
+        assert target.exists() == answer.startswith("y")
+        assert str(tmp_path) in result.stderr
+
+
 def test_local_cli_flow(tmp_path):
     (tmp_path / "auth.py").write_text("def can_edit(user):\n    return user.is_admin\n")
     assert runner.invoke(app, ["index", "--repo", str(tmp_path)]).exit_code == 0

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import shutil
 import sqlite3
 from pathlib import Path
@@ -54,6 +55,30 @@ TLSInsecure = Annotated[
         help="Desativa/ativa a verificação de certificados TLS do modelo.",
     ),
 ]
+
+
+@app.callback(invoke_without_command=True)
+def main(
+    ctx: typer.Context,
+    resume: Annotated[
+        bool, typer.Option("--resume", help="Retoma a conversa do diretório atual.")
+    ] = False,
+):
+    if resume:
+        if ctx.invoked_subcommand:
+            raise typer.BadParameter("Use --resume após o diretório ou o comando chat.")
+        ctx.invoke(chat, repo=Path("."), read_only=False, tls_insecure=None, resume=True)
+
+
+def approve_command(argv, timeout, cancelled, *, root):
+    errors.print(
+        safe_preview(f"Diretório: {root}\nComando · timeout {timeout}s\n{shlex.join(argv)}"),
+        markup=False,
+    )
+    try:
+        return typer.confirm("Autorizar esta execução?", default=False)
+    except (EOFError, typer.Abort):
+        return False
 
 
 def fail(exc: Exception):
@@ -156,7 +181,7 @@ def ask(question: str, repo: Root = Path("."), tls_insecure: TLSInsecure = None)
 
 @app.command()
 def edit(question: str, repo: Root = Path("."), tls_insecure: TLSInsecure = None):
-    """Propõe mudanças e solicita aprovação para cada diff antes de aplicar."""
+    """Propõe mudanças e solicita aprovação para diffs e comandos."""
     run_question(question, repo, allow_edits=True, tls_insecure=tls_insecure)
 
 
@@ -166,6 +191,13 @@ def run_question(question: str, repo: Path, *, allow_edits: bool, tls_insecure: 
             Repository(repo),
             OpenAICompatible(Settings.from_env(tls_insecure=tls_insecure)),
             allow_edits=allow_edits,
+            approve_command=(
+                lambda argv, timeout, cancelled: approve_command(
+                    argv, timeout, cancelled, root=repo.expanduser().resolve()
+                )
+            )
+            if allow_edits
+            else None,
         )
         parts: list[str] = []
 
@@ -219,11 +251,14 @@ def run_question(question: str, repo: Path, *, allow_edits: bool, tls_insecure: 
 def chat(
     repo: Root = Path("."),
     read_only: Annotated[
-        bool, typer.Option("--read-only", help="Desabilita propostas de edição.")
+        bool, typer.Option("--read-only", help="Somente leitura: desabilita edições e comandos.")
     ] = False,
     tls_insecure: TLSInsecure = None,
+    resume: Annotated[
+        bool, typer.Option("--resume", help="Retoma a última conversa deste projeto.")
+    ] = False,
 ):
-    """Abre o chat interativo com painéis de conversa e atividade."""
+    """Abre o agente interativo no projeto, com conversa, ferramentas e revisão."""
     from codaro.tui import CodaroApp
 
     try:
@@ -232,7 +267,8 @@ def chat(
                 Repository(repo),
                 OpenAICompatible(Settings.from_env(tls_insecure=tls_insecure)),
                 allow_edits=not read_only,
-            )
+            ),
+            resume=resume,
         ).run()
     except (ValueError, OSError, sqlite3.Error) as exc:
         fail(exc)

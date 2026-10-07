@@ -2,7 +2,7 @@
 
 Assistente de IA no terminal para investigar repositórios locais, com fontes no código e recuperação progressiva de contexto.
 
-> Busca, leitura, explicação e edição de trechos com diff e aprovação. Execução de comandos, referências via LSP e interrupção imediata de conexões ociosas estão no roadmap.
+> Busca, leitura, explicação, edição com revisão de diff, comandos com aprovação e retomada de conversa por projeto. Referências via LSP e interrupção imediata de conexões HTTP ociosas estão no roadmap.
 
 ## Instalação
 
@@ -57,19 +57,52 @@ codaro ./examples/demo
 
 O agente recebe a raiz absoluta do projeto em cada consulta e pode confirmá-la com `get_repository_info`. No chat, `/pwd` mostra essa raiz diretamente, sem chamar o modelo; no terminal, use `codaro pwd --repo /caminho/do/projeto`. A pasta de instalação do Codaro não define a pasta explorada.
 
-O chat ocupa toda a largura do terminal. O cabeçalho mostra projeto, modelo, modo de edição e conexão; as atividades ficam na conversa e a barra de status mostra a ação em andamento. `Ctrl+L` limpa a conversa, `Ctrl+X` solicita cancelamento, `Ctrl+P` abre os comandos e `Ctrl+Q` encerra. O cancelamento é verificado entre fragmentos da resposta e chamadas de ferramentas; se o servidor estiver parado sem enviar dados, aguarda o próximo fragmento ou o timeout. O histórico usado na conversa fica na memória da sessão; o fluxo da última investigação também é registrado em `.codaro/prompt.json` para diagnóstico. O modelo deve suportar `tools` na API de chat completions; a confiabilidade das chamadas varia conforme modelo e servidor.
+O chat ocupa toda a largura do terminal, com mensagens compactas e entrada fixa embaixo. O cabeçalho mostra projeto, modelo, modo de edição e conexão; as atividades ficam agrupadas por pergunta e a barra de status mostra a ação em andamento. `Ctrl+L` limpa a conversa, `Ctrl+X` solicita cancelamento, `Ctrl+P` abre os comandos e `Ctrl+Q` encerra. O cancelamento HTTP é verificado entre fragmentos da resposta e chamadas de ferramentas; se o servidor estiver parado sem enviar dados, aguarda o próximo fragmento ou o timeout. A conversa é salva em `.codaro/session.json`; o fluxo da última investigação fica em `.codaro/prompt.json` para diagnóstico. O modelo deve suportar `tools` na API de chat completions; a confiabilidade das chamadas varia conforme modelo e servidor.
 
 ## Interface e streaming
 
 - `codaro chat` mostra a resposta enquanto ela chega, em Markdown, com títulos, listas, tabelas e destaque de sintaxe em blocos de código.
-- A abertura tem sugestões que preenchem um rascunho sem chamar o modelo. Enter envia; Alt+Enter insere uma nova linha (Shift+Enter também funciona quando reconhecido pelo terminal). A entrada cresce até seis linhas visíveis e preserva rascunhos acima de 8.000 caracteres para que você possa reduzi-los antes do envio.
-- Cada ação mostra consulta ou arquivo/símbolo, quantidade de resultados ou linhas, duração e indicação de leitura parcial ou reutilização de conteúdo. Os detalhes ficam recolhidos após a conclusão e podem ser expandidos; erros ficam abertos.
-- As ações aparecem uma única vez, na conversa, e aproveitam a largura disponível em terminais estreitos e largos. A barra de status informa o arquivo ou consulta durante a execução.
+- A abertura tem sugestões que preenchem um rascunho sem chamar o modelo. Enter envia; Alt+Enter insere uma nova linha (Shift+Enter também funciona quando reconhecido pelo terminal). A entrada cresce até oito linhas de altura e preserva rascunhos acima de 8.000 caracteres para que você possa reduzi-los antes do envio.
+- Cada pergunta tem um resumo expansível das ações, leituras, buscas e duração. Dentro dele ficam consulta ou arquivo/símbolo, resultados ou linhas e indicação de leitura parcial ou reutilização de conteúdo. Erros abrem os detalhes automaticamente.
+- As atividades aparecem uma única vez na conversa. A barra de status informa o arquivo ou consulta durante a execução.
 - A barra superior mostra pasta abreviada, modelo, modo de edição e conexão. A barra de status informa o estado atual. `/pwd` mostra o caminho completo.
 - Texto intermediário de fases de ferramentas é removido antes da resposta final. Campos separados de reasoning não são exibidos como resposta.
 - `codaro ask` também atualiza a resposta progressivamente no terminal e envia as informações de atividade para stderr.
 - O provedor usa SSE da API OpenAI-compatible. Se o servidor responder com JSON comum, a resposta é exibida de uma vez.
 - Uma resposta interrompida ou cancelada não é salva no histórico. O chat remove o bloco parcial e informa a interrupção.
+
+## Comandos, referências e histórico
+
+Digite `/` para ver sugestões; ↑/↓ escolhem e Tab completa. Os comandos abaixo são locais e não consultam a IA:
+
+| Comando | Função |
+| --- | --- |
+| `/help` | Comandos e atalhos |
+| `/pwd` | Diretório completo da sessão |
+| `/status` | Modelo, modo, turnos, último contexto enviado em caracteres e seu limite |
+| `/model` ou `/model nome` | Ver ou trocar o modelo para as próximas perguntas, preservando endpoint e TLS |
+| `/clear` | Limpar o chat e descartar propostas pendentes |
+| `/resume` | Recuperar a última conversa salva no projeto |
+| `/compact` | Reduzir o contexto ativo aos quatro turnos mais recentes, preservando a conversa salva |
+
+Use ↑/↓ no início/fim da entrada para percorrer perguntas e recuperar o rascunho ao voltar. Em textos com várias linhas ou linhas quebradas visualmente, as setas continuam movendo o cursor; Alt+↑/↓ acessam o histórico diretamente. Textos colados com múltiplas linhas permanecem no rascunho até Enter. Escape e Ctrl+X cancelam a investigação; nas revisões, Escape volta ou rejeita o comando.
+
+`Explique @src/main.py` inclui uma leitura local antes da primeira requisição. Tab completa caminhos permitidos; para nomes com espaços use `@"pasta com espaços/main.py"`. São até quatro referências por pergunta, sujeitas às mesmas regras de ignore, limites e proteção das ferramentas. Uma referência inexistente ou proibida informa erro antes de consultar o modelo. Essas leituras ficam em `local_retrievals` no JSON de debug, sem simular chamadas do modelo.
+
+Se houver `AGENTS.md` na raiz, o agente consulta as orientações locais de estilo, build e testes em cada pergunta. São até 80 linhas e 2.400 caracteres serializados por leitura inicial, com teto compartilhado de 6.000 caracteres e desconto no orçamento de ferramentas. Orientações não dispensam aprovações nem as restrições da sessão. Instruções em subpastas ainda não são carregadas automaticamente.
+
+## Retomar a conversa
+
+```bash
+codaro . --resume
+codaro ./outro-projeto --resume
+# Atalho na pasta atual
+codaro --resume
+```
+
+A última conversa de cada projeto é salva automaticamente em `.codaro/session.json`, com até 50 turnos e 512 KB; ao retomar, o chat mostra até 30 turnos recentes. O contexto enviado à IA mantém seu próprio limite e pode descartar turnos antigos sem apagar a conversa salva. `/clear` limpa a sessão em memória; o arquivo anterior permanece disponível para `/resume` até outra pergunta concluída substituí-lo. Propostas pendentes não são reaplicadas ao retomar; resultados de aprovação já registrados são preservados.
+
+O arquivo usa gravação atômica e `0600` em POSIX, bloqueia links e valida raiz, versão e mensagens ao carregar. A chave do provedor é mascarada, inclusive em formas escapadas. A conversa pode conter código e outros dados do projeto: mantenha `.codaro/` no `.gitignore`. Sessões simultâneas no mesmo projeto compartilham o arquivo e a última gravação prevalece.
 
 ## Edição com revisão de diff
 
@@ -88,7 +121,15 @@ O agente deve ler o trecho atual e chamar `propose_edit` com o texto original ex
 - BOM UTF-8, finais de linha LF/CRLF e bits de permissão usuais são preservados. Arquivos binários, links simbólicos, hard links e caminhos proibidos são bloqueados. A aplicação requer POSIX com `dir_fd` e `O_NOFOLLOW`; plataformas sem esses recursos podem investigar, mas não aplicar.
 - Até oito propostas por resposta, uma por arquivo. Cada trecho original/novo tem até 3.000 caracteres; o diff tem até 60.000 caracteres. O trecho original deve ocorrer uma única vez e estar inteiramente em linhas lidas, sem truncamento.
 - Resolva as propostas antes de outra pergunta. Limpar o chat descarta as propostas pendentes. Uma resposta cancelada ou interrompida também descarta suas propostas.
-- Cada arquivo é aprovado e aplicado separadamente: não há transação entre arquivos, criação/exclusão de arquivos, execução de testes, undo automático ou persistência de propostas entre sessões. A escrita atômica evita arquivos parcialmente escritos; não impede toda corrida com um processo hostil que altera caminhos simultaneamente.
+- Cada arquivo é aprovado e aplicado separadamente: não há transação entre arquivos, criação/exclusão de arquivos pela ferramenta de edição, undo automático ou persistência de propostas pendentes entre sessões. A escrita atômica evita arquivos parcialmente escritos; não impede toda corrida com um processo hostil que altera caminhos simultaneamente.
+
+## Comandos e validação com aprovação
+
+No chat com edição habilitada e em `codaro edit`, o modelo pode solicitar `run_command` usando `argv` (lista de argumentos) e `timeout` (1–300 segundos, padrão 60). Cada execução exige aprovação humana e mostra diretório, argumentos e timeout. Enter rejeita por padrão; Escape rejeita a revisão no chat. `--read-only` e `codaro ask` não disponibilizam essa ferramenta. Comandos ficam bloqueados enquanto houver propostas pendentes, para evitar tratar um teste do código antigo como validação de um diff ainda não aplicado.
+
+Os comandos partem da raiz escolhida, sem shell implícito, e executam com as permissões do usuário; essa raiz define o diretório de trabalho, não uma sandbox. `CODARO_API_KEY` não é herdada pelo subprocesso. Saída e erro são combinados, capturados com memória limitada e devolvidos com código de saída, timeout e indicação de truncamento. Em POSIX, cancelamento/timeout encerram o grupo de processos; em outras plataformas, o processo principal é encerrado. Os resultados também entram no fluxo nativo `tool_calls` → `tool` e no JSON de debug.
+
+Após aplicar um diff no chat, **Validar alteração** inicia outra investigação: o agente lê o código atual, descobre os testes relevantes e solicita sua execução. A aprovação de um diff não aprova comandos de teste. O resultado real aparece na conversa; quando testes não foram executados, isso continua explícito. A escolha dos testes depende das evidências, das instruções do projeto e do modelo.
 
 ## API compatível com OpenAI
 

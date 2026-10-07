@@ -125,9 +125,9 @@ def test_narrow_terminal_uses_full_width_chat(tmp_path):
 
 class StreamingUIModel(UIModel):
     def stream(self, messages, tools=None, on_delta=None, cancelled=None):
-        self.started.set()
         on_delta("## Resposta\n\n**Parcial**")
-        self.release.wait(3)
+        self.started.set()
+        self.release.wait(10)
         if cancelled and cancelled.is_set():
             from codaro.provider import RequestCancelled
 
@@ -147,6 +147,7 @@ def test_chat_displays_partial_markdown_before_completion(tmp_path):
     async def scenario():
         async with app.run_test(size=(120, 35)) as pilot:
             await pilot.press("o", "i", "enter")
+            assert await asyncio.to_thread(model.started.wait, 10)
             assert app.busy
             assert "Parcial" in app.response_text
             assert app.reply is not None
@@ -168,8 +169,9 @@ def test_chat_cancel_removes_partial_response(tmp_path):
     async def scenario():
         async with app.run_test(size=(120, 35)) as pilot:
             await pilot.press("o", "i", "enter")
+            assert await asyncio.to_thread(model.started.wait, 10)
             assert "Parcial" in app.response_text
-            await pilot.press("ctrl+x")
+            await pilot.press("escape")
             model.release.set()
             await wait_ready(app, pilot)
             assert app.reply is None
@@ -470,6 +472,259 @@ def test_project_overview_never_renders_rejected_session_explanation(tmp_path):
             assert len(app.query("Markdown")) == 1
             assert len(app.query(".speaker")) == 1
             assert "list_files e search_code" not in app.response_text
-            assert len(app.query(".tool-card")) == 3
+            assert len(app.query(".tool-card")) == 1
+            assert len(app.activity_group.events) == 3
+
+    run_ui(scenario())
+
+
+def test_local_commands_completion_and_history_restore_draft(tmp_path):
+    model = UIModel()
+    app = CodaroApp(Agent(Repository(tmp_path), model))
+
+    async def scenario():
+        async with app.run_test(size=(100, 35)) as pilot:
+            prompt = app.query_one(Prompt)
+            await pilot.press("/", "s", "t", "tab")
+            assert prompt.value == "/status "
+            await pilot.press("enter")
+            assert "Último contexto enviado" in str(app.query_one(".question", Static).render())
+            assert not model.started.is_set()
+            await pilot.press("o", "i", "enter")
+            await wait_ready(app, pilot)
+            prompt.value = "rascunho"
+            await pilot.press("up")
+            assert prompt.value == "oi"
+            await pilot.press("down")
+            assert prompt.value == "rascunho"
+            prompt.value = "/desconhecido"
+            await pilot.press("enter")
+            assert len(app.agent.turns) == 1
+            assert "desconhecido" in str(app.query_one(".notice", Static).render())
+
+    run_ui(scenario())
+
+
+def test_file_completion_is_local_and_multiline_navigation_is_preserved(tmp_path):
+    (tmp_path / "main file.py").write_text("x = 1\n")
+    (tmp_path / ".env").write_text("TOKEN=private\n")
+    app = CodaroApp(Agent(Repository(tmp_path), UIModel()))
+
+    async def scenario():
+        async with app.run_test(size=(100, 35)) as pilot:
+            for _ in range(100):
+                if app.reference_paths:
+                    break
+                await pilot.pause(0.01)
+            assert app.reference_paths == ["main file.py"]
+            prompt = app.query_one(Prompt)
+            prompt.value = "Leia @main"
+            prompt.move_cursor(prompt.document.end)
+            await pilot.press("tab")
+            assert prompt.value == 'Leia @"main file.py" '
+            prompt.value = "primeira\nsegunda"
+            prompt.move_cursor(prompt.document.end)
+            await pilot.press("up")
+            assert prompt.cursor_location[0] == 0
+            assert prompt.value == "primeira\nsegunda"
+            assert not app.agent.provider.started.is_set()
+
+    run_ui(scenario())
+
+
+def test_activity_group_summarizes_multiple_tools_and_opens_errors(tmp_path):
+    from codaro.agent import AgentEvent
+    from codaro.tui import ActivityGroup
+
+    app = CodaroApp(Agent(Repository(tmp_path), UIModel()))
+
+    async def scenario():
+        async with app.run_test(size=(100, 35)) as pilot:
+            app.activity(
+                AgentEvent("tool_end", "Ler linhas", "main.py:1–3\n3 linhas", "success", 2)
+            )
+            app.activity(
+                AgentEvent("tool_end", "Buscar código", "Consulta: main\n1 resultado", "success", 3)
+            )
+            await pilot.pause()
+            group = app.query_one(ActivityGroup)
+            assert group.collapsed
+            assert "2 ações" in group.title
+            app.activity(
+                AgentEvent("tool_end", "Ler linhas", "missing.py\nInexistente", "error", 1)
+            )
+            await pilot.pause()
+            assert not group.collapsed
+            assert len(app.query(ActivityGroup)) == 1
+            assert "Inexistente" in str(group.details.render())
+
+    run_ui(scenario())
+
+
+def test_session_resume_restores_conversation_without_calling_model(tmp_path):
+    from codaro.sessions import SessionStore
+
+    store = SessionStore(tmp_path)
+    store.save(
+        [
+            [
+                {"role": "user", "content": "pergunta anterior"},
+                {"role": "assistant", "content": "resposta anterior"},
+            ]
+        ],
+        "test-model",
+    )
+    model = UIModel()
+    app = CodaroApp(Agent(Repository(tmp_path), model), resume=True)
+
+    async def scenario():
+        async with app.run_test(size=(100, 35)) as pilot:
+            await pilot.pause()
+            assert len(app.agent.turns) == 1
+            assert len(app.query("Markdown")) == 1
+            assert not model.started.is_set()
+            await pilot.press("o", "i", "enter")
+            await wait_ready(app, pilot)
+            assert len(store.load()) == 2
+
+    run_ui(scenario())
+
+
+def test_command_review_defaults_to_reject_and_approval_executes(tmp_path):
+    import sys
+
+    from test_agent import FakeModel, call
+
+    from codaro.tui import CommandReview
+
+    for approved in (False, True):
+        target = tmp_path / "ran.txt"
+        target.unlink(missing_ok=True)
+        script = "from pathlib import Path; Path('ran.txt').write_text('yes'); print('ok')"
+        model = FakeModel(
+            [
+                call("run_command", {"argv": [sys.executable, "-c", script]}),
+                {"content": "Resultado recebido."},
+            ]
+        )
+        model.settings = Settings("http://localhost/v1", "test")
+        app = CodaroApp(Agent(Repository(tmp_path), model, allow_edits=True))
+
+        async def scenario(app=app, approved=approved, target=target):
+            async with app.run_test(size=(100, 35)) as pilot:
+                await pilot.press("o", "i", "enter")
+                for _ in range(200):
+                    if isinstance(app.screen, CommandReview):
+                        break
+                    await pilot.pause(0.01)
+                assert isinstance(app.screen, CommandReview)
+                await pilot.pause(0.1)
+                assert not target.exists()
+                assert app.screen.focused.id == "reject-command"
+                if approved:
+                    await pilot.click("#approve-command")
+                else:
+                    await pilot.press("enter")
+                await wait_ready(app, pilot)
+                assert target.exists() == approved
+                assert app.query_one(Prompt).disabled is False
+
+        run_ui(scenario())
+
+
+def test_cancel_during_command_approval_dismisses_without_execution(tmp_path):
+    import sys
+
+    from test_agent import FakeModel, call
+
+    from codaro.tui import CommandReview
+
+    model = FakeModel([call("run_command", {"argv": [sys.executable, "-c", "raise Exception()"]})])
+    model.settings = Settings("http://localhost/v1", "test")
+    app = CodaroApp(Agent(Repository(tmp_path), model, allow_edits=True))
+
+    async def scenario():
+        async with app.run_test(size=(100, 35)) as pilot:
+            await pilot.press("o", "i", "enter")
+            for _ in range(200):
+                if isinstance(app.screen, CommandReview):
+                    break
+                await pilot.pause(0.01)
+            assert isinstance(app.screen, CommandReview)
+            await pilot.press("ctrl+x")
+            await wait_ready(app, pilot)
+            await pilot.pause()
+            assert not isinstance(app.screen, CommandReview)
+            assert not app.agent.turns
+            assert "cancelada" in str(app.query_one(".notice", Static).render())
+
+    run_ui(scenario())
+
+
+def test_applied_edit_can_continue_into_approved_validation(tmp_path):
+    import sys
+
+    from test_agent import FakeModel, call, edit_responses
+
+    from codaro.tui import CommandReview
+
+    path = tmp_path / "code.py"
+    path.write_text("x = 1\n")
+    script = (
+        "from pathlib import Path; assert Path('code.py').read_text() == 'x = 2\\n'; print('OK')"
+    )
+    model = FakeModel(
+        [
+            *edit_responses(),
+            call("read_lines", {"path": "code.py", "start": 1, "end": 1}),
+            call("run_command", {"argv": [sys.executable, "-c", script]}, "validate"),
+            {"content": "code.py:1 validado com saída 0."},
+        ]
+    )
+    model.settings = Settings("http://localhost/v1", "test")
+    app = CodaroApp(Agent(Repository(tmp_path), model, allow_edits=True))
+
+    async def scenario():
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.press("o", "i", "enter")
+            await wait_ready(app, pilot)
+            await pilot.pause(0.1)
+            proposal = app.agent.edits.pending[0]
+            await pilot.click(f"#review-{proposal.id}")
+            await pilot.click("#apply-edit")
+            await wait_ready(app, pilot)
+            await pilot.pause(0.1)
+            assert path.read_text() == "x = 2\n"
+            await pilot.click(f"#validate-{proposal.id}")
+            for _ in range(200):
+                if isinstance(app.screen, CommandReview):
+                    break
+                await pilot.pause(0.01)
+            assert isinstance(app.screen, CommandReview)
+            await pilot.pause(0.1)
+            await pilot.click("#approve-command")
+            await wait_ready(app, pilot)
+            assert app.rendered_text == "code.py:1 validado com saída 0."
+            restored = app.session.load()
+            assert len(restored) == 2
+            assert "Edição aplicada" in restored[0][-1]["content"]
+
+    run_ui(scenario())
+
+
+def test_saved_conversation_survives_context_pruning(tmp_path):
+    app = CodaroApp(Agent(Repository(tmp_path), UIModel(), history_budget=0))
+
+    async def scenario():
+        async with app.run_test(size=(100, 35)) as pilot:
+            for question in ("Primeira pergunta", "Segunda pergunta"):
+                app.query_one(Prompt).value = question
+                await pilot.press("enter")
+                await wait_ready(app, pilot)
+            assert len(app.agent.turns) == 0
+            assert len(app.session.load()) == 2
+            app.query_one(Prompt).value = "/compact"
+            await pilot.press("enter")
+            assert len(app.session.load()) == 2
 
     run_ui(scenario())
