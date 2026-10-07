@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 from test_tui import UIModel, run_ui
-from textual.widgets import Input, Select, Static
+from textual.widgets import Button, Input, Select, Static
 
 from codaro.agent import Agent
 from codaro.provider import ModelError, create_provider
@@ -106,6 +106,14 @@ def test_provider_form_tests_connection_before_registration(tmp_path, monkeypatc
             assert not store.path.exists()
             app.screen.query_one("#provider-test-model", Select).value = "llama3.1:8b"
             await pilot.pause()
+            # Textual ignores clicks while the previous click animation is active.
+            # Fast mocked responses can finish before that animation on CI.
+            button = app.screen.query_one("#provider-test", Button)
+            for _ in range(100):
+                if not button.has_class("-active") and not button.disabled:
+                    break
+                await pilot.pause(0.02)
+            assert not button.has_class("-active") and not button.disabled
             await pilot.click("#provider-test")
             for _ in range(100):
                 await pilot.pause(0.02)
