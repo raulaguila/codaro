@@ -171,7 +171,7 @@ def test_narrow_terminal_uses_full_width_chat(tmp_path):
             assert app.query_one("#conversation").region.width == 70
             assert not app.query("#sidebar, #repository, #activity")
             assert app.query_one("#status", Static)
-            assert app.query_one("#session", Static).tooltip == str(tmp_path)
+            assert str(tmp_path) in app.query_one("#session", Static).tooltip
 
     run_ui(scenario())
 
@@ -604,7 +604,7 @@ def test_chat_review_conflict_preserves_new_content(tmp_path):
     run_ui(scenario())
 
 
-def test_chat_review_enter_returns_and_clear_rejects(tmp_path):
+def test_chat_review_enter_returns_and_clear_preserves_pending(tmp_path):
     path = tmp_path / "code.py"
     path.write_text("x = 1\n")
     agent = Agent(Repository(tmp_path), EditUIModel(), allow_edits=True)
@@ -622,8 +622,9 @@ def test_chat_review_enter_returns_and_clear_rejects(tmp_path):
             assert agent.edits.pending
             assert path.read_text() == "x = 1\n"
             await pilot.press("ctrl+l")
-            assert proposal.state == "rejected"
-            assert not agent.edits.pending
+            assert proposal.state == "pending"
+            assert agent.edits.pending
+            assert "mantidos" in str(app.query_one("#status", Static).render())
 
     run_ui(scenario())
 
@@ -1161,6 +1162,10 @@ def test_modes_plan_transition_and_local_task_scope_review(tmp_path):
             await app.local_command("/permissions task")
             await pilot.pause()
             assert isinstance(app.screen, ScopeReview)
+            from textual.widgets import Checkbox
+
+            app.screen.query_one("#scope-advanced", Checkbox).value = True
+            await pilot.pause()
             app.screen.query_one("#scope-json", TextArea).text = '{"paths":["src"],"commands":[]}'
             await pilot.click("#grant-scope")
             await pilot.pause()

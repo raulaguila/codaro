@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
 import shlex
@@ -11,14 +12,16 @@ from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
+from rich.markdown import Markdown as RichMarkdown
 from rich.syntax import Syntax
 from textual import work
 from textual.app import App, ComposeResult, SystemCommand
 from textual.binding import Binding
+from textual.command import CommandPalette
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.screen import ModalScreen
-from textual.widgets import Button, Collapsible, Footer, Markdown, Static, TextArea
+from textual.widgets import Button, Checkbox, Collapsible, Footer, Markdown, Static, TextArea
 
 from codaro.agent import Agent, AgentEvent, InvestigationCancelled
 from codaro.edits import EditProposal
@@ -116,8 +119,8 @@ def short_path(root: Path, limit: int = 40) -> str:
 class EditReview(ModalScreen[str]):
     DEFAULT_CSS = """
     EditReview { align: center middle; background: #000000 65%; }
-    #review { width: 95%; height: 90%; border: round #38bdf8; background: #111827; }
-    #review-title { height: auto; padding: 1 2; color: #38bdf8; text-style: bold; }
+    #review { width: 95%; height: 90%; border: round $accent; background: $surface; }
+    #review-title { height: auto; padding: 1 2; color: $accent; text-style: bold; }
     #review-diff { height: 1fr; padding: 0 1; }
     #review-actions { height: auto; align-horizontal: center; padding: 1; }
     #review-actions Button { margin: 0 1; min-width: 10; }
@@ -175,9 +178,15 @@ class ChangesReview(EditReview):
 class ScopeReview(ModalScreen[dict | None]):
     DEFAULT_CSS = """
     ScopeReview { align: center middle; }
-    #scope-review { width: 90%; height: 80%; border: round #fbbf24; padding: 1; }
-    #scope-review TextArea { height: 1fr; }
-    #scope-review Horizontal { height: auto; }
+    #scope-review { width: 95%; height: 90%; border: round $warning;
+                    background: $surface; padding: 0 1; }
+    #scope-fields { height: 1fr; }
+    #scope-task { max-height: 2; }
+    #scope-review Static { height: auto; }
+    #scope-review TextArea { height: 4; }
+    #scope-review Horizontal { height: 3; }
+    #scope-review Button { width: 1fr; min-width: 8; padding: 0; }
+    #scope-json { display: none; }
     """
     BINDINGS = [Binding("escape", "reject", "Cancelar")]
 
@@ -190,6 +199,7 @@ class ScopeReview(ModalScreen[dict | None]):
             yield Static("Autorizar escopo desta tarefa/sessão", markup=False)
             yield Static(
                 safe_preview(self.scope_task["id"] + " · " + self.scope_task["objective"]),
+                id="scope-task",
                 markup=False,
             )
             yield Static(
@@ -197,7 +207,20 @@ class ScopeReview(ModalScreen[dict | None]):
                 "comandos exatos. Fora do escopo exige nova aprovação.",
                 markup=False,
             )
-            yield TextArea('{"paths": ["src", "tests"], "commands": []}', id="scope-json")
+            with VerticalScroll(id="scope-fields"):
+                yield Static("Caminhos autorizados · um por linha; inclui subpastas", markup=False)
+                yield TextArea("src\ntests", id="scope-paths")
+                yield Static(
+                    "Comandos exatos · um por linha; aspas preservam argumentos", markup=False
+                )
+                yield TextArea("", id="scope-commands")
+                yield Static("", id="scope-preview", markup=False)
+                yield Checkbox("Editar JSON avançado", id="scope-advanced")
+                yield TextArea('{"paths": ["src", "tests"], "commands": []}', id="scope-json")
+            yield Static(
+                "Revogue com /permissions action. Fora do escopo exige nova aprovação.",
+                markup=False,
+            )
             yield Static("", id="scope-error", markup=False)
             with Horizontal():
                 yield Button("Autorizar escopo", id="grant-scope", variant="warning")
@@ -205,6 +228,33 @@ class ScopeReview(ModalScreen[dict | None]):
 
     def on_mount(self):
         self.query_one("#cancel-scope", Button).focus()
+
+    def on_checkbox_changed(self, event):
+        if event.checkbox.id == "scope-advanced":
+            editor = self.query_one("#scope-json", TextArea)
+            editor.display = event.value
+            if event.value:
+                from codaro.ux_screens import ScopeFields
+
+                try:
+                    value = ScopeFields.parse(
+                        self.query_one("#scope-paths", TextArea).text,
+                        self.query_one("#scope-commands", TextArea).text,
+                    )
+                    editor.text = json.dumps(value, ensure_ascii=False, indent=2)
+                except ValueError as exc:
+                    self.query_one("#scope-error", Static).update(str(exc))
+
+    def on_text_area_changed(self, event):
+        if event.text_area.id in {"scope-paths", "scope-commands"}:
+            paths = self.query_one("#scope-paths", TextArea).text
+            commands = self.query_one("#scope-commands", TextArea).text
+            self.query_one("#scope-preview", Static).update(
+                "Escopo: "
+                + ", ".join(paths.splitlines())
+                + " · comandos: "
+                + str(len(commands.splitlines()))
+            )
 
     def action_reject(self):
         self.dismiss(None)
@@ -217,11 +267,19 @@ class ScopeReview(ModalScreen[dict | None]):
             text = self.query_one("#scope-json", TextArea).text
             if len(text) > 8000:
                 raise ValueError("Escopo grande demais.")
-            value = json.loads(text)
+            if self.query_one("#scope-advanced", Checkbox).value:
+                value = json.loads(text)
+            else:
+                from codaro.ux_screens import ScopeFields
+
+                value = ScopeFields.parse(
+                    self.query_one("#scope-paths", TextArea).text,
+                    self.query_one("#scope-commands", TextArea).text,
+                )
             if not isinstance(value, dict) or set(value) != {"paths", "commands"}:
                 raise ValueError("Use paths e commands.")
             ApprovalPolicy().grant("preview", value["paths"], value["commands"])
-        except (ValueError, TypeError) as exc:
+        except (ValueError, TypeError, RecursionError) as exc:
             self.query_one("#scope-error", Static).update(safe_preview(str(exc)))
             return
         self.dismiss(value)
@@ -230,11 +288,12 @@ class ScopeReview(ModalScreen[dict | None]):
 class CommandReview(ModalScreen[bool]):
     DEFAULT_CSS = """
     CommandReview { align: center middle; background: #000000 65%; }
-    #command-review { width: 90%; max-width: 100; height: auto; padding: 1 2;
-                      border: round #fbbf24; background: #111827; }
+    #command-review { width: 95%; max-width: 100; height: 18; max-height: 90%; padding: 0 1;
+                      border: round $warning; background: $surface; }
+    #command-fields { height: 1fr; }
     #command-review Static { height: auto; margin-bottom: 1; }
     #command-review Horizontal { height: 3; }
-    #command-review Button { margin-right: 1; }
+    #command-review Button { width: 1fr; min-width: 8; padding: 0; }
     """
     BINDINGS = [Binding("escape", "reject", "Rejeitar", priority=True)]
 
@@ -245,16 +304,18 @@ class CommandReview(ModalScreen[bool]):
     def compose(self) -> ComposeResult:
         with Vertical(id="command-review"):
             yield Static("Autorizar comando", markup=False)
-            yield Static(
-                safe_preview(
-                    f"Diretório: {self.root}\nTimeout: {self.timeout}s\n\n" + shlex.join(self.argv)
-                ),
-                markup=False,
-            )
-            yield Static(
-                "O comando pode alterar arquivos. A aprovação vale só para esta execução.",
-                markup=False,
-            )
+            with VerticalScroll(id="command-fields"):
+                yield Static(
+                    safe_preview(
+                        f"Diretório: {self.root}\nTimeout: {self.timeout}s\n\n"
+                        + shlex.join(self.argv)
+                    ),
+                    markup=False,
+                )
+                yield Static(
+                    "O comando pode alterar arquivos. A aprovação vale só para esta execução.",
+                    markup=False,
+                )
             with Horizontal():
                 yield Button("Executar", id="approve-command", variant="warning")
                 yield Button("Rejeitar", id="reject-command")
@@ -301,6 +362,14 @@ class GenerationPreview(Collapsible):
             else ""
         )
         self.content.update(self.text + suffix)
+        # Render completed Markdown blocks; keep unmatched fences literal while streaming.
+        stable = (
+            not self.reasoning
+            and self.state in {"generating", "answer"}
+            and self.text.count("```") % 2 == 0
+        )
+        if stable:
+            self.content.update(RichMarkdown(self.text + suffix))
 
     def finish(self, state: str):
         self.state = state
@@ -364,6 +433,7 @@ class ActivityGroup(Collapsible):
     def finish(self, successful: bool):
         if not self.events:
             self.title = "Geração concluída" if successful else "Geração interrompida"
+            self.display = False
 
     def add(self, event: AgentEvent):
         self.events.append(event)
@@ -399,7 +469,7 @@ class ActivityGroup(Collapsible):
 
 class ProposalCard(Vertical):
     DEFAULT_CSS = """
-    ProposalCard { height: auto; margin: 1; padding: 1; border: round #fbbf24; }
+    ProposalCard { height: auto; margin: 1; padding: 1; border: round $warning; }
     ProposalCard Static { height: auto; }
     ProposalCard Button { margin-top: 1; }
     """
@@ -423,62 +493,145 @@ class ProposalCard(Vertical):
 class CodaroApp(App):
     TITLE = "Codaro · explore seu código"
     CSS = """
-    Screen { background: #0f172a; }
-    #brand { height: 1; margin: 1 2 0 2; color: #f1f5f9; text-style: bold; }
-    #session { height: 1; margin: 0 2; color: #94a3b8; }
-    #session.insecure { color: #fbbf24; }
+    Screen { background: $background; }
+    #brand { height: 1; margin: 1 2 0 2; color: $text; text-style: bold; }
+    #session { height: auto; max-height: 2; margin: 0 2; color: $text-muted; }
+    #session.insecure { color: $warning; }
     #conversation { width: 100%; height: 1fr; padding: 0 2; }
     #welcome { height: auto; max-width: 78; margin: 1; }
-    #welcome-title { height: 1; color: #f1f5f9; text-style: bold; }
-    #welcome-description { height: auto; margin-bottom: 1; color: #94a3b8; }
+    #welcome-title { height: 1; color: $text; text-style: bold; }
+    #welcome-description { height: auto; margin-bottom: 1; color: $text-muted; }
     #suggestions { height: 3; }
-    #welcome Button { width: 1fr; min-width: 12; background: #172033; border: none; }
-    #welcome Button:hover, #welcome Button:focus { border: round #38bdf8; }
+    #welcome Button { width: 1fr; min-width: 12; background: $panel; border: none; }
+    #welcome Button:hover, #welcome Button:focus { border: round $accent; }
     #prompt { height: 3; max-height: 8; margin: 0 1; border: none;
-              border-top: solid #475569; padding: 0 1; }
-    #prompt:focus { border-top: solid #38bdf8; }
-    #completion { display: none; height: auto; max-height: 7; margin: 0 2; color: #94a3b8; }
-    #prompt-hint { height: 1; margin: 0 2; color: #94a3b8; }
-    #status { height: 1; margin: 0 2; color: #cbd5e1; }
-    .question { height: auto; margin: 1 0; color: #f1f5f9; }
-    .assistant { margin: 0; padding: 0 1; background: #0f172a; }
-    .speaker { height: 1; margin: 1 1 0 1; color: #e2e8f0; text-style: bold; }
-    .tool-card { height: auto; margin: 0 1; border: none; border-left: thick #475569; padding: 0; }
-    .tool-card.error { border-left: thick #f87171; }
-    .tool-card.success { border-left: thick #34d399; }
-    .tool-card CollapsibleTitle { color: #94a3b8; }
+              border-top: solid $primary; padding: 0 1; }
+    #prompt:focus { border-top: solid $accent; }
+    #completion { display: none; height: auto; max-height: 7; margin: 0 2; color: $text-muted; }
+    #prompt-hint { height: 1; margin: 0 2; color: $text-muted; }
+    #context-meter { height: 1; margin: 0 2; color: $text-muted; }
+    #new-messages { display: none; height: 1; min-height: 1; border: none; margin: 0 2; }
+    #status { height: 1; margin: 0 2; color: $text; }
+    .recovery-actions { height: 3; }
+    .recovery-actions Button { width: 1fr; min-width: 8; padding: 0; }
+    #configure-start { height: 1; min-height: 1; width: auto; border: none; padding: 0; }
+    .question { height: auto; margin: 1 0; color: $text; }
+    .assistant { margin: 0; padding: 0 1; background: $background; }
+    .speaker { height: 1; margin: 1 1 0 1; color: $text; text-style: bold; }
+    .tool-card { height: auto; margin: 0 1; border: none; border-left: thick $primary;
+                 padding: 0; }
+    .tool-card.error { border-left: thick $error; }
+    .tool-card.success { border-left: thick $success; }
+    .tool-card CollapsibleTitle { color: $text-muted; }
     .tool-card > Contents { padding: 0 1; }
     .generation-previews { height: auto; }
     .generation-preview { height: auto; border: none; padding: 0; }
     .generation-preview > Contents { padding: 0 1; }
-    .generation-text { height: auto; color: #94a3b8; }
-    .notice { height: auto; margin: 1; color: #fbbf24; }
+    .generation-text { height: auto; color: $text-muted; }
+    .notice { height: auto; margin: 1; color: $warning; }
     """
     BINDINGS = [
         Binding("ctrl+q", "quit", "Sair", priority=True, key_display="Ctrl+Q"),
-        Binding("ctrl+l", "clear_chat", "Limpar", priority=True, key_display="Ctrl+L"),
+        Binding("ctrl+l", "clear_chat", "Mensagens", priority=True, key_display="Ctrl+L"),
         Binding("ctrl+x", "cancel", "Cancelar", priority=True, key_display="Ctrl+X"),
         Binding("escape", "cancel", "Cancelar", show=False),
         Binding("ctrl+p", "command_palette", "Comandos", priority=True, key_display="Ctrl+P"),
     ]
 
+    def action_command_palette(self):
+        if self.use_command_palette and not CommandPalette.is_open(self):
+            self.push_screen(CommandPalette(id="--command-palette", placeholder="Buscar comandos…"))
+
     def get_system_commands(self, screen):
-        yield from super().get_system_commands(screen)
-        if self.busy or isinstance(screen, ModalScreen):
+        if isinstance(screen, ModalScreen):
             return
         yield SystemCommand(
-            "Cadastrar provedor",
-            "Cadastrar API key e listar modelos do provedor (BYOK).",
-            self.action_register_provider,
+            "Ajuda",
+            "/help · Comandos e atalhos",
+            lambda: self.run_worker(self.open_provider_menu("/help")),
+        )
+        if self.busy:
+            yield SystemCommand(
+                "Cancelar atividade",
+                "Solicitar interrupção; rascunho preservado",
+                self.action_cancel,
+            )
+            return
+        actions = {
+            "Cadastrar provedor": (
+                "/providers",
+                "Cadastrar API key e listar modelos do provedor (BYOK).",
+            ),
+            "Gerenciar provedores": (
+                "/provider-manage",
+                "Editar, testar, renomear e remover perfis.",
+            ),
+            "Selecionar provedor e modelo": (
+                "/models",
+                "Escolher entre os provedores cadastrados e seus modelos.",
+            ),
+            "Perguntar": ("/ask", "Consultar sem modificar arquivos"),
+            "Planejar": ("/plan", "Investigar e definir etapas"),
+            "Executar": ("/execute", "Implementar e validar com aprovação"),
+            "Retomar conversa": ("/resume", "Retomar a última conversa salva"),
+            "Revisar alterações": ("/changes", "Ver alterações e checkpoints"),
+            "Permissões por tarefa": (
+                "/permissions task",
+                "Autorizar caminhos e comandos da tarefa ativa",
+            ),
+            "Revogar escopo": ("/permissions action", "Voltar à aprovação por ação"),
+            "Contexto": ("/status", "Orçamento, origem e contagem"),
+            "Compactar contexto": ("/compact", "Reduzir histórico enviado ao modelo"),
+            "Histórico": ("/history", "Consultar a memória da conversa"),
+            "Tarefas": ("/task list", "Ver tarefas deste projeto"),
+            "Desfazer limpeza": ("/restore-clear", "Restaurar mensagens e contexto"),
+        }
+        for title, (command, description) in actions.items():
+            yield SystemCommand(
+                title,
+                command + " · " + description,
+                lambda cmd=command: self.run_worker(self.open_provider_menu(cmd)),
+            )
+        yield SystemCommand(
+            "Nova conversa e tarefa",
+            "/new · Revogar escopo e começar outra atividade",
+            self.action_new_conversation,
         )
         yield SystemCommand(
-            "Selecionar provedor e modelo",
-            "Escolher entre os provedores cadastrados e seus modelos.",
-            self.action_select_provider_model,
+            "Limpar mensagens",
+            "/clear · Manter tarefa, escopo e propostas; permite desfazer",
+            lambda: self.run_worker(self.action_clear_chat()),
+        )
+        yield SystemCommand(
+            "Mostrar/ocultar raciocínio",
+            "/reasoning · Alternar prévias do modelo",
+            self.toggle_reasoning,
+        )
+        # Localize the framework actions while retaining theme and keyboard functionality.
+        labels = {
+            "Theme": ("Tema", "Escolher tema da interface"),
+            "Quit": ("Sair", "Encerrar o Codaro"),
+            "Keys": ("Atalhos", "Mostrar teclas disponíveis"),
+            "Maximize": ("Ampliar painel", "Ampliar elemento atual"),
+            "Screenshot": ("Capturar tela", "Salvar captura SVG"),
+        }
+        for item in super().get_system_commands(screen):
+            if item.title in labels:
+                title, help_text = labels[item.title]
+                yield SystemCommand(title, help_text, item.callback)
+
+    def toggle_reasoning(self):
+        self.show_reasoning = not self.show_reasoning
+        if self.reasoning_preview is not None:
+            self.reasoning_preview.collapsed = not self.show_reasoning
+        self.query_one("#status", Static).update(
+            "Raciocínio expandido" if self.show_reasoning else "Raciocínio recolhido"
         )
 
     async def open_provider_menu(self, command: str):
-        if self.busy or isinstance(self.screen, ModalScreen):
+        if (self.busy and command not in {"/help", "/status"}) or isinstance(
+            self.screen, ModalScreen
+        ):
             return
         prompt = self.query_one(Prompt)
         draft = prompt.value
@@ -542,6 +695,9 @@ class CodaroApp(App):
         if not agent.legacy:
             agent.approve_edit = self.approve_changes
         self.plan_card: Collapsible | None = None
+        self.clear_backup = None
+        self.show_reasoning = True
+        self.provider_available = True
 
     def shortcut_display(self, key: str) -> str:
         key = key.upper()
@@ -551,6 +707,8 @@ class CodaroApp(App):
         return f"⌥{key}" if self.is_macos else f"Alt+{key}"
 
     def get_key_display(self, binding: Binding) -> str:
+        if self.size.width < 80 and binding.key.startswith("ctrl+"):
+            return ("⌘" if self.is_macos else "^") + binding.key.removeprefix("ctrl+").upper()
         if self.is_macos and binding in self.BINDINGS and binding.key.startswith("ctrl+"):
             return self.shortcut_display(binding.key.removeprefix("ctrl+"))
         return super().get_key_display(binding)
@@ -570,6 +728,7 @@ class CodaroApp(App):
                 Button("Propor mudança", id="suggest-edit", disabled=not self.agent.allow_edits),
                 id="suggestions",
             ),
+            Button("Configurar provedor", id="configure-start"),
             id="welcome",
         )
 
@@ -578,6 +737,10 @@ class CodaroApp(App):
         yield Static("", id="session", markup=False)
         with VerticalScroll(id="conversation"):
             yield self.welcome()
+        yield Button("Novas mensagens ↓", id="new-messages")
+        yield Static(
+            "Contexto: aguardando primeira chamada · /status", id="context-meter", markup=False
+        )
         yield Static("Pronto", id="status")
         yield Static("", id="completion", markup=False)
         yield Prompt(
@@ -606,6 +769,10 @@ class CodaroApp(App):
         except (ValueError, OSError) as exc:
             self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
 
+    def on_resize(self):
+        if self.query("#session"):
+            self.update_session_header()
+
     def update_session_header(self):
         settings = self.agent.provider.settings
         mode = (
@@ -617,12 +784,24 @@ class CodaroApp(App):
         if settings.base_url.startswith("http://"):
             tls = "HTTP"
         root = short_path(self.agent.repository.root)
-        summary = f"{root} · {settings.model} · {mode}"
+        width = max(20, self.size.width - 4)
+        identity = f"{root} · {settings.model}"
+        if len(identity) > width:
+            identity = identity[: width - 1] + "…"
+        summary = (
+            f"{identity} · {mode}" if len(identity + mode) + 6 < width else f"{identity}\n{mode}"
+        )
         summary = f"{tls} · {summary}" if settings.tls_insecure else f"{summary} · {tls}"
         session = self.query_one("#session", Static)
         session.update(safe_preview(summary))
         session.set_class(settings.tls_insecure, "insecure")
-        session.tooltip = safe_preview(str(self.agent.repository.root))
+        session.tooltip = safe_preview(str(self.agent.repository.root) + " · " + settings.model)
+        self.query_one("#prompt-hint", Static).update(
+            f"Enter envia · {self.option_display('Enter')} linha · / ajuda · @ arquivo"
+            if width < 80
+            else f"Enter envia · {self.option_display('Enter')} nova linha · "
+            "/ comandos · @ arquivo · ↑ histórico"
+        )
 
     @work(thread=True, exclusive=True, group="files")
     def refresh_reference_paths(self):
@@ -710,12 +889,39 @@ class CodaroApp(App):
             self.mount_message(Static("Este comando não recebe argumentos.", classes="notice"))
             return
         if (
-            name in {"/resume", "/compact", "/model", "/models", "/providers", "/undo"}
+            name
+            in {
+                "/resume",
+                "/compact",
+                "/model",
+                "/models",
+                "/providers",
+                "/provider-manage",
+                "/undo",
+            }
             and self.agent.edits.pending
         ):
             self.mount_message(Static("Revise as edições pendentes primeiro.", classes="notice"))
             return
         self.query_one(Prompt).value = ""
+        if name == "/new":
+            await self.action_new_conversation()
+            return
+        if name == "/restore-clear":
+            await self.restore_clear()
+            return
+        if name == "/reasoning":
+            self.toggle_reasoning()
+            return
+        if name == "/provider-manage":
+            from codaro.providers import ProviderStore
+            from codaro.ux_screens import ProviderManager
+
+            try:
+                self.push_screen(ProviderManager(ProviderStore()), self.manage_provider_decision)
+            except (ValueError, OSError) as exc:
+                self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
+            return
         if name == "/clear":
             await self.action_clear_chat()
             return
@@ -731,7 +937,8 @@ class CodaroApp(App):
                     self.update_session_header()
                     for button in self.query("#suggest-edit"):
                         button.disabled = not self.agent.allow_edits
-                text = f"Modo: {self.agent.mode.label}. Permissões: {self.agent.policy.kind}."
+                policy_label = "por tarefa" if self.agent.policy.kind == "task" else "por ação"
+                text = f"Modo: {self.agent.mode.label}. Permissões: {policy_label}."
                 if name == "/execute" and self.agent.tasks.current():
                     self.query_one(
                         Prompt
@@ -901,19 +1108,49 @@ class CodaroApp(App):
             )
         self.mount_message(Static(safe_preview(text), classes="question", markup=False))
 
+    def manage_provider_decision(self, result):
+        if not result:
+            return
+        from codaro.provider_ui import ProviderSetup
+        from codaro.providers import ProviderStore
+
+        store = ProviderStore()
+        if result.startswith("removed:"):
+            if self.agent.provider.settings.provider_id == result.removeprefix("removed:"):
+                self.provider_available = False
+                self.mount_message(
+                    Static("Provedor ativo removido · selecione outro modelo.", classes="notice")
+                )
+            return
+        profile = result.removeprefix("edit:") if result.startswith("edit:") else None
+        self.push_screen(
+            ProviderSetup(store, profile=profile),
+            lambda name: self.provider_edited(profile, name, store),
+        )
+
+    def provider_edited(self, previous, name, store):
+        if name and previous == self.agent.provider.settings.provider_id:
+            try:
+                self.activate_provider(store.active_settings(name), preserve_session=False)
+            except (ValueError, OSError) as exc:
+                self.provider_available = False
+                self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
+        self.provider_registered(name, store)
+
     def provider_registered(self, name, store=None):
         if name is not None:
             from codaro.provider_ui import ModelPicker
 
             self.push_screen(ModelPicker(store, profile=name), self.activate_provider)
 
-    def activate_provider(self, settings: Settings | None):
+    def activate_provider(self, settings: Settings | None, *, preserve_session=True):
         if settings is None:
             return
         try:
             current = self.agent.provider.settings
             if (
-                current.provider_id == settings.provider_id
+                preserve_session
+                and current.provider_id == settings.provider_id
                 and current.base_url == settings.base_url
             ):
                 settings = replace(
@@ -923,6 +1160,7 @@ class CodaroApp(App):
                     token_encoding=current.token_encoding,
                 )
             self.agent.set_provider(create_provider(settings))
+            self.provider_available = True
             self.session.secret = settings.api_key
             self.context_limit = self.agent.adaptive_input_limit
             self.context_chars = self.context_tokens = 0
@@ -1089,12 +1327,27 @@ class CodaroApp(App):
         if len(conversation.children) >= 100:
             for old in list(conversation.children)[:10]:
                 old.remove()
+        follow = conversation.is_vertical_scroll_end
         conversation.mount(widget)
-        self.call_after_refresh(conversation.scroll_end, animate=False)
+        if follow:
+            self.call_after_refresh(conversation.scroll_end, animate=False)
+        else:
+            self.query_one("#new-messages", Button).display = True
 
     async def on_prompt_submitted(self, event: Prompt.Submitted):
         question = event.value.strip()
-        if not question or self.busy:
+        if not question:
+            return
+        if self.busy:
+            self.query_one("#status", Static).update(
+                "Agente trabalhando · rascunho preservado · aguarde para enviar"
+            )
+            return
+        if not self.provider_available and not question.startswith("/"):
+            self.mount_message(
+                Static("Selecione outro provedor e modelo antes de enviar.", classes="notice")
+            )
+            await self.local_command("/models")
             return
         if len(event.value) > 8000:
             self.query_one("#status", Static).update(
@@ -1110,6 +1363,8 @@ class CodaroApp(App):
             )
             return
         self.hide_welcome()
+        for button in self.query(".recovery-actions Button"):
+            button.disabled = True
         for button in self.query("#execute-plan"):
             button.disabled = True
         for card in self.proposal_cards.values():
@@ -1127,7 +1382,7 @@ class CodaroApp(App):
         self.reply = None
         self.speaker = None
         event.input.value = ""
-        event.input.disabled = True
+        event.input.disabled = False
         self.mount_message(Static(f"› {safe_preview(question)}", classes="question", markup=False))
         self.query_one("#status", Static).update("Investigando…")
         self.investigate(question)
@@ -1154,7 +1409,12 @@ class CodaroApp(App):
         except InvestigationCancelled:
             answer = "Investigação cancelada."
         except (ModelError, ValueError, OSError) as exc:
-            answer = f"Não foi possível concluir: {exc}"
+            message = str(exc)
+            if self.agent.provider.settings.provider_id:
+                message = message.replace(
+                    "Confira CODARO_BASE_URL", "Confira a URL em Ctrl+P → Gerenciar provedores"
+                )
+            answer = f"Não foi possível concluir: {message}"
         except sqlite3.Error:
             answer = (
                 "Falha no índice SQLite. Confira permissões, espaço livre e integridade do índice."
@@ -1165,6 +1425,19 @@ class CodaroApp(App):
         self.deliver(self.finish, answer, successful)
 
     def activity(self, event: AgentEvent):
+        if event.kind == "model_start":
+            self.query_one("#context-meter", Static).update(
+                f"Contexto ≈ {event.context_tokens or 0:,}/"
+                f"{event.context_limit or self.agent.adaptive_input_limit:,} · "
+                f"{self.agent.provider.settings.context_source} · /status"
+            )
+        elif event.kind == "compaction" or event.title in {
+            "Contexto liberado",
+            "Contexto reduzido",
+        }:
+            self.query_one("#context-meter", Static).update(
+                "Contexto compactado automaticamente · /status"
+            )
         if event.kind == "plan":
             self.show_plan()
         elif event.kind == "model_start":
@@ -1235,6 +1508,7 @@ class CodaroApp(App):
     def append_reasoning(self, delta: str):
         if self.reasoning_preview is None:
             self.reasoning_preview = GenerationPreview(reasoning=True)
+            self.reasoning_preview.collapsed = not self.show_reasoning
             self.mount_message(self.reasoning_preview)
         self.reasoning_preview.update_text(
             (self.reasoning_preview.text + safe_preview(delta))[:4001]
@@ -1313,7 +1587,24 @@ class CodaroApp(App):
                 self.answer_preview.finish("cancelled")
                 self.answer_preview = None
             self.discard_response()
-            self.mount_message(Static(safe_preview(answer), classes="notice", markup=False))
+            settings = self.agent.provider.settings
+            self.mount_message(
+                Static(
+                    safe_preview(
+                        f"{settings.provider_id or 'Local/ambiente'} / {settings.model}\n" + answer
+                    ),
+                    classes="notice",
+                    markup=False,
+                )
+            )
+            self.mount_message(
+                Horizontal(
+                    Button("Repetir", id="retry-question"),
+                    Button("Configurar", id="recover-provider"),
+                    Button("Outro modelo", id="recover-model"),
+                    classes="recovery-actions",
+                )
+            )
         if successful:
             for proposal in self.agent.edits.pending:
                 card = ProposalCard(proposal)
@@ -1352,25 +1643,104 @@ class CodaroApp(App):
             self.save_session()
 
     async def action_clear_chat(self):
-        if self.busy or isinstance(self.screen, (EditReview, CommandReview, ScopeReview)):
+        if self.busy or isinstance(self.screen, ModalScreen):
             return
-        for proposal in self.agent.edits.pending:
-            self.agent.edits.reject(proposal.id)
-        self.proposal_cards.clear()
-        self.activity_group = None
-        self.plan_card = None
+        self.clear_backup = (copy.deepcopy(self.agent.turns), copy.deepcopy(self.session_turns))
         self.agent.turns.clear()
         self.session_turns.clear()
         self.response_text = self.rendered_text = ""
-        self.reply = None
-        self.speaker = None
+        self.reply = self.speaker = None
+        self.activity_group = self.plan_card = None
+        self.answer_preview = self.generation_preview = self.reasoning_preview = None
         conversation = self.query_one("#conversation", VerticalScroll)
         await conversation.remove_children()
         await conversation.mount(self.welcome())
+        self.proposal_cards.clear()
+        for proposal in self.agent.edits.pending:
+            card = ProposalCard(proposal)
+            self.proposal_cards[proposal.id] = card
+            self.mount_message(card)
+        self.show_plan()
+        self.save_session()
         self.query_one(Prompt).focus()
-        self.query_one("#status", Static).update("Pronto · conversa limpa")
+        self.query_one("#new-messages").display = False
+        self.query_one("#status", Static).update(
+            "Mensagens limpas · tarefa, escopo e propostas mantidos · /restore-clear desfaz"
+        )
+
+    async def restore_clear(self):
+        if self.clear_backup is None:
+            self.mount_message(Static("Não há limpeza para desfazer.", classes="notice"))
+            return
+        self.agent.turns, self.session_turns = self.clear_backup
+        self.clear_backup = None
+        self.save_session()
+        await self.restore_session()
+        self.proposal_cards.clear()
+        for proposal in self.agent.edits.pending:
+            card = ProposalCard(proposal)
+            self.proposal_cards[proposal.id] = card
+            self.mount_message(card)
+        self.plan_card = None
+        self.show_plan()
+
+    async def action_new_conversation(self):
+        if self.busy or isinstance(self.screen, ModalScreen):
+            return
+        from codaro.ux_screens import NewConversation
+
+        self.push_screen(NewConversation(), self.begin_conversation)
+
+    def begin_conversation(self, objective):
+        if objective is None:
+            return
+        self.run_worker(self.reset_conversation(objective))
+
+    async def reset_conversation(self, objective):
+        try:
+            for proposal in list(self.agent.edits.pending):
+                self.agent.edits.reject(proposal.id)
+            self.agent.policy.reset()
+            self.agent.tasks.mutate(lambda data: data.update(active=None))
+            self.agent.memory.clear_task()
+            await self.action_clear_chat()
+            self.clear_backup = None
+            self.history = InputHistory()
+            if objective:
+                self.agent.tasks.start(objective, new=True)
+            self.update_session_header()
+            self.query_one("#status", Static).update(
+                "Nova conversa · permissões por ação · propostas anteriores descartadas"
+            )
+        except (ValueError, OSError, ModelError) as exc:
+            self.mount_message(
+                Static(
+                    safe_preview(f"Não foi possível iniciar outra conversa: {exc}"),
+                    classes="notice",
+                    markup=False,
+                )
+            )
 
     def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "new-messages":
+            self.query_one("#conversation", VerticalScroll).scroll_end(animate=False)
+            event.button.display = False
+            return
+        if event.button.id == "retry-question" and not self.busy:
+            prompt = self.query_one(Prompt)
+            prompt.value = self.active_question
+            self.post_message(Prompt.Submitted(prompt))
+            return
+        if (
+            event.button.id in {"recover-provider", "recover-model", "configure-start"}
+            and not self.busy
+        ):
+            self.run_worker(
+                self.open_provider_menu(
+                    "/providers" if event.button.id != "recover-model" else "/models"
+                )
+            )
+            return
         if event.button.id == "execute-plan":
             if self.busy:
                 return

@@ -342,7 +342,7 @@ class OpenAICompatible:
             on_reasoning=on_reasoning,
         )
 
-    def check_tool_calling(self):
+    def check_tool_calling(self, *, cancelled=None, on_stage=None):
         probe = {
             "type": "function",
             "function": {
@@ -365,7 +365,9 @@ class OpenAICompatible:
                 ),
             }
         ]
-        message = self._request(messages, [probe])
+        if on_stage:
+            on_stage("chamada de ferramenta")
+        message = self._request(messages, [probe], cancelled=cancelled)
         calls = message.get("tool_calls") or []
         try:
             valid = (
@@ -392,7 +394,11 @@ class OpenAICompatible:
                 },
             ]
         )
-        answer = self.stream(messages)
+        if cancelled is not None and cancelled.is_set():
+            raise RequestCancelled("Teste cancelado.")
+        if on_stage:
+            on_stage("resposta final")
+        answer = self._request(messages, None, on_delta=lambda delta: None, cancelled=cancelled)
         if answer.get("tool_calls") or marker not in (answer.get("content") or ""):
             raise ModelError(
                 "O modelo chamou a ferramenta, mas não concluiu o ciclo com o resultado. "

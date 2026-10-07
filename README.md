@@ -124,6 +124,23 @@ No chat: `/task`, `/task list`, `/task new OBJETIVO` e `/task resume ID`. Use um
 
 Limites padrão: Perguntar oito etapas; Planejar vinte; Executar trinta e duas. Planejar/Executar têm orçamento acumulado de 96.000 caracteres de resultados, mantendo o limite de contexto por requisição. A atividade tem prazo de 1.800 segundos, descontando espera em revisões, e até três falhas de validação por interação. Repetição consecutiva sem progresso encerra a investigação. Configure `--max-steps` (1–200), `--max-seconds` (1–7.200) e `--max-corrections` (1–10) no chat ou execute. Um bloqueio/limite conserva o progresso para outra interação; não cria execução ilimitada.
 
+## Navegação e configuração no chat
+
+Ctrl+P reúne Perguntar, Planejar, Executar, nova conversa/tarefa, retomada, alterações, permissões, contexto, histórico, provedores, temas e ajuda. A paleta e seus comandos estão em português; os aliases técnicos continuam disponíveis.
+
+- **Limpar mensagens** (`Ctrl+L` ou `/clear`) limpa mensagens e contexto enviados, mantendo a tarefa, o escopo autorizado e propostas pendentes visíveis. `/restore-clear` desfaz a última limpeza nesta sessão.
+- **Nova conversa e tarefa** (`/new`) abre uma revisão do efeito: revoga o escopo anterior, descarta propostas pendentes e começa outra atividade. Arquivos já alterados são mantidos. É possível informar o novo objetivo.
+- **Gerenciar provedores** (`/provider-manage`) permite editar URL/TLS, renomear, substituir a API key, testar e remover perfis. Na edição, uma chave vazia mantém a credencial salva; ela permanece mascarada. Remover o perfil ativo exige selecionar outro modelo antes de enviar uma pergunta.
+- Os formulários têm rótulos permanentes e ações fixas. **Testar conexão** permite cancelar e ignora resultados tardios. O teste não salva o perfil. Uma operação HTTP síncrona já iniciada pode continuar até retornar/atingir timeout; o cancelamento evita novas etapas e libera a interface.
+- O seletor oculta modelos que a API informa não suportarem ferramentas/chat e distingue suporte confirmado de suporte desconhecido. Para capacidade desconhecida, use o teste do modelo no cadastro/edição do provedor.
+- O escopo da tarefa usa campos de caminhos e comandos exatos, um por linha, com prévia e JSON avançado opcional. Aspas agrupam argumentos; essa entrada não executa um shell. `/permissions action` revoga o escopo.
+- A chegada de mensagens respeita a posição de leitura e oferece **Novas mensagens ↓**. O orçamento estimado e sua origem continuam visíveis após a geração; `/status` detalha contagem e calibração.
+- É possível escrever o próximo rascunho enquanto o agente trabalha. O envio simultâneo fica bloqueado e preserva o texto. Erros oferecem repetir a pergunta, configurar o provedor e escolher outro modelo.
+- `/reasoning` alterna o raciocínio expandido/recolhido nesta sessão. A prévia renderiza Markdown estável, conserva cercas incompletas como texto e só promove a resposta depois da aceitação. Respostas sem ferramentas não criam um resumo vazio de atividades.
+- Os temas usam cores semânticas para manter texto/fundo consistentes. Em terminais estreitos, o cabeçalho prioriza modo e aprovação em duas linhas e os atalhos usam `^` para Ctrl; no macOS, `⌘` indica Command. `/help` mostra os atalhos completos e a alternativa Ctrl.
+
+Detalhamento da correção dos 17 achados: [UI e UX](docs/UI_UX.md).
+
 ## Interface e streaming
 
 - `codaro chat` exibe a resposta final após o agente concluir e validar o turno, em Markdown, com títulos, listas, tabelas e destaque de sintaxe em blocos de código. Durante a geração, a barra de status e as ferramentas mostram o progresso.

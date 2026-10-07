@@ -314,7 +314,54 @@ class ProviderStore:
         self.mutate(add)
         return profile["models"]
 
-    def test_connection(self, kind, key, *, base_url=None, tls_insecure=False, model_id=None):
+    def update(self, kind, key, *, previous_name, name=None, base_url=None, tls_insecure=False):
+        previous_name, old = self.profile(previous_name)
+        name = name or previous_name
+        if kind not in PRESETS or not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", name):
+            raise ValueError("Provedor ou nome de perfil inválido.")
+        settings = Settings(
+            provider_base_url(kind, base_url), "unselected", key, tls_insecure=tls_insecure
+        )
+        if kind not in {"ollama", "custom", "openai-compatible"} and not key:
+            raise ValueError("Informe a API key do provedor.")
+        candidate = {
+            **old,
+            "kind": kind,
+            "base_url": settings.base_url,
+            "api_key": key,
+            "tls_insecure": tls_insecure,
+        }
+        candidate["models"] = ModelCatalog(candidate, transport=self.transport).list()
+        if not any(item["id"] == old["model"] for item in candidate["models"]):
+            candidate["model"] = ""
+        if kind != old["kind"] or settings.base_url != old["base_url"]:
+            candidate["context_overrides"] = {}
+        candidate["updated_at"] = timestamp()
+
+        def save(value):
+            if value["profiles"].get(previous_name) != old:
+                raise ValueError("Perfil alterado durante a consulta; tente novamente.")
+            if name != previous_name and name in value["profiles"]:
+                raise ValueError("Já existe um perfil com esse nome.")
+            del value["profiles"][previous_name]
+            value["profiles"][name] = candidate
+            if value["active"] == previous_name:
+                value["active"] = name
+
+        self.mutate(save)
+        return candidate["models"]
+
+    def test_connection(
+        self,
+        kind,
+        key,
+        *,
+        base_url=None,
+        tls_insecure=False,
+        model_id=None,
+        cancelled=None,
+        on_stage=None,
+    ):
         """Check the form without saving; selected models get a complete tool round trip."""
         if kind not in PRESETS:
             raise ValueError("Provedor desconhecido.")
@@ -332,20 +379,30 @@ class ProviderStore:
             "api_key": key,
             "tls_insecure": tls_insecure,
         }
+
+        def check_cancel():
+            if cancelled is not None and cancelled.is_set():
+                raise ModelError("Teste cancelado.")
+
+        check_cancel()
+        if on_stage:
+            on_stage("catálogo")
         catalog = ModelCatalog(profile, transport=self.transport)
         models = catalog.list()
+        check_cancel()
         if model_id:
             model = next((item for item in models if item["id"] == model_id), None)
             if model is None:
                 raise ValueError("Modelo não está no catálogo consultado.")
             model = catalog.details(model)
+            check_cancel()
             if model["tools"] is False:
                 raise ValueError("A API informa que este modelo não suporta ferramentas/chat.")
             from codaro.provider import create_provider
 
             create_provider(
                 self.settings_for("teste", profile, model), transport=self.transport
-            ).check_tool_calling()
+            ).check_tool_calling(cancelled=cancelled, on_stage=on_stage)
         return models
 
     def models(self, name=None, *, refresh=False):

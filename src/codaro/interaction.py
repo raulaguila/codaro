@@ -7,6 +7,10 @@ import re
 from dataclasses import dataclass
 
 COMMANDS = {
+    "/new": "Nova conversa/tarefa; revoga escopo e descarta propostas após confirmação",
+    "/restore-clear": "Desfazer limpeza de mensagens",
+    "/reasoning": "Expandir/recolher raciocínio durante geração",
+    "/provider-manage": "Gerenciar perfis, credenciais e conexão",
     "/mode": "Ver/trocar modo: ask, plan ou execute",
     "/ask": "Trocar para Perguntar",
     "/plan": "Trocar para Planejar",
@@ -19,7 +23,7 @@ COMMANDS = {
     "/model": "Selecionar modelo do provedor ou trocar com /model nome",
     "/models": "Lista e seleção de modelos da API",
     "/providers": "Cadastrar um provedor e sua API key (BYOK)",
-    "/clear": "Limpar a conversa atual",
+    "/clear": "Limpar mensagens/contexto; mantém tarefa, escopo e propostas; permite desfazer",
     "/resume": "Retomar a última conversa salva neste projeto",
     "/compact": "Reduzir o contexto aos quatro turnos mais recentes",
     "/history": "Buscar conversa com /history termos",
