@@ -332,11 +332,18 @@ class GenerationPreview(Collapsible):
         async def mount_answer():
             if not self.is_attached:
                 return
-            await self.query_one(Collapsible.Contents).mount(reply)
-            if not self.is_attached:
+            contents = self.query(Collapsible.Contents)
+            titles = self.query("CollapsibleTitle")
+            if not contents or not titles:
+                return
+            title = titles.first()
+            await contents.first().mount(reply)
+            # Clearing the chat can prune descendants while this await yields,
+            # even before the preview itself becomes detached.
+            if not all(widget.is_attached for widget in (self, reply, self.content, title)):
                 return
             self.content.display = False
-            self.query_one("CollapsibleTitle").add_class("speaker")
+            title.add_class("speaker")
 
         self.call_after_refresh(mount_answer)
         return reply

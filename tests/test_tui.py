@@ -233,6 +233,53 @@ def test_chat_keeps_streaming_preview_separate_from_final_markdown(tmp_path):
     run_ui(scenario())
 
 
+def test_final_answer_promotion_survives_children_pruned_during_mount(tmp_path, monkeypatch):
+    from textual.widgets import Collapsible
+
+    from codaro.tui import GenerationPreview
+
+    async def scenario():
+        app = CodaroApp(Agent(Repository(tmp_path), UIModel()))
+        async with app.run_test(size=(120, 35)) as pilot:
+            preview = GenerationPreview()
+            await app.query_one("#conversation").mount(preview)
+            contents = preview.query_one(Collapsible.Contents)
+            original_mount = contents.mount
+            started = asyncio.Event()
+            release = asyncio.Event()
+            resumed = asyncio.Event()
+
+            def delayed_mount(*widgets, **kwargs):
+                mounted = original_mount(*widgets, **kwargs)
+
+                async def wait_for_teardown():
+                    await mounted
+                    started.set()
+                    await release.wait()
+                    resumed.set()
+
+                return wait_for_teardown()
+
+            monkeypatch.setattr(contents, "mount", delayed_mount)
+            preview.accept("Resposta final.")
+            try:
+                await asyncio.wait_for(started.wait(), 5)
+                # Removal prunes children before detaching their container. Force
+                # that intermediate state while Markdown mounting is suspended.
+                await preview.remove_children()
+                assert preview.is_attached
+                assert not preview.query("CollapsibleTitle")
+            finally:
+                release.set()
+            await asyncio.wait_for(resumed.wait(), 5)
+            await pilot.pause()
+            await app.action_clear_chat()
+            assert app.query_one("#welcome").display
+            assert not app.query(GenerationPreview)
+
+    run_ui(scenario())
+
+
 def test_chat_cancel_removes_partial_response(tmp_path):
     model = StreamingUIModel()
     agent = Agent(Repository(tmp_path), model)
