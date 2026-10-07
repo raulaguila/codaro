@@ -61,15 +61,15 @@ O chat ocupa toda a largura do terminal, com mensagens compactas e entrada fixa 
 
 ## Interface e streaming
 
-- `codaro chat` mostra a resposta enquanto ela chega, em Markdown, com títulos, listas, tabelas e destaque de sintaxe em blocos de código.
+- `codaro chat` exibe a resposta final após o agente concluir e validar o turno, em Markdown, com títulos, listas, tabelas e destaque de sintaxe em blocos de código. Durante a geração, a barra de status e as ferramentas mostram o progresso.
 - A abertura tem sugestões que preenchem um rascunho sem chamar o modelo. Enter envia; Alt+Enter insere uma nova linha (Shift+Enter também funciona quando reconhecido pelo terminal). A entrada cresce até oito linhas de altura e preserva rascunhos acima de 8.000 caracteres para que você possa reduzi-los antes do envio.
 - Cada pergunta tem um resumo expansível das ações, leituras, buscas e duração. Dentro dele ficam consulta ou arquivo/símbolo, resultados ou linhas e indicação de leitura parcial ou reutilização de conteúdo. Erros abrem os detalhes automaticamente.
 - As atividades aparecem uma única vez na conversa. A barra de status informa o arquivo ou consulta durante a execução.
 - A barra superior mostra pasta abreviada, modelo, modo de edição e conexão. A barra de status informa o estado atual. `/pwd` mostra o caminho completo.
-- Texto intermediário de fases de ferramentas é removido antes da resposta final. Campos separados de reasoning não são exibidos como resposta.
+- O texto recebido por streaming fica em prévias recolhidas dentro de **Investigação**. Expanda a investigação e a prévia para acompanhar a geração: ela é identificada como **não validada**, pois o mesmo stream pode terminar em chamadas de ferramentas ou exigir uma nova tentativa. Etapas intermediárias, prévias rejeitadas e interrupções permanecem identificadas e recolhidas; não substituem mensagens finais. Cada prévia mostra até 4.000 caracteres; o fluxo completo está em `.codaro/prompt.json`. Campos separados de reasoning não são exibidos na interface.
 - `codaro ask` também atualiza a resposta progressivamente no terminal e envia as informações de atividade para stderr.
 - O provedor usa SSE da API OpenAI-compatible. Se o servidor responder com JSON comum, a resposta é exibida de uma vez.
-- Uma resposta interrompida ou cancelada não é salva no histórico. O chat remove o bloco parcial e informa a interrupção.
+- Uma resposta interrompida ou cancelada não é salva no histórico. O chat informa a interrupção e conserva a prévia recolhida apenas na investigação daquela tela. Retomar a sessão restaura somente perguntas e respostas concluídas.
 
 ## Comandos, referências e histórico
 

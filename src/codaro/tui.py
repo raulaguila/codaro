@@ -195,13 +195,63 @@ class CommandReview(ModalScreen[bool]):
         self.dismiss(False)
 
 
+class GenerationPreview(Collapsible):
+    """Opt-in, bounded preview; never presented as an accepted assistant answer."""
+
+    def __init__(self):
+        self.text = ""
+        self.state = "generating"
+        self.content = Static("", markup=False, classes="generation-text")
+        super().__init__(
+            self.content,
+            title="Prévia não validada · gerando…",
+            classes="generation-preview",
+            collapsed=True,
+        )
+
+    def update_text(self, text: str):
+        self.text = text[:4000]
+        suffix = (
+            "\n… prévia limitada; fluxo completo em .codaro/prompt.json" if len(text) > 4000 else ""
+        )
+        self.content.update(self.text + suffix)
+
+    def finish(self, state: str):
+        self.state = state
+        self.title = {
+            "tools": "Etapa intermediária · chamada de ferramentas",
+            "retry": "Prévia rejeitada · nova tentativa",
+            "answer": "Prévia não validada · aguardando conclusão",
+            "accepted": "Prévia da resposta · geração concluída",
+            "cancelled": "Prévia interrompida · sem resposta concluída",
+        }.get(state, "Prévia interrompida · sem resposta concluída")
+        self.collapsed = True
+
+
 class ActivityGroup(Collapsible):
     """One expandable activity summary per turn; errors remain visible."""
 
     def __init__(self):
         self.events: list[AgentEvent] = []
+        self.generations: list[GenerationPreview] = []
+        self.previews = Vertical(classes="generation-previews")
         self.details = Static("", markup=False)
-        super().__init__(self.details, title="Investigação", classes="tool-card", collapsed=True)
+        super().__init__(
+            self.details, self.previews, title="Investigação", classes="tool-card", collapsed=True
+        )
+
+    def add_preview(self, preview: GenerationPreview):
+        self.generations.append(preview)
+        if self.previews.is_attached:
+            self.previews.mount(preview)
+        else:
+            self.call_after_refresh(self.previews.mount, preview)
+
+    def finish(self, successful: bool):
+        if self.generations and self.generations[-1].state == "answer":
+            self.generations[-1].finish("accepted" if successful else "cancelled")
+        if not self.events:
+            self.title = "Geração concluída" if successful else "Geração interrompida"
 
     def add(self, event: AgentEvent):
         self.events.append(event)
@@ -286,6 +336,10 @@ class CodaroApp(App):
     .tool-card.success { border-left: thick #34d399; }
     .tool-card CollapsibleTitle { color: #94a3b8; }
     .tool-card > Contents { padding: 0 1; }
+    .generation-previews { height: auto; }
+    .generation-preview { height: auto; border: none; padding: 0; }
+    .generation-preview > Contents { padding: 0 1; }
+    .generation-text { height: auto; color: #94a3b8; }
     .notice { height: auto; margin: 1; color: #fbbf24; }
     """
     BINDINGS = [
@@ -303,6 +357,9 @@ class CodaroApp(App):
         self.cancelled = threading.Event()
         self.response_text = ""
         self.rendered_text = ""
+        self.draft_text = ""
+        self.draft_rendered = ""
+        self.generation_preview: GenerationPreview | None = None
         self.reply: Markdown | None = None
         self.speaker: Static | None = None
         self.context_chars = 0
@@ -365,7 +422,7 @@ class CodaroApp(App):
 
     async def on_mount(self):
         self.update_session_header()
-        self.set_interval(0.08, self.flush_response)
+        self.set_interval(0.08, self.flush_preview)
         self.query_one(Prompt).focus()
         self.refresh_reference_paths()
         if self.resume_requested:
@@ -738,10 +795,7 @@ class CodaroApp(App):
 
     def activity(self, event: AgentEvent):
         if event.kind == "model_start":
-            self.flush_response()
-            self.response_text = self.rendered_text = ""
-            self.reply = None
-            self.speaker = None
+            self.finish_preview("retry")
             self.context_chars = event.context_chars or 0
             self.context_tokens = event.context_tokens or 0
             self.reported_tokens = None
@@ -754,10 +808,7 @@ class CodaroApp(App):
             self.reported_tokens = event.reported_tokens
             self.query_one("#status", Static).update(safe_preview(event.detail))
         elif event.kind == "model_end":
-            if event.state == "answer":
-                self.flush_response()
-            else:
-                self.discard_response()
+            self.finish_preview(event.state)
         elif event.kind == "tool_start":
             self.query_one("#status", Static).update(
                 safe_preview(f"{event.title}… · {event.detail}".rstrip(" ·"))
@@ -775,11 +826,34 @@ class CodaroApp(App):
             )
 
     def append_delta(self, delta: str):
-        self.response_text += safe_preview(delta)
-        self.query_one("#status", Static).update("Respondendo… · Ctrl+X para cancelar")
+        # A content delta may precede native tool_calls in the same message.
+        # Only finish() can commit an answer to the conversation.
+        self.draft_text = (self.draft_text + safe_preview(delta))[:4001]
+        self.query_one("#status", Static).update(
+            "Gerando… · prévia em Investigação · Ctrl+X para cancelar"
+        )
         # Render the first fragment immediately; subsequent fragments are coalesced by the timer.
-        if self.reply is None:
-            self.flush_response()
+        if self.generation_preview is None:
+            self.flush_preview()
+
+    def flush_preview(self):
+        if not self.draft_text or self.draft_text == self.draft_rendered:
+            return
+        if self.generation_preview is None:
+            self.generation_preview = GenerationPreview()
+            if self.activity_group is None:
+                self.activity_group = ActivityGroup()
+                self.mount_message(self.activity_group)
+            self.activity_group.add_preview(self.generation_preview)
+        self.generation_preview.update_text(self.draft_text)
+        self.draft_rendered = self.draft_text
+
+    def finish_preview(self, state: str):
+        self.flush_preview()
+        if self.generation_preview is not None:
+            self.generation_preview.finish(state)
+        self.draft_text = self.draft_rendered = ""
+        self.generation_preview = None
 
     def flush_response(self):
         if not self.response_text or self.response_text == self.rendered_text:
@@ -807,6 +881,9 @@ class CodaroApp(App):
             self.speaker = None
 
     def finish(self, answer: str, successful: bool = True):
+        self.finish_preview("answer" if successful else "cancelled")
+        if self.activity_group is not None:
+            self.activity_group.finish(successful)
         if successful:
             self.response_text = safe_preview(answer)
             self.flush_response()

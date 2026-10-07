@@ -138,7 +138,7 @@ class StreamingUIModel(UIModel):
         }
 
 
-def test_chat_displays_partial_markdown_before_completion(tmp_path):
+def test_chat_keeps_streaming_preview_separate_from_final_markdown(tmp_path):
     from textual.widgets import Markdown
 
     model = StreamingUIModel()
@@ -149,14 +149,29 @@ def test_chat_displays_partial_markdown_before_completion(tmp_path):
             await pilot.press("o", "i", "enter")
             assert await asyncio.to_thread(model.started.wait, 10)
             assert app.busy
-            assert "Parcial" in app.response_text
-            assert app.reply is not None
-            assert app.query(Markdown)
+            assert not app.response_text
+            assert app.reply is None
+            assert not app.query(Markdown)
+            assert not app.query(".speaker")
+            preview = app.generation_preview
+            assert preview is not None
+            assert "Parcial" in preview.text
+            assert "não validada" in preview.title
+            assert preview.collapsed
+            assert app.activity_group.collapsed
+            # Streaming remains available by explicitly expanding the investigation.
+            app.activity_group.collapsed = False
+            preview.collapsed = False
+            await pilot.pause()
+            assert preview.content.visible
             model.release.set()
             await wait_ready(app, pilot)
             await pilot.pause(0.1)
             assert len(app.query("MarkdownFence")) == 1
             assert app.rendered_text.count("Parcial") == 1
+            assert preview.collapsed
+            assert "geração concluída" in preview.title
+            assert app.session_turns[-1][-1]["content"] == app.response_text
 
     run_ui(scenario())
 
@@ -170,13 +185,179 @@ def test_chat_cancel_removes_partial_response(tmp_path):
         async with app.run_test(size=(120, 35)) as pilot:
             await pilot.press("o", "i", "enter")
             assert await asyncio.to_thread(model.started.wait, 10)
-            assert "Parcial" in app.response_text
+            preview = app.generation_preview
+            assert "Parcial" in preview.text
             await pilot.press("escape")
             model.release.set()
             await wait_ready(app, pilot)
             assert app.reply is None
             assert not app.response_text
             assert not agent.turns
+            assert not app.session_turns
+            assert "interrompida" in preview.title
+            assert preview.collapsed
+
+    run_ui(scenario())
+
+
+def test_streamed_tool_iteration_never_becomes_a_chat_answer(tmp_path):
+    from test_agent import call
+
+    from codaro.tui import GenerationPreview
+
+    class IteratingModel(UIModel):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+            self.final_started = threading.Event()
+            self.final_release = threading.Event()
+
+        def stream(self, messages, tools=None, on_delta=None, cancelled=None):
+            self.calls += 1
+            if self.calls == 1:
+                on_delta("Vou listar arquivos antes de responder.")
+                self.started.set()
+                self.release.wait(10)
+                return call("list_files", {})
+            on_delta("Não há arquivos permitidos.")
+            self.final_started.set()
+            self.final_release.wait(10)
+            return {"content": "Não há arquivos permitidos."}
+
+    model = IteratingModel()
+    app = CodaroApp(Agent(Repository(tmp_path), model))
+
+    async def scenario():
+        async with app.run_test(size=(70, 25)) as pilot:
+            try:
+                await pilot.press("o", "i", "enter")
+                assert await asyncio.to_thread(model.started.wait, 10)
+                first = app.generation_preview
+                assert first is not None
+                assert not app.query("Markdown, .speaker")
+                model.release.set()
+                assert await asyncio.to_thread(model.final_started.wait, 10)
+                await pilot.pause()
+                assert "intermediária" in first.title
+                assert first.collapsed
+                assert "Vou listar" in first.text
+                assert len(app.query(GenerationPreview)) == 2
+                assert not app.query("Markdown, .speaker")
+                assert len(app.activity_group.events) == 1
+            finally:
+                model.release.set()
+                model.final_release.set()
+            await wait_ready(app, pilot)
+            await pilot.pause()
+            assert app.rendered_text == "Não há arquivos permitidos."
+            assert len(app.query("Markdown")) == 1
+            assert len(app.query(".speaker")) == 1
+            assert len(app.query(GenerationPreview)) == 2
+            assert all(preview.collapsed for preview in app.query(GenerationPreview))
+            assert "Vou listar" not in app.session_turns[-1][-1]["content"]
+
+    run_ui(scenario())
+
+
+def test_failed_stream_retains_only_an_interrupted_preview(tmp_path):
+    class FailingStream(UIModel):
+        def stream(self, messages, tools=None, on_delta=None, cancelled=None):
+            on_delta("Texto incompleto antes da falha.")
+            raise ModelError("Conexão interrompida.")
+
+    app = CodaroApp(Agent(Repository(tmp_path), FailingStream()))
+
+    async def scenario():
+        from codaro.tui import GenerationPreview
+
+        async with app.run_test(size=(120, 35)) as pilot:
+            await pilot.press("o", "i", "enter")
+            await wait_ready(app, pilot)
+            await pilot.pause()
+            preview = app.query_one(GenerationPreview)
+            assert "interrompida" in preview.title
+            assert preview.collapsed
+            assert "Texto incompleto" in preview.text
+            assert not app.query("Markdown, .speaker")
+            assert not app.session_turns
+            assert "Conexão interrompida" in str(app.query_one(".notice", Static).render())
+
+    run_ui(scenario())
+
+
+def test_rejected_stream_is_labeled_and_prior_answer_stays_visible(tmp_path):
+    from codaro.tui import GenerationPreview
+
+    class RepairingStream(UIModel):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+
+        def stream(self, messages, tools=None, on_delta=None, cancelled=None):
+            self.calls += 1
+            if self.calls == 1:
+                return {"content": "Primeira resposta estável."}
+            if self.calls == 2:
+                text = '{"name":"list_files","parameters":{}}'
+                on_delta(text)
+                return {"content": text}
+            on_delta("Segunda resposta corrigida.")
+            self.started.set()
+            self.release.wait(10)
+            return {"content": "Segunda resposta corrigida."}
+
+    model = RepairingStream()
+    app = CodaroApp(Agent(Repository(tmp_path), model))
+
+    async def scenario():
+        async with app.run_test(size=(120, 35)) as pilot:
+            await pilot.press("o", "i", "enter")
+            await wait_ready(app, pilot)
+            original_reply = app.query_one("Markdown")
+            try:
+                await pilot.press("o", "i", "enter")
+                assert await asyncio.to_thread(model.started.wait, 10)
+                await pilot.pause()
+                previews = list(app.query(GenerationPreview))
+                assert any("rejeitada" in preview.title for preview in previews)
+                assert len(app.query("Markdown")) == 1
+                assert app.query_one("Markdown") is original_reply
+                assert original_reply.is_attached
+            finally:
+                model.release.set()
+            await wait_ready(app, pilot)
+            await pilot.pause()
+            assert len(app.query("Markdown")) == 2
+            assert len(app.query(".speaker")) == 2
+            assert app.rendered_text == "Segunda resposta corrigida."
+            assert len(app.session_turns) == 2
+            assert "list_files" not in app.session_turns[-1][-1]["content"]
+
+    run_ui(scenario())
+
+
+def test_large_preview_is_bounded_without_truncating_final_answer(tmp_path):
+    class LargeStream(UIModel):
+        def stream(self, messages, tools=None, on_delta=None, cancelled=None):
+            on_delta("a" * 3500)
+            on_delta("b" * 3500)
+            on_delta("FINAL")
+            return {"content": "a" * 3500 + "b" * 3500 + "FINAL"}
+
+    app = CodaroApp(Agent(Repository(tmp_path), LargeStream()))
+
+    async def scenario():
+        from codaro.tui import GenerationPreview
+
+        async with app.run_test(size=(120, 35)) as pilot:
+            await pilot.press("o", "i", "enter")
+            await wait_ready(app, pilot)
+            await pilot.pause()
+            preview = app.query_one(GenerationPreview)
+            assert len(preview.text) == 4000
+            assert "prévia limitada" in str(preview.content.render())
+            assert app.response_text.endswith("FINAL")
+            assert len(app.response_text) == 7005
 
     run_ui(scenario())
 
