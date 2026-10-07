@@ -328,7 +328,6 @@ def cites_observed_lines(answer: str, evidence: list[tuple[str, int, int]]) -> b
 
 def textual_tool_call(content: str, *, after_error: bool = False) -> bool:
     """Detect protocol mistakes for a bounded repair, never execute text as a tool."""
-    names = {tool["function"]["name"] for tool in ALL_DEFINITIONS}
     intention = any(
         phrase in content.casefold()
         for phrase in (
@@ -343,25 +342,38 @@ def textual_tool_call(content: str, *, after_error: bool = False) -> bool:
         )
     )
     decoder = json.JSONDecoder()
-    for match in list(re.finditer(r"(?m)^[ \t]*(?=\{)", content))[:8]:
+    for match in list(re.finditer(r"(?m)^[ \t]*(?:<tool_call>\s*)?(?=[{\[])", content))[:8]:
         try:
             value, end = decoder.raw_decode(content, match.end())
         except (ValueError, RecursionError):
             continue
-        if not isinstance(value, dict):
+        # Invented names (e.g. read_file) are protocol mistakes too. Restrict
+        # detection to call-shaped objects, but never turn them into executable calls.
+        candidates = value.get("tool_calls", [value]) if isinstance(value, dict) else value
+        if not isinstance(candidates, list):
             continue
-        function = value.get("function", value)
-        if (
-            not isinstance(function, dict)
-            or not isinstance(function.get("name"), str)
-            or function["name"] not in names
-        ):
-            continue
-        if not {"arguments", "parameters"}.intersection(function):
+        call_shaped = False
+        for candidate in candidates[:8]:
+            if not isinstance(candidate, dict):
+                continue
+            function = candidate.get("function", candidate)
+            if (
+                isinstance(function, dict)
+                and isinstance(function.get("name"), str)
+                and re.fullmatch(r"[A-Za-z_][\w.-]{0,79}", function["name"])
+                and {"arguments", "parameters"}.intersection(function)
+            ):
+                call_shaped = True
+                break
+        if not call_shaped:
             continue
         prefix = content[: match.end()].strip()
         suffix = content[end:].strip()
-        standalone = prefix in {"", "```", "```json"} and suffix in {"", "```"}
+        standalone = prefix in {"", "```", "```json", "<tool_call>"} and suffix in {
+            "",
+            "```",
+            "</tool_call>",
+        }
         if standalone or intention or after_error:
             return True
     return False
@@ -1123,6 +1135,9 @@ class Agent:
                     instructions.append(
                         "A chamada em texto não foi executada. Para agir, "
                         "use tool_calls e o schema, com inteiros sem aspas. "
+                        "Use somente nomes anunciados no array tools. "
+                        "read_file não existe: para ler um arquivo, use read_lines "
+                        "com path, start e end (até 160 linhas por chamada). "
                         "Após o resultado, responda ao usuário. Se foi "
                         "um exemplo solicitado, identifique como exemplo "
                         "sem executar a ferramenta."

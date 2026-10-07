@@ -136,6 +136,21 @@ Limites padrão: Perguntar oito etapas; Planejar vinte; Executar trinta e duas. 
 - O provedor usa SSE da API OpenAI-compatible. Se o servidor responder com JSON comum, a resposta é exibida de uma vez.
 - Uma resposta interrompida ou cancelada não é salva no histórico. O chat informa a interrupção e conserva a prévia recolhida apenas na investigação daquela tela. Retomar a sessão restaura somente perguntas e respostas concluídas.
 
+O chat detecta o sistema onde o processo está rodando. No macOS, o rodapé e `/help` mostram Command (`⌘`) com a alternativa Ctrl, e Option (`⌥`) nas dicas da entrada. Linux e Windows mantêm Ctrl/Alt. Em SSH, a detecção corresponde ao servidor.
+
+| Ação | macOS | Linux / Windows |
+| --- | --- | --- |
+| Cancelar | `⌘X` ou `Ctrl+X` | `Ctrl+X` |
+| Limpar conversa | `⌘L` ou `Ctrl+L` | `Ctrl+L` |
+| Comandos | `⌘P` ou `Ctrl+P` | `Ctrl+P` |
+| Sair | `⌘Q` ou `Ctrl+Q` | `Ctrl+Q` |
+| Nova linha | `⌥Enter` | `Alt+Enter` |
+| Histórico direto | `⌥↑` / `⌥↓` | `Alt+↑` / `Alt+↓` |
+
+**Command depende do terminal:** o Codaro aceita o modificador `super` do protocolo de teclado estendido, mas alguns terminais interceptam `⌘Q`/`⌘P`/outras combinações para seus próprios menus. Nesses casos, use Ctrl ou configure um mapeamento no terminal para enviar a combinação equivalente: `⌘X` → byte hexadecimal `18`, `⌘L` → `0c`, `⌘P` → `10`, `⌘Q` → `11`. Esses bytes acionam os atalhos Ctrl existentes. Para Option, configure o terminal para enviar Alt/Esc; Shift+Enter também insere uma nova linha quando reconhecido pelo terminal.
+
+Chamadas de ferramentas devem chegar no campo nativo `tool_calls`, com nomes e argumentos do catálogo enviado ao servidor. Se o modelo escrever uma chamada JSON como texto — inclusive com um nome inventado como `read_file` — o agente pede uma correção pelo protocolo uma vez. Esse texto não é executado nem aceito como resposta final; se o erro persistir, a tarefa fica bloqueada e o fluxo é preservado em `.codaro/prompt.json`. Exemplos acompanhados de explicação continuam permitidos. Use `codaro doctor --check-tools` para verificar o ciclo de chamada, resultado e resposta com seu modelo/servidor.
+
 ## Comandos, referências e histórico
 
 Digite `/` para ver sugestões; ↑/↓ escolhem e Tab completa. Os comandos abaixo são locais e não consultam a IA:

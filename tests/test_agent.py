@@ -502,3 +502,60 @@ def test_malformed_json_as_content_does_not_break_protocol_detector():
 
     assert not textual_tool_call('{"name":[],"parameters":{}}')
     assert not textual_tool_call('{"name":"list_files","parameters":')
+
+
+def test_unknown_text_tool_recovers_using_real_native_read(tmp_path):
+    from codaro.policies import Mode
+
+    (tmp_path / "main.py").write_text('print("resultado real")\n')
+    faux = '{"name":"read_file","arguments":{"path":"main.py"}}'
+    model = FakeModel(
+        [
+            {"content": faux},
+            call("read_lines", {"path": "main.py", "start": 1, "end": 10}),
+            {"content": "O arquivo imprime resultado real."},
+        ]
+    )
+    agent = Agent(Repository(tmp_path), model, mode=Mode.EXECUTE)
+    assert agent.ask("O que main.py faz?") == "O arquivo imprime resultado real."
+    tools = [item for item in model.requests[-1][0] if item["role"] == "tool"]
+    assert len(tools) == 1
+    assert tools[0]["name"] == "read_lines"
+    assert 'print("resultado real")' in json.loads(tools[0]["content"])["content"]
+    assert "read_file não existe" in model.requests[1][0][0]["content"]
+    assert faux not in json.dumps(agent.turns)
+
+
+def test_repeated_unknown_text_tool_blocks_task_and_records_debug(tmp_path):
+    import pytest
+
+    from codaro.policies import Mode
+    from codaro.provider import ModelError
+
+    faux = '{"name":"read_file","arguments":{"path":"README.md"}}'
+    model = FakeModel([{"content": faux}, {"content": faux}])
+    agent = Agent(Repository(tmp_path), model, mode=Mode.EXECUTE)
+    with pytest.raises(ModelError, match="doctor --check-tools"):
+        agent.ask("Leia README.md.")
+    assert agent.tasks.current()["state"] == "blocked"
+    assert not agent.turns
+    assert len(model.requests) == 2
+    trace = json.loads((tmp_path / ".codaro/prompt.json").read_text())
+    assert trace["status"] == "error"
+    assert not any(item["role"] == "tool" for messages, _ in model.requests for item in messages)
+
+
+def test_text_tool_detector_handles_unknown_names_and_wrappers():
+    from codaro.agent import textual_tool_call
+
+    faux = '{"name":"read_file","arguments":{"path":"README.md"}}'
+    for content in (
+        faux,
+        f"```json\n{faux}\n```",
+        f"<tool_call>{faux}</tool_call>",
+        f"[{faux}]",
+        '{"tool_calls":[{"type":"function","function":' + faux + "}]}",
+    ):
+        assert textual_tool_call(content), content
+    assert not textual_tool_call("Exemplo de chamada de ferramenta:\n" + faux)
+    assert not textual_tool_call('{"name":"my-project","version":"1.0.0"}')

@@ -5,6 +5,7 @@ import json
 import logging
 import shlex
 import sqlite3
+import sys
 import threading
 from dataclasses import replace
 from pathlib import Path
@@ -425,6 +426,19 @@ class CodaroApp(App):
 
     def __init__(self, agent: Agent, *, resume: bool = False):
         super().__init__()
+        self.is_macos = sys.platform == "darwin"
+        if self.is_macos:
+            # The extended terminal keyboard protocol names Command "super".
+            # Keep Ctrl bindings: some terminals reserve Command for their menus.
+            for binding in self.BINDINGS:
+                if binding.key.startswith("ctrl+"):
+                    self._bindings.bind(
+                        binding.key.replace("ctrl+", "super+", 1),
+                        binding.action,
+                        binding.description,
+                        show=False,
+                        priority=binding.priority,
+                    )
         self.agent = agent
         self.busy = False
         self.cancelled = threading.Event()
@@ -458,6 +472,18 @@ class CodaroApp(App):
             agent.approve_edit = self.approve_changes
         self.plan_card: Collapsible | None = None
 
+    def shortcut_display(self, key: str) -> str:
+        key = key.upper()
+        return f"⌘{key} / Ctrl+{key}" if self.is_macos else f"Ctrl+{key}"
+
+    def option_display(self, key: str) -> str:
+        return f"⌥{key}" if self.is_macos else f"Alt+{key}"
+
+    def get_key_display(self, binding: Binding) -> str:
+        if self.is_macos and binding in self.BINDINGS and binding.key.startswith("ctrl+"):
+            return self.shortcut_display(binding.key.removeprefix("ctrl+"))
+        return super().get_key_display(binding)
+
     def welcome(self) -> Vertical:
         return Vertical(
             Static("Vamos trabalhar no seu projeto", id="welcome-title", markup=False),
@@ -490,7 +516,8 @@ class CodaroApp(App):
             highlight_cursor_line=False,
         )
         yield Static(
-            "Enter envia · Alt+Enter nova linha · / comandos · @ arquivo · ↑ histórico",
+            f"Enter envia · {self.option_display('Enter')} nova linha · "
+            "/ comandos · @ arquivo · ↑ histórico",
             id="prompt-hint",
             markup=False,
         )
@@ -679,9 +706,22 @@ class CodaroApp(App):
                 text = "Use /permissions action ou /permissions task."
         elif name == "/help":
             text = "\n".join(f"{key} · {description}" for key, description in COMMANDS.items())
-            text += "\n\nTab completa · ↑↓ escolhem sugestões/histórico · Alt+↑↓ histórico\n"
+            text += (
+                "\n\nTab completa · ↑↓ escolhem sugestões/histórico · "
+                f"{self.option_display('↑↓')} histórico\n"
+            )
             text += 'Referências: @src/main.py ou @"pasta com espaços/main.py"\n'
-            text += "Ctrl+X cancela · Ctrl+L limpa · Ctrl+P comandos · Ctrl+Q sai"
+            text += (
+                f"{self.shortcut_display('x')} cancela · {self.shortcut_display('l')} limpa · "
+                f"{self.shortcut_display('p')} comandos · {self.shortcut_display('q')} sai"
+            )
+            if self.is_macos:
+                text += (
+                    "\n\n⌘ = Command · ⌥ = Option. Command funciona quando o terminal envia "
+                    "a tecla ao Codaro; se abrir um menu ou encerrar o terminal, use Ctrl. "
+                    "Para Option, configure o terminal para enviar Alt/Esc. "
+                    "Shift+Enter também insere uma nova linha quando reconhecido pelo terminal."
+                )
         elif name == "/pwd":
             text = f"Diretório da sessão\n{self.agent.repository.root}"
         elif name in {"/memory", "/history", "/map", "/changes", "/undo"}:
@@ -1041,7 +1081,7 @@ class CodaroApp(App):
         # Only finish() can commit an answer to the conversation.
         self.draft_text = (self.draft_text + safe_preview(delta))[:4001]
         self.query_one("#status", Static).update(
-            "Gerando… · prévia em Investigação · Ctrl+X para cancelar"
+            f"Gerando… · prévia em Investigação · {self.shortcut_display('x')} para cancelar"
         )
         # Render the first fragment immediately; subsequent fragments are coalesced by the timer.
         if self.generation_preview is None:

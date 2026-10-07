@@ -1,5 +1,6 @@
 import asyncio
 import threading
+from types import SimpleNamespace
 
 from textual.widgets import Static
 
@@ -67,6 +68,58 @@ def test_chat_submission_and_clear(tmp_path):
             assert not agent.turns
 
     run_ui(scenario())
+
+
+def test_macos_shortcuts_receive_command_and_keep_ctrl_fallback(tmp_path, monkeypatch):
+    from textual._xterm_parser import XTermParser
+    from textual.command import CommandPalette
+
+    monkeypatch.setattr("codaro.tui.sys", SimpleNamespace(platform="darwin"))
+    model = UIModel(blocked=True)
+    agent = Agent(Repository(tmp_path), model)
+
+    async def scenario():
+        app = CodaroApp(agent)
+        async with app.run_test(size=(120, 35)) as pilot:
+            assert "⌥Enter" in str(app.query_one("#prompt-hint", Static).render())
+            assert "⌘L" in app.get_key_display(app.BINDINGS[1])
+            agent.turns = [[{"role": "user", "content": "teste"}]]
+            # Exercise the same escape sequence used by an extended-keyboard terminal.
+            for event in XTermParser().feed("\x1b[108;9u"):
+                app.post_message(event)
+            await pilot.pause()
+            assert not agent.turns
+            await pilot.press("super+p")
+            assert isinstance(app.screen, CommandPalette)
+            await pilot.press("escape")
+            agent.turns = [[{"role": "user", "content": "teste"}]]
+            await pilot.press("ctrl+l")
+            assert not agent.turns
+            await app.local_command("/help")
+            await pilot.pause()
+            help_text = str(app.query(".question").last().render())
+            assert "⌘" in help_text and "use Ctrl" in help_text
+            try:
+                await pilot.press("o", "i", "enter")
+                assert await asyncio.to_thread(model.started.wait, 10)
+                await pilot.press("super+x")
+                assert app.cancelled.is_set()
+            finally:
+                model.release.set()
+            await wait_ready(app, pilot)
+            assert not agent.turns
+            await pilot.press("super+q")
+            assert not app.is_running
+
+    run_ui(scenario())
+
+
+def test_other_systems_keep_ctrl_and_alt_labels(tmp_path, monkeypatch):
+    for platform in ("linux", "win32"):
+        monkeypatch.setattr("codaro.tui.sys", SimpleNamespace(platform=platform))
+        app = CodaroApp(Agent(Repository(tmp_path), UIModel()))
+        assert app.get_key_display(app.BINDINGS[1]) == "Ctrl+L"
+        assert app.option_display("Enter") == "Alt+Enter"
 
 
 def test_chat_recovers_from_provider_error(tmp_path):
