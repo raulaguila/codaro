@@ -7,6 +7,12 @@ import re
 from dataclasses import dataclass
 
 COMMANDS = {
+    "/mode": "Ver/trocar modo: ask, plan ou execute",
+    "/ask": "Trocar para Perguntar",
+    "/plan": "Trocar para Planejar",
+    "/execute": "Executar o plano ativo ou trocar para Executar",
+    "/task": "Ver tarefa; new objetivo, list ou resume identificador",
+    "/permissions": "Revisar autorização por tarefa ou voltar a action",
     "/help": "Comandos e atalhos",
     "/pwd": "Diretório da sessão",
     "/status": "Modelo, modo e contexto enviado",

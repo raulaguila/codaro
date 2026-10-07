@@ -5,7 +5,6 @@ from test_agent import FakeModel, call
 
 from codaro.agent import Agent, serialize
 from codaro.index import CodeIndex
-from codaro.provider import ModelError
 from codaro.repository import Repository, RepositoryError
 
 QUESTION = "Explique a estrutura deste projeto e seus pontos de entrada."
@@ -60,7 +59,6 @@ def test_photo_regression_reading_gitignore_recovers_go_manifest_and_real_entryp
     model = FakeModel(
         [
             call("read_lines", {"path": str(tmp_path / ".gitignore"), "start": 1, "end": 10}),
-            {"content": ".gitignore:1 define a estrutura deste projeto."},
             {
                 "content": "go.mod:1 identifica o módulo; "
                 "cmd/backend/main.go:3 define a função main."
@@ -99,7 +97,6 @@ def test_failed_read_recovers_only_files_actually_available_and_not_ignored(tmp_
     model = FakeModel(
         [
             call("read_lines", {"path": "missing.py", "start": 1, "end": 1}),
-            {"content": "Não tenho acesso ao projeto."},
             {"content": "cmd/backend/main.go:3 é o ponto de entrada."},
         ]
     )
@@ -128,18 +125,13 @@ def test_recovery_works_for_nested_projects_and_is_bounded(tmp_path):
     assert any("main.go" in item["path"] for item in context["reads"])
 
 
-def test_recovery_does_not_bypass_evidence_validation(tmp_path):
+def test_prefetched_sources_do_not_require_formatted_citations(tmp_path):
     go_project(tmp_path)
-    model = FakeModel(
-        [
-            {"content": "Pontos de entrada são list_files."},
-            {"content": "Pontos de entrada são list_files."},
-        ]
-    )
+    model = FakeModel([{"content": "O módulo Go inicia na função main do backend."}])
     agent = Agent(Repository(tmp_path), model)
-    with pytest.raises(ModelError, match="sem citar arquivos"):
-        agent.ask(QUESTION)
-    assert not agent.turns
+    assert "função main" in agent.ask(QUESTION)
+    assert len(model.requests) == 1
+    assert "func main() {}" in model.requests[0][0][0]["content"]
 
 
 def test_recovery_locates_main_beyond_initial_file_window(tmp_path):
@@ -149,7 +141,6 @@ def test_recovery_locates_main_beyond_initial_file_window(tmp_path):
     )
     model = FakeModel(
         [
-            {"content": "Vou explicar sem investigar."},
             {"content": "cmd/backend/main.go:102 define main."},
         ]
     )

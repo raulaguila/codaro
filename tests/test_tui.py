@@ -626,16 +626,15 @@ def test_intermediate_tool_prose_is_removed_before_final_answer(tmp_path):
     run_ui(scenario())
 
 
-def test_project_overview_never_renders_rejected_session_explanation(tmp_path):
+def test_project_overview_accepts_an_answer_without_formatted_citations(tmp_path):
     from test_agent import FakeModel, call
 
     (tmp_path / "main.py").write_text("def main(): return 0\n")
     model = FakeModel(
         [
             call("get_repository_info", {}),
-            {"content": "Os pontos de entrada são list_files e search_code."},
             call("read_lines", {"path": "main.py", "start": 1, "end": 1}, "read"),
-            {"content": "main.py:1 define a função main."},
+            {"content": "A função main é o ponto de entrada."},
         ]
     )
     model.settings = Settings("http://localhost:11434/v1", "test")
@@ -649,7 +648,7 @@ def test_project_overview_never_renders_rejected_session_explanation(tmp_path):
             await pilot.press("enter")
             await wait_ready(app, pilot)
             await pilot.pause()
-            assert app.rendered_text == "main.py:1 define a função main."
+            assert app.rendered_text == "A função main é o ponto de entrada."
             assert len(app.query("Markdown")) == 1
             assert len(app.query(".speaker")) == 1
             assert "list_files e search_code" not in app.response_text
@@ -957,5 +956,119 @@ def test_ui_undo_reviews_inverse_diff_and_default_enter_does_not_apply(tmp_path)
             await wait_ready(app, pilot)
             assert path.read_bytes() == proposal.before
             assert not app.agent.edits.pending
+
+    run_ui(scenario())
+
+
+def test_modes_plan_transition_and_local_task_scope_review(tmp_path):
+    from test_agent import FakeModel, call
+    from textual.widgets import TextArea
+
+    from codaro.tui import ScopeReview
+
+    model = FakeModel(
+        [
+            call(
+                "update_plan",
+                {
+                    "steps": [{"title": "Criar módulo e verificar", "state": "todo"}],
+                    "criteria": ["Verificação aprovada"],
+                },
+            ),
+            call("finish_task", {"status": "planned", "summary": "Plano pronto"}),
+            {"content": "Plano disponível."},
+        ]
+    )
+    model.settings = Settings("http://localhost/v1", "test")
+    agent = Agent(Repository(tmp_path), model, mode="plan")
+    app = CodaroApp(agent)
+
+    async def scenario():
+        async with app.run_test(size=(120, 40)) as pilot:
+            app.query_one(Prompt).value = "Criar um módulo"
+            await pilot.press("enter")
+            await wait_ready(app, pilot)
+            await pilot.pause()
+            assert app.plan_card is not None
+            assert agent.tasks.current()["state"] == "planned"
+            await pilot.click("#execute-plan")
+            assert agent.mode.value == "execute"
+            assert "Execute o plano" in app.query_one(Prompt).value
+            assert agent.policy.kind == "action"
+            await app.local_command("/permissions task")
+            await pilot.pause()
+            assert isinstance(app.screen, ScopeReview)
+            app.screen.query_one("#scope-json", TextArea).text = '{"paths":["src"],"commands":[]}'
+            await pilot.click("#grant-scope")
+            await pilot.pause()
+            assert agent.policy.kind == "task"
+            assert agent.policy.paths == ("src",)
+            assert "Aprovação por tarefa" in str(app.query_one("#session", Static).render())
+            await app.local_command("/mode ask")
+            assert agent.mode.value == "ask"
+            assert agent.policy.kind == "action"
+
+    run_ui(scenario())
+
+
+def test_inline_diff_review_continues_same_agent_loop_then_validates(tmp_path):
+    import sys
+
+    from test_agent import FakeModel, call
+
+    from codaro.tui import ChangesReview, CommandReview
+
+    (tmp_path / "x.py").write_text("x = 1\n")
+    model = FakeModel(
+        [
+            call("read_lines", {"path": "x.py", "start": 1, "end": 1}),
+            call(
+                "propose_edit",
+                {
+                    "path": "x.py",
+                    "old_text": "x = 1",
+                    "new_text": "x = 2",
+                    "reason": "Ajustar valor",
+                },
+            ),
+            call(
+                "run_command",
+                {
+                    "argv": [sys.executable, "-c", "import x; assert x.x == 2"],
+                    "purpose": "validation",
+                },
+            ),
+            call("finish_task", {"status": "completed", "summary": "Valor ajustado e verificado"}),
+            {"content": "Alteração validada."},
+        ]
+    )
+    model.settings = Settings("http://localhost/v1", "test")
+    agent = Agent(Repository(tmp_path), model, mode="execute")
+    app = CodaroApp(agent)
+
+    async def wait_screen(pilot, screen):
+        for _ in range(100):
+            await pilot.pause(0.02)
+            if isinstance(app.screen, screen):
+                return
+        raise AssertionError(f"Review did not appear: {screen}")
+
+    async def scenario():
+        async with app.run_test(size=(120, 40)) as pilot:
+            app.query_one(Prompt).value = "Mude x e valide"
+            await pilot.press("enter")
+            await wait_screen(pilot, ChangesReview)
+            assert (tmp_path / "x.py").read_text() == "x = 1\n"
+            assert app.screen.focused.id == "back-edit"
+            await pilot.click("#apply-edit")
+            await wait_screen(pilot, CommandReview)
+            assert (tmp_path / "x.py").read_text() == "x = 2\n"
+            await pilot.click("#approve-command")
+            await wait_ready(app, pilot)
+            await pilot.pause()
+            assert agent.tasks.current()["state"] == "completed"
+            assert app.rendered_text == "Alteração validada."
+            assert len(app.query("Markdown")) == 1
+            assert not agent.edits.pending
 
     run_ui(scenario())

@@ -39,6 +39,7 @@ def test_cli_native_command_requires_approval_before_execution(tmp_path, monkeyp
                         ]
                     },
                 ),
+                call("finish_task", {"status": "blocked", "summary": "Sem validação adicional."}),
                 {"content": "Comando finalizado."},
             ]
         )
@@ -151,7 +152,16 @@ def test_ask_stream_renders_answer_and_tools_without_duplicate_output(tmp_path, 
 def install_edit_model(monkeypatch):
     from test_agent import edit_responses
 
-    responses = iter(edit_responses())
+    responses = iter(
+        [
+            *edit_responses()[:-1],
+            __import__("test_agent").call(
+                "finish_task",
+                {"status": "blocked", "summary": "Revisão encerrada; testes não foram executados."},
+            ),
+            {"content": "Revisão encerrada."},
+        ]
+    )
 
     def stream(self, messages, tools=None, on_delta=None, cancelled=None):
         response = next(responses)
@@ -168,8 +178,9 @@ def test_edit_cli_approval_applies_only_after_diff(tmp_path, monkeypatch):
     result = runner.invoke(app, ["edit", "Mude x.", "--repo", str(tmp_path)], input="y\n")
     assert result.exit_code == 0, result.output
     assert (tmp_path / "code.py").read_text() == "x = 2\n"
-    assert "-x = 1" in result.stdout and "+x = 2" in result.stdout
-    assert result.stdout.index("+x = 2") < result.stdout.index("Aplicar a edição")
+    assert "-x = 1" in result.stderr and "+x = 2" in result.stderr
+    assert "Aplicar este conjunto" in result.stdout
+    assert "Alteração aplicada" in result.stderr
 
 
 def test_edit_cli_default_rejects(tmp_path, monkeypatch):
@@ -177,7 +188,7 @@ def test_edit_cli_default_rejects(tmp_path, monkeypatch):
     install_edit_model(monkeypatch)
     result = runner.invoke(app, ["edit", "Mude x.", "--repo", str(tmp_path)], input="\n")
     assert result.exit_code == 0, result.output
-    assert "rejeitada" in result.stdout
+    assert "rejeitada" in result.stderr
     assert (tmp_path / "code.py").read_text() == "x = 1\n"
 
 
@@ -185,7 +196,8 @@ def test_edit_cli_eof_cannot_apply(tmp_path, monkeypatch):
     (tmp_path / "code.py").write_text("x = 1\n")
     install_edit_model(monkeypatch)
     result = runner.invoke(app, ["edit", "Mude x.", "--repo", str(tmp_path)])
-    assert result.exit_code == 1
+    assert result.exit_code == 0
+    assert "rejeitada" in result.stderr
     assert (tmp_path / "code.py").read_text() == "x = 1\n"
 
 
@@ -390,3 +402,43 @@ def test_evaluate_command_exports_report_and_fails_unmet_expectations(tmp_path):
     result = runner.invoke(app, ["evaluate", str(cases), "--output", str(output)])
     assert result.exit_code == 1
     assert json.loads(output.read_text())["passed"] == 0
+
+
+def test_cli_modes_and_task_selection_preserve_root_without_llm_calls(tmp_path, monkeypatch):
+    captured = []
+    monkeypatch.setattr("codaro.tui.CodaroApp.run", lambda self: captured.append(self.agent))
+    for mode in ("ask", "plan", "execute"):
+        result = runner.invoke(app, ["chat", "--repo", str(tmp_path), "--mode", mode])
+        assert result.exit_code == 0, result.output
+        assert captured[-1].mode.value == mode
+        assert captured[-1].allow_edits == (mode == "execute")
+    result = runner.invoke(app, ["task", "new", "Criar serviço", "--repo", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    identifier = json.loads(result.stdout)["id"]
+    result = runner.invoke(app, ["task", "resume", identifier, "--repo", str(tmp_path)])
+    assert result.exit_code == 0 and json.loads(result.stdout)["id"] == identifier
+
+
+def test_cli_task_scope_requires_confirmation_before_calling_model(tmp_path, monkeypatch):
+    calls = []
+
+    def stream(self, *_args, **_kwargs):
+        calls.append(True)
+        return {"content": "Sem alterações necessárias."}
+
+    monkeypatch.setattr("codaro.cli.OpenAICompatible.stream", stream)
+    args = [
+        "execute",
+        "Ajustar código",
+        "--repo",
+        str(tmp_path),
+        "--approval",
+        "task",
+        "--scope",
+        "src",
+    ]
+    result = runner.invoke(app, args, input="n\n")
+    assert result.exit_code == 1 and not calls
+    result = runner.invoke(app, args, input="y\n")
+    assert result.exit_code == 0 and calls == [True]
+    assert "criar/alterar/remover/renomear" in result.stdout

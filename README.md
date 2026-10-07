@@ -1,8 +1,8 @@
 # Codaro CLI
 
-Assistente de IA no terminal para investigar repositórios locais, com fontes no código e recuperação progressiva de contexto.
+Agente de desenvolvimento no terminal para perguntar, planejar e executar atividades em repositórios locais, com recuperação progressiva de contexto.
 
-> Busca, leitura, explicação, edição com revisão de diff, comandos com aprovação e retomada de conversa por projeto. Referências via LSP e interrupção imediata de conexões HTTP ociosas estão no roadmap.
+> Busca, planejamento persistente, alterações com revisão de diff, comandos com aprovação, validação e retomada de tarefas por projeto. Referências via LSP e interrupção imediata de conexões HTTP ociosas estão no roadmap.
 
 ## Instalação
 
@@ -59,6 +59,71 @@ O agente recebe a raiz absoluta do projeto em cada consulta e pode confirmá-la 
 
 O chat ocupa toda a largura do terminal, com mensagens compactas e entrada fixa embaixo. O cabeçalho mostra projeto, modelo, modo de edição e conexão; as atividades ficam agrupadas por pergunta e a barra de status mostra a ação em andamento. `Ctrl+L` limpa a conversa, `Ctrl+X` solicita cancelamento, `Ctrl+P` abre os comandos e `Ctrl+Q` encerra. O cancelamento HTTP é verificado entre fragmentos da resposta e chamadas de ferramentas; se o servidor estiver parado sem enviar dados, aguarda o próximo fragmento ou o timeout. A conversa é salva em `.codaro/session.json`; o fluxo da última investigação fica em `.codaro/prompt.json` para diagnóstico. O modelo deve suportar `tools` na API de chat completions; a confiabilidade das chamadas varia conforme modelo e servidor.
 
+## Modos, planejamento e execução
+
+Um único agente usa um prompt base e capacidades controladas pelo aplicativo. O modo muda as instruções e as ferramentas disponíveis; texto do modelo nunca concede permissões.
+
+| Modo | Comportamento |
+| --- | --- |
+| **Perguntar (`ask`)** | Responde dúvidas e consulta código/conversa quando necessário; não altera arquivos do projeto nem executa comandos. |
+| **Planejar (`plan`)** | Investiga arquitetura, registra etapas e critérios de aceite, sem alterações ou comandos. |
+| **Executar (`execute`)** | Investiga, planeja atividades amplas, implementa, executa verificações autorizadas e corrige falhas. Perguntas simples continuam recebendo respostas simples. |
+
+`codaro .` abre **Executar**, com aprovação por ação. `--read-only` seleciona Perguntar. Os modos de consulta também podem salvar conversa e planejamento em `.codaro`.
+
+```bash
+codaro . --mode ask
+codaro . --mode plan
+codaro ask 'Como funciona a autenticação?'
+codaro plan 'Adicionar recuperação de senha'
+codaro execute 'Execute o plano da tarefa ativa e valide o resultado'
+# Compatibilidade: edit usa o mesmo ciclo de execute
+codaro edit 'Corrija a validação de entrada'
+```
+
+No chat, `/mode ask|plan|execute` troca o modo; `/ask`, `/plan` e `/execute` são atalhos. A troca preserva conversa e tarefa, e revoga o escopo de aprovação anterior. O plano aparece em um bloco expansível. **Executar plano** seleciona Executar e preenche uma mensagem; Enter inicia a atividade. `/execute` também preenche esse rascunho quando existe uma tarefa. Trocas durante execução/revisão são bloqueadas.
+
+O agente registra etapas (`todo`, `doing`, `done`) e critérios com `update_plan`, recupera páginas de tarefa com `get_task` e sinaliza plano/conclusão/bloqueio com `finish_task`. Uma conclusão com etapas pendentes ou sem validação da revisão atual é recusada pela ferramenta. O plano pode declarar `validation_commands` com os comandos exatos esperados; atualizar essa lista permite substituir verificações obsoletas após uma mudança de arquitetura, sem conceder autorização para executá-las. Perguntas simples podem concluir sem planejamento formal. O controlador informa pendências quando o modelo encerra a resposta antes de completar a atividade.
+
+### Aprovação por ação ou por tarefa
+
+**Por ação (`action`) é o padrão**: cada conjunto de diffs e cada comando exige revisão. Após a decisão, o resultado volta ao modelo pelo protocolo nativo; a mesma execução continua para validar ou registrar o bloqueio. Voltar/Escape na revisão integrada rejeita aquele conjunto; Enter não aprova por foco inicial.
+
+**Por tarefa (`task`) é opcional**, com autorização explícita para caminhos relativos e comandos exatos. Permite criação, alteração, remoção e renomeação dentro dos caminhos revisados. Comandos são arrays de argumentos completos, sem correspondência por prefixo. Fora do escopo, a ação volta a exigir aprovação individual.
+
+```bash
+codaro execute 'Corrija a autenticação e valide' --approval task \
+  --scope src --scope tests \
+  --allow-command '["pytest","-q"]' \
+  --allow-command '["ruff","check","src","tests"]'
+```
+
+Antes de chamar a IA, a CLI apresenta objetivo, caminhos e comandos e solicita confirmação com padrão não. No chat, defina `/task new OBJETIVO`, selecione Executar e use `/permissions task`; revise o JSON de caminhos/comandos e confirme. `/permissions action` revoga o escopo. Autorizações vivem somente na sessão e são vinculadas ao identificador da tarefa; não são restauradas de disco, copiadas da memória ou herdadas por outra tarefa. Paths externos, links, ignores e arquivos proibidos continuam bloqueados nas ferramentas de arquivo. Comandos aprovados **não são uma sandbox** e podem atuar fora desses caminhos; conceder um comando autoriza seus efeitos, não apenas a pasta usada como cwd.
+
+### Ciclo de implementação e validação
+
+O fluxo é investigar → planejar → preparar/revisar → aplicar → validar → corrigir e validar novamente. `propose_edit` substitui um trecho exato já lido; `apply_changes` reúne operações `edit`, `create`, `delete` e `rename`. Remover/renomear exige leitura completa do arquivo atual. A criação pode incluir diretórios; o destino futuro é verificado com o mesmo motor de ignores do ripgrep, sem criar arquivos no projeto antes da autorização.
+
+Cada conjunto contém até oito arquivos; renomear conta como criação do destino e remoção da origem. Um conflito interrompe as operações restantes e retorna quais foram aplicadas e quais ficaram pendentes. Não há transação atômica entre arquivos. Não fazemos rollback automático sobre alterações externas; use checkpoints para revisar uma reversão. Diretórios vazios criados podem permanecer após falha ou desfazer.
+
+Para verificar a implementação, o agente usa `run_command` com `purpose: "validation"`. Cada solicitação executa novamente: resultados de testes não são reutilizados no novo ciclo. O registro associa exit code/timeout à revisão do código. Alterações nas ferramentas e mudanças detectadas nos arquivos indexados invalidam resultados antigos; comandos de validação já usados precisam passar novamente na revisão atual, ou o plano deve declarar explicitamente a lista atual de verificações necessárias. Isso comprova os comandos executados, **não a cobertura ou correção semântica de todo o projeto**. Comandos marcados `operation` não contam como validação.
+
+### Tarefas, retomada e limites
+
+```bash
+codaro task                       # tarefa ativa
+codaro task list
+codaro task new 'Implementar recuperação de senha'
+codaro task resume ID_DA_TAREFA   # seleciona para conferência/continuação
+codaro . --resume
+```
+
+No chat: `/task`, `/task list`, `/task new OBJETIVO` e `/task resume ID`. Use uma nova tarefa para uma atividade diferente; perguntas de acompanhamento preservam o objetivo ativo. A seleção/retomada não executa operações. Ao continuar, o agente confere o índice atual e recebe o plano, a revisão e operações recentes; chamadas antigas não são reaplicadas automaticamente. Uma tarefa cancelada pode ser selecionada explicitamente com `resume`. Aprovações por tarefa precisam ser revistas em outra sessão.
+
+`.codaro/tasks.json` é privado, atômico e vinculado à raiz: retém até vinte tarefas/4 MB, vinte e quatro etapas, dezesseis critérios, duzentos eventos e trinta e duas validações por tarefa. Registra interações/run IDs, decisões de aprovação, intenções de alteração, checkpoints e resultados de comandos. Não armazena raciocínio interno como planejamento. Memória de conversa, checkpoints e último fluxo HTTP continuam em seus arquivos existentes. Locks impedem execuções concorrentes no mesmo projeto; estados interrompidos permanecem inspecionáveis. Arquivos e comandos já aplicados são mantidos após cancelamento.
+
+Limites padrão: Perguntar oito etapas; Planejar vinte; Executar trinta e duas. Planejar/Executar têm orçamento acumulado de 96.000 caracteres de resultados, mantendo o limite de contexto por requisição. A atividade tem prazo de 1.800 segundos, descontando espera em revisões, e até três falhas de validação por interação. Repetição consecutiva sem progresso encerra a investigação. Configure `--max-steps` (1–200), `--max-seconds` (1–7.200) e `--max-corrections` (1–10) no chat ou execute. Um bloqueio/limite conserva o progresso para outra interação; não cria execução ilimitada.
+
 ## Interface e streaming
 
 - `codaro chat` exibe a resposta final após o agente concluir e validar o turno, em Markdown, com títulos, listas, tabelas e destaque de sintaxe em blocos de código. Durante a geração, a barra de status e as ferramentas mostram o progresso.
@@ -67,7 +132,7 @@ O chat ocupa toda a largura do terminal, com mensagens compactas e entrada fixa 
 - As atividades aparecem uma única vez na conversa. A barra de status informa o arquivo ou consulta durante a execução.
 - A barra superior mostra pasta abreviada, modelo, modo de edição e conexão. A barra de status informa o estado atual. `/pwd` mostra o caminho completo.
 - O texto recebido por streaming fica em prévias recolhidas dentro de **Investigação**. Expanda a investigação e a prévia para acompanhar a geração: ela é identificada como **não validada**, pois o mesmo stream pode terminar em chamadas de ferramentas ou exigir uma nova tentativa. Etapas intermediárias, prévias rejeitadas e interrupções permanecem identificadas e recolhidas; não substituem mensagens finais. Cada prévia mostra até 4.000 caracteres; o fluxo completo está em `.codaro/prompt.json`. Campos separados de reasoning não são exibidos na interface.
-- `codaro ask` também atualiza a resposta progressivamente no terminal e envia as informações de atividade para stderr.
+- `codaro ask`, `plan` e `execute` mostram progresso no terminal e enviam atividade para stderr; o texto final aparece após o retorno do agente. O conteúdo provisório fica no JSON de diagnóstico.
 - O provedor usa SSE da API OpenAI-compatible. Se o servidor responder com JSON comum, a resposta é exibida de uma vez.
 - Uma resposta interrompida ou cancelada não é salva no histórico. O chat informa a interrupção e conserva a prévia recolhida apenas na investigação daquela tela. Retomar a sessão restaura somente perguntas e respostas concluídas.
 
@@ -148,13 +213,13 @@ codaro chat --read-only --repo /caminho/do/projeto
 codaro edit 'Adicione uma validação de entrada à função can_edit' --repo examples/demo
 ```
 
-O agente deve ler o trecho atual e chamar `propose_edit` com o texto original exato, o novo texto e o motivo. A proposta fica na memória; o arquivo permanece intacto. No chat, **Revisar diff** abre o diff com destaque de sintaxe, motivo e ações **Aplicar**, **Rejeitar** e **Voltar**. A ação inicialmente focada é Voltar: Enter não aprova automaticamente. No comando `edit`, cada diff aparece antes da confirmação; a resposta padrão é **não**. `ask` continua somente leitura.
+O agente lê o trecho atual e solicita a alteração com texto original exato, novo texto e motivo. O conjunto de diffs é revisado durante o ciclo, antes da aplicação. Após Aplicar/Rejeitar/Voltar, o resultado volta ao modelo. A ação inicialmente focada é Voltar: Enter não aprova automaticamente. Na CLI, o padrão de confirmação é **não**. `ask` continua somente leitura.
 
 - A aplicação verifica novamente as regras de ignore, o conteúdo original e a identidade do arquivo, e usa substituição atômica no mesmo diretório. Uma alteração concorrente detectada bloqueia a proposta; faça uma nova solicitação sobre o arquivo atual.
 - BOM UTF-8, finais de linha LF/CRLF e bits de permissão usuais são preservados. Arquivos binários, links simbólicos, hard links e caminhos proibidos são bloqueados. A aplicação requer POSIX com `dir_fd` e `O_NOFOLLOW`; plataformas sem esses recursos podem investigar, mas não aplicar.
-- Até oito propostas por resposta, uma por arquivo. Cada trecho original/novo tem até 3.000 caracteres; o diff tem até 60.000 caracteres. O trecho original deve ocorrer uma única vez e estar inteiramente em linhas lidas, sem truncamento.
-- Resolva as propostas antes de outra pergunta. Limpar o chat descarta as propostas pendentes. Uma resposta cancelada ou interrompida também descarta suas propostas.
-- Cada arquivo é aprovado e aplicado separadamente: não há transação entre arquivos, criação/exclusão de arquivos pela ferramenta de edição ou persistência de propostas pendentes entre sessões. Desfazer também exige revisão e aprovação. A escrita atômica evita arquivos parcialmente escritos; não impede toda corrida com um processo hostil que altera caminhos simultaneamente.
+- Até oito arquivos por conjunto, uma operação por caminho. Cada trecho original/novo tem até 3.000 caracteres; o diff tem até 60.000 caracteres. O trecho original deve ocorrer uma única vez e estar inteiramente em linhas lidas, sem truncamento.
+- Durante a revisão integrada, a tarefa aguarda a decisão. Cancelar descarta propostas ainda pendentes, preservando alterações já aplicadas. O adaptador Python legado sem callback de revisão conserva propostas para revisão posterior.
+- A aprovação pode abranger um conjunto; os arquivos são aplicados sequencialmente, com resultado parcial explícito. Há criação/exclusão/renomeação; não há transação entre arquivos nem reaplicação de propostas pendentes em outra sessão. Desfazer exige revisão. A gravação de conteúdo é atômica; não impede toda corrida com processos externos alterando caminhos simultaneamente.
 
 ## Checkpoints e desfazer
 
@@ -176,7 +241,7 @@ No chat com edição habilitada e em `codaro edit`, o modelo pode solicitar `run
 
 Os comandos partem da raiz escolhida, sem shell implícito, e executam com as permissões do usuário; essa raiz define o diretório de trabalho, não uma sandbox. `CODARO_API_KEY` não é herdada pelo subprocesso. Saída e erro são combinados, capturados com memória limitada e devolvidos com código de saída, timeout e indicação de truncamento. Em POSIX, cancelamento/timeout encerram o grupo de processos; em outras plataformas, o processo principal é encerrado. Os resultados também entram no fluxo nativo `tool_calls` → `tool` e no JSON de debug.
 
-Após aplicar um diff no chat, **Validar alteração** inicia outra investigação: o agente lê o código atual, descobre os testes relevantes e solicita sua execução. A aprovação de um diff não aprova comandos de teste. O resultado real aparece na conversa; quando testes não foram executados, isso continua explícito. A escolha dos testes depende das evidências, das instruções do projeto e do modelo.
+No ciclo integrado, a validação segue a aplicação na mesma interação. Aprovar um diff não aprova comandos de teste fora do escopo autorizado. **Validar alteração** permanece disponível para revisões manuais/desfazer. A escolha das verificações depende do projeto e do modelo; resultados não executados permanecem pendentes.
 
 ## API compatível com OpenAI
 
@@ -244,21 +309,17 @@ A gravação usa arquivo temporário e substituição atômica, com permissão `
 
 Cabeçalhos de autorização não são registrados e a chave configurada é mascarada, incluindo formas escapadas em JSON. **O arquivo contém perguntas, histórico e código consultado**: a remoção da chave do provedor não remove outros segredos presentes nesses conteúdos. `.codaro` fica fora das buscas do agente e já está no `.gitignore` deste projeto; adicione `.codaro/` ao `.gitignore` de outros projetos em que usar o Codaro. Corpos HTTP de erro ficam limitados a 64 KB; os limites normais de respostas e streaming continuam valendo. Falhas de gravação geram aviso e preservam o resultado ou erro original da investigação.
 
-O formato segue o fluxo de diagnóstico do Thoth: requisições e respostas por iteração, resultados de ferramentas e fechamento atômico. No Thoth, planejamento usa chamadas sem streaming e a síntese tem uma etapa própria. No Codaro, perguntas reconhecidas sobre estrutura e pontos de entrada investigam em JSON até obter leituras de arquivos; depois podem usar streaming. O Codaro também aceita chamadas estruturadas durante SSE, com o mesmo contrato de mensagens no modo JSON e no streaming. O payload é construído pela mesma função usada para calcular o orçamento e registrar a requisição, evitando divergências entre essas representações.
+O formato segue o fluxo de diagnóstico do Thoth: requisições e respostas por iteração, resultados de ferramentas e fechamento atômico. No Thoth, planejamento usa chamadas sem streaming e a síntese tem uma etapa própria. No Codaro, perguntas reconhecidas sobre estrutura recebem leituras locais iniciais limitadas; o modelo pode usar JSON ou streaming para continuar. O Codaro também aceita chamadas estruturadas durante SSE, com o mesmo contrato de mensagens no modo JSON e no streaming. O payload é construído pela mesma função usada para calcular o orçamento e registrar a requisição, evitando divergências entre essas representações.
 
 ## Estrutura do projeto e evidências
 
 `get_repository_info` descreve a sessão do **Codaro**: pasta, capacidades e escopo. Essas capacidades não são módulos, scripts ou pontos de entrada do projeto explorado. O resultado identifica explicitamente esse escopo.
 
-Perguntas reconhecidas sobre estrutura, arquitetura e pontos de entrada têm uma verificação adicional: a explicação precisa citar `caminho:linha` de arquivos lidos com sucesso **naquela pergunta**. Listagens, previews de busca, metadados, leituras com erro e linhas parcialmente truncadas não satisfazem essa verificação. A investigação começa sem streaming até obter uma leitura válida; texto de chamadas de ferramentas não é emitido como resposta final.
+Citações `caminho:linha` são recomendadas quando úteis, mas **não são requisito para aceitar a resposta**. Perguntas gerais podem ser respondidas diretamente. Falhas de leitura também podem ser explicadas sem citações. O prompt orienta fundamentar afirmações sobre o projeto nas fontes consultadas e não inventar resultados.
 
-Se o modelo tentar concluir sem evidências, o controlador faz uma recuperação local antes da única tentativa de correção: usa os caminhos realmente disponíveis, escolhe manifestos e candidatos de inicialização e lê trechos do projeto. São até cinco leituras de 60 linhas, com até 1.800 caracteres serializados por resultado e 6.000 caracteres para o contexto recuperado, descontados do orçamento de ferramentas. Em arquivos de inicialização conhecidos, a recuperação procura a declaração de `main`/`bootstrap` para localizar o trecho mesmo após um bloco longo de imports/declarations. Esses limites e nomes conhecidos não substituem uma investigação completa: o modelo ainda pode pedir outras leituras.
+Perguntas reconhecidas sobre estrutura/arquitetura/pontos de entrada recebem uma recuperação inicial limitada de manifestos e candidatos: até cinco leituras de 60 linhas, 1.800 caracteres serializados por leitura e 6.000 caracteres ao todo, descontados do orçamento. Para pontos de entrada conhecidos, a leitura procura main/bootstrap mesmo após imports longos. O reconhecimento usa padrões em português/inglês e não classifica toda intenção. Metadados e nomes candidatos não substituem o conteúdo dos arquivos. As leituras entram na mensagem system como dados e são registradas em `local_retrievals`.
 
-A explicação rejeitada permanece no JSON de diagnóstico, mas não é enviada novamente como fatos nem salva no histórico da conversa. A recuperação entra na mensagem `system` inicial; cada requisição mantém uma única mensagem desse tipo. O dump registra as leituras do controlador em `local_retrievals`, separadamente de chamadas solicitadas pelo modelo. Persistindo a falta de evidências ou terminando o orçamento, o Codaro informa a falha. Se o índice não encontrar nenhum arquivo permitido, o resultado explica a limitação do escopo. Consultas sobre pasta/ferramentas, listagens e perguntas conceituais gerais continuam sem exigir leituras de implementação.
-
-Arquivos de regras de ignore, como `.gitignore`, podem ser lidos para diagnosticar exclusões, mas não contam como implementação nem pontos de entrada.
-
-O reconhecimento desse tipo de pergunta usa padrões em português e inglês; não classifica toda intenção possível. A verificação confirma leitura e uma citação dentro das linhas lidas, sem garantir que todas as conclusões do modelo estejam corretas ou que a evidência escolhida seja suficiente para toda a pergunta.
+O controlador não tenta certificar a verdade de uma explicação por presença de uma citação. Para edição, continua exigindo conteúdo atual observado; para conclusão de implementação, verifica resultados de validação associados à revisão atual. A qualidade da interpretação e a suficiência dos testes ainda dependem do modelo e do projeto.
 
 ### Formato interno do Thoth versus API OpenAI
 
@@ -276,15 +337,15 @@ A busca inicial é textual e estrutural. Embeddings, reranking e LSP serão adic
 
 ## Limites de contexto e arquivos
 
-- Até 8 etapas de ferramentas e 8 chamadas por etapa; finalização sem ferramentas após o limite.
+- Até 8/20/32 etapas em Perguntar/Planejar/Executar por padrão, com até oito chamadas por etapa. Finalização sem ferramentas após o limite; CLI permite configurar o número de etapas.
 - Leituras de até 160 linhas e 6.000 caracteres, com indicação de truncamento e próxima linha. `partial_line` indica que uma única linha excedeu o orçamento; não conclua sobre a parte omitida.
 - Até 12 resultados por busca, com previews de 240 caracteres.
-- Orçamento de 24.000 caracteres de resultados por pergunta. É uma aproximação de volume, não uma contagem exata de tokens.
+- Orçamento de 24.000 caracteres em Perguntar e 96.000 em Planejar/Executar por interação. É uma aproximação de volume, não uma contagem exata de tokens.
 - Histórico de perguntas e respostas limitado a 16.000 caracteres, sem reter corpos de ferramentas entre turnos. A requisição completa respeita o teto adicional de 64.000 caracteres e o orçamento estimado de tokens, incluindo instruções, mensagens e schemas.
 - Janela configurável em tokens: padrão **16.384**, reserva de saída **1.400** e margem **512**. Esses valores são limites do cliente; configure a janela realmente habilitada no servidor. O tamanho arquitetural anunciado do modelo não garante a configuração do endpoint.
 - A partir de 85% do orçamento, o agente remove turnos antigos e compacta grupos completos de chamadas/respostas da investigação atual. Um registro limitado preserva caminhos, ações e status de comandos/propostas, sem tratar código removido como prova. A conversa salva e os resultados no JSON de debug são preservados. Trechos descartados precisam ser relidos antes de justificar conclusões/edições; pares `tool_calls`/`tool` nunca são quebrados.
-- Leituras, buscas e listagens são reduzidas conforme o espaço restante. Leituras idênticas/contidas não repetem conteúdo quando o arquivo não mudou; intervalos com prefixo sobreposto enviam somente as novas linhas. Após compactação, as leituras podem ser feitas novamente. Comandos/propostas idênticos reutilizam o resultado dentro da mesma investigação; para repetir uma execução, inicie nova pergunta. Erros de leitura podem ser tentados novamente.
-- Rejeições reconhecidas de contexto do servidor reduzem o orçamento e permitem até duas novas tentativas ao modelo, sem reexecutar ferramentas. Outros erros HTTP mantêm seu tratamento normal. Se pergunta, instruções e schemas não couberem, o agente explica a configuração necessária em vez de enviar uma requisição localmente excessiva. A investigação continua limitada a oito etapas e ao volume total de resultados por pergunta; compactação não significa análise ilimitada.
+- Leituras, buscas e listagens são reduzidas conforme o espaço restante. Leituras idênticas/contidas não repetem conteúdo quando o arquivo não mudou; intervalos com prefixo sobreposto enviam somente as novas linhas. Após compactação, as leituras podem ser feitas novamente. Comandos no ciclo integrado executam a cada nova solicitação, permitindo testar novamente depois de corrigir. Apenas o adaptador legado mantém o cache de execuções por pergunta. Erros de leitura podem ser tentados novamente.
+- Rejeições reconhecidas de contexto do servidor reduzem o orçamento e permitem até duas novas tentativas ao modelo, sem reexecutar ferramentas. Outros erros HTTP mantêm seu tratamento normal. Se pergunta, instruções e schemas não couberem, o agente explica a configuração necessária em vez de enviar uma requisição localmente excessiva. A investigação continua limitada às etapas configuradas e ao volume total de resultados por interação; compactação não significa análise ilimitada.
 - Até 20.000 arquivos de 512 KB cada. Caminhos externos e links simbólicos são rejeitados. No POSIX, leituras usam descritores de diretório e `O_NOFOLLOW`; o caminho alternativo para plataformas sem esse recurso não oferece a mesma proteção contra substituições concorrentes de diretórios.
 - Além das extensões de código/configuração, são permitidos nomes conhecidos como `.gitignore`, `.dockerignore`, `.codaroignore`, `.gitattributes`, `.editorconfig`, `go.mod`, `go.sum`, `Makefile`, `Dockerfile`, `Containerfile`, `Justfile`, `Procfile`, `Gemfile`, `Rakefile`, `Jenkinsfile`, `CMakeLists.txt`, `README` e `LICENSE`. Caminhos absolutos dentro da raiz selecionada funcionam; as mesmas regras de ignore, tamanho, arquivos binários e links continuam aplicadas.
 - `.env*`, nomes contendo `secret`/`credential`, chaves privadas e diretórios gerados são excluídos. Isso não detecta todos os segredos; revise as exclusões antes de usar uma API externa.
@@ -345,7 +406,7 @@ Veja os achados e as limitações em [AUDIT.md](AUDIT.md).
 - Reranking quando houver ganho medido.
 - Definições e referências via LSP, com novos parsers Tree-sitter.
 - Interrupção imediata de conexões que estejam sem enviar fragmentos.
-- Criação de arquivos e transações de edição envolvendo vários arquivos.
+- Transações de edição envolvendo vários arquivos e execução opcional em sandbox.
 
 
 ## Diagnóstico e recuperação
@@ -370,6 +431,6 @@ codaro evaluate evaluations/cases.json --output .codaro/evaluation-retrieval.jso
 codaro evaluate evaluations/cases.json --agent --output .codaro/evaluation-agent.json
 ```
 
-O modo local mede precisão dos até seis resultados, recall dos caminhos esperados e duração. `--agent` mede conclusão, correspondência das expectativas textuais, precisão das citações em linhas efetivamente lidas, chamadas ao modelo/ferramentas, chamadas repetidas, compactações, estimativas e usage disponível. O relatório informa quantas chamadas possuem consumo real; ausência de usage não é apresentada como consumo zero. Casos com erro não interrompem os seguintes; o comando retorna código 1 se alguma expectativa falhar.
+O modo local mede precisão dos até seis resultados, recall dos caminhos esperados e duração. `--agent` mede conclusão, correspondência das expectativas textuais, recall de arquivos efetivamente lidos, precisão das citações quando presentes, chamadas ao modelo/ferramentas, chamadas repetidas, compactações, estimativas e usage disponível. Uma resposta sem citações pode passar quando as fontes esperadas foram lidas e as expectativas textuais foram satisfeitas; referências inventadas, quando presentes, falham. O relatório informa quantas chamadas possuem consumo real; ausência de usage não é apresentada como consumo zero. Casos com erro não interrompem os seguintes; o comando retorna código 1 se alguma expectativa falhar.
 
 Avaliações do agente não permitem edição/comandos e usam memória efêmera, preservando a memória das conversas do projeto. Atualizam o índice e o último JSON de debug. Os casos iniciais são testes de fumaça; métricas objetivas e correspondências textuais não substituem revisão humana da qualidade semântica. Compare relatórios ao mudar modelo, prompts, recuperação ou limites de contexto.

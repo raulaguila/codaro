@@ -52,6 +52,15 @@ class Checkpoints:
             ):
                 raise ValueError("Checkpoint inválido.")
             ids.add(item["id"])
+            if any(
+                type(item.get(key, True)) is not bool for key in ("before_exists", "after_exists")
+            ):
+                raise ValueError("Estado de existência inválido no checkpoint.")
+            if (
+                type(item.get("file_mode", 0o644)) is not int
+                or not 0 <= item.get("file_mode", 0o644) <= 0o777
+            ):
+                raise ValueError("Permissões inválidas no checkpoint.")
             for key in ("before", "after"):
                 try:
                     raw = base64.b64decode(item[key], validate=True)
@@ -92,6 +101,9 @@ class Checkpoints:
             "state": "ready",
             "reason": proposal.reason[:500],
             "task_id": proposal.task_id,
+            "before_exists": proposal.before_exists,
+            "after_exists": proposal.after_exists,
+            "file_mode": proposal.file_mode,
         }
         for name in ("before", "after"):
             raw = getattr(proposal, name)
@@ -117,10 +129,11 @@ class Checkpoints:
         for item in reversed(self.load()):
             can_undo = False
             try:
-                target = self.repository.resolve_file(item["path"])
-                can_undo = (
-                    item["state"] in {"ready", "applied"}
-                    and digest(self.repository.read_bytes(target)) == item["after_hash"]
+                target = self.repository.resolve_destination(item["path"])
+                can_undo = item["state"] in {"ready", "applied"} and (
+                    digest(self.repository.read_bytes(target)) == item["after_hash"]
+                    if item.get("after_exists", True)
+                    else not target.exists()
                 )
             except (ValueError, OSError):
                 pass
@@ -141,10 +154,15 @@ class Checkpoints:
         )
         if item is None:
             raise ValueError("Nenhuma alteração disponível para desfazer.")
-        target = self.repository.resolve_file(item["path"])
+        target = self.repository.resolve_destination(item["path"])
         before = base64.b64decode(item["after"], validate=True)
         after = base64.b64decode(item["before"], validate=True)
-        if self.repository.read_bytes(target) != before:
+        matches = (
+            self.repository.read_bytes(target) == before
+            if item.get("after_exists", True)
+            else not target.exists()
+        )
+        if not matches:
             raise ValueError("Arquivo mudou após a edição; desfazer bloqueado.")
         lines = difflib.unified_diff(
             before.decode("utf-8-sig").splitlines(keepends=True),
@@ -164,4 +182,7 @@ class Checkpoints:
             after,
             diff,
             undo_of=item["id"],
+            before_exists=item.get("after_exists", True),
+            after_exists=item.get("before_exists", True),
+            file_mode=item.get("file_mode", 0o644),
         )

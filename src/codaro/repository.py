@@ -4,6 +4,7 @@ import os
 import shutil
 import stat
 import subprocess
+import tempfile
 from pathlib import Path
 
 MAX_FILE_BYTES = 512_000
@@ -176,6 +177,51 @@ class Repository:
                 "Arquivo inexistente, grande demais ou excluído pelas regras de ignore. "
                 "Use list_files para descobrir arquivos disponíveis; não adivinhe caminhos."
             )
+        return path
+
+    def resolve_destination(self, name: str) -> Path:
+        """Evaluate a future path with ripgrep's ignore engine in a temporary mirror."""
+        from codaro.storage import private_read
+
+        if not isinstance(name, str) or not name or len(name) > 2000:
+            raise RepositoryError("Destino inválido.")
+        relative = self._relative(self.root / name)
+        path = self.root / relative
+        if not self.allowed(path):
+            raise RepositoryError("Destino bloqueado pela política de arquivos.")
+        if path.exists():
+            return self.resolve_file(name)
+        with tempfile.TemporaryDirectory(prefix="codaro-ignore-") as temporary:
+            mirror = Path(temporary)
+            for ancestor in (Path("."), *relative.parents):
+                for ignore_name in (".gitignore", ".ignore", ".rgignore"):
+                    source = self.root / ancestor / ignore_name
+                    try:
+                        data = private_read(source, 64_000)
+                    except FileNotFoundError:
+                        continue
+                    except ValueError as exc:
+                        raise RepositoryError("Arquivo de ignore inválido.") from exc
+                    destination = mirror / ancestor / ignore_name
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_bytes(data)
+            future = mirror / relative
+            future.parent.mkdir(parents=True, exist_ok=True)
+            future.touch()
+            args = ["rg", "--files", "--null", "--hidden", "--no-require-git"]
+            try:
+                rules = private_read(self.root / ".codaroignore", 64_000)
+            except FileNotFoundError:
+                rules = None
+            if rules is not None:
+                (mirror / ".codaroignore").write_bytes(rules)
+                args.extend(["--ignore-file", str(mirror / ".codaroignore")])
+            result = subprocess.run(args, cwd=mirror, capture_output=True, timeout=20)
+            if result.returncode not in (0, 1):
+                raise RepositoryError("Não foi possível verificar os ignores do destino.")
+            names = {os.fsdecode(item) for item in result.stdout.split(b"\0") if item}
+            if relative.as_posix() not in names:
+                raise RepositoryError("Destino excluído pelas regras de ignore.")
         return path
 
     def read_bytes(self, path: Path) -> bytes:

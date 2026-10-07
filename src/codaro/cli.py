@@ -20,8 +20,10 @@ from typer.core import TyperGroup
 
 from codaro.agent import Agent, AgentEvent
 from codaro.index import CodeIndex, safe_preview
+from codaro.policies import Mode
 from codaro.provider import ModelError, OpenAICompatible, Settings
 from codaro.repository import Repository
+from codaro.tasks import TaskStore
 
 
 class CodaroGroup(TyperGroup):
@@ -90,6 +92,63 @@ def approve_command(argv, timeout, cancelled, *, root):
         return typer.confirm("Autorizar esta execução?", default=False)
     except (EOFError, typer.Abort):
         return False
+
+
+def approve_changes(proposals, cancelled):
+    if cancelled is not None and cancelled.is_set():
+        return False
+    for proposal in proposals:
+        errors.print(
+            Panel(
+                Text(safe_preview(proposal.reason)),
+                title=Text(proposal.operation + " · " + proposal.path),
+            )
+        )
+        errors.print(Syntax(safe_preview(proposal.diff), "diff", word_wrap=True))
+    try:
+        return typer.confirm(
+            f"Aplicar este conjunto de {len(proposals)} arquivo(s)?", default=False
+        )
+    except (EOFError, typer.Abort):
+        return False
+
+
+def grant_scope(agent, paths, commands):
+    task = agent.tasks.current()
+    if task is None:
+        raise ValueError("Defina uma tarefa antes de autorizar o escopo.")
+    parsed = [json.loads(command) for command in commands]
+    from codaro.policies import ApprovalPolicy
+
+    proposed = ApprovalPolicy()
+    proposed.grant(task["id"], paths, parsed)
+    errors.print(
+        safe_preview(
+            json.dumps(
+                {
+                    "task": task["id"],
+                    "objective": task["objective"],
+                    "paths": paths,
+                    "commands": parsed,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        ),
+        markup=False,
+    )
+    try:
+        approved = typer.confirm(
+            "Autorizar criar/alterar/remover/renomear nesses caminhos e "
+            "executar somente esses comandos nesta sessão/tarefa?",
+            default=False,
+        )
+    except (EOFError, typer.Abort):
+        approved = False
+    if approved:
+        agent.policy = proposed
+        agent.tasks.event("scope_approval", {"paths": paths, "commands": parsed})
+    return approved
 
 
 def fail(exc: Exception):
@@ -217,6 +276,13 @@ def run_question(
     allow_edits: bool,
     tls_insecure: bool | None = None,
     context_window: int | None = None,
+    mode: str | Mode | None = None,
+    approval: str = "action",
+    scopes: list[str] | None = None,
+    commands: list[str] | None = None,
+    max_steps: int | None = None,
+    max_seconds: int = 1800,
+    max_corrections: int = 3,
 ):
     try:
         agent = Agent(
@@ -225,6 +291,11 @@ def run_question(
                 Settings.from_env(tls_insecure=tls_insecure, context_window=context_window)
             ),
             allow_edits=allow_edits,
+            mode=mode or (Mode.EXECUTE if allow_edits else Mode.ASK),
+            approve_edit=approve_changes,
+            max_steps=max_steps,
+            max_seconds=max_seconds,
+            max_corrections=max_corrections,
             approve_command=(
                 lambda argv, timeout, cancelled: approve_command(
                     argv, timeout, cancelled, root=repo.expanduser().resolve()
@@ -233,6 +304,16 @@ def run_question(
             if allow_edits
             else None,
         )
+        if approval not in {"action", "task"}:
+            raise ValueError("Use approval action ou task.")
+        if approval == "task":
+            if agent.mode != Mode.EXECUTE:
+                raise ValueError("Autorização por tarefa está disponível em Executar.")
+            agent.tasks.start(question)
+            if not grant_scope(agent, scopes or [], commands or []):
+                raise ValueError("Escopo não autorizado; nenhuma ação executada.")
+        elif scopes or commands:
+            raise ValueError("Use --approval task para autorizar escopo/comandos.")
         parts: list[str] = []
 
         def detail(event: AgentEvent):
@@ -254,7 +335,7 @@ def run_question(
 
             def delta(fragment: str):
                 parts.append(fragment)
-                live.update(Markdown(safe_preview("".join(parts))))
+                live.update(Text("Gerando resposta… · texto provisório em .codaro/prompt.json"))
 
             try:
                 answer = agent.ask(question, on_delta=delta, on_detail=detail)
@@ -291,6 +372,10 @@ def chat(
     read_only: Annotated[
         bool, typer.Option("--read-only", help="Somente leitura: desabilita edições e comandos.")
     ] = False,
+    mode: Annotated[Mode, typer.Option("--mode", help="ask, plan ou execute.")] = Mode.EXECUTE,
+    max_steps: Annotated[int | None, typer.Option(min=1, max=200)] = None,
+    max_seconds: Annotated[int, typer.Option(min=1, max=7200)] = 1800,
+    max_corrections: Annotated[int, typer.Option(min=1, max=10)] = 3,
     tls_insecure: TLSInsecure = None,
     context_window: ContextWindow = None,
     resume: Annotated[
@@ -308,6 +393,10 @@ def chat(
                     Settings.from_env(tls_insecure=tls_insecure, context_window=context_window)
                 ),
                 allow_edits=not read_only,
+                mode=Mode.ASK if read_only else mode,
+                max_steps=max_steps,
+                max_seconds=max_seconds,
+                max_corrections=max_corrections,
             ),
             resume=resume,
         ).run()
@@ -442,7 +531,10 @@ def undo(checkpoint: Annotated[str | None, typer.Argument()] = None, repo: Root 
         proposal = manager.propose_undo(checkpoint)
         console.print(Syntax(safe_preview(proposal.diff), "diff", word_wrap=True))
         if typer.confirm(f"Desfazer a edição em {proposal.path}?", default=False):
-            manager.apply(proposal.id)
+            from codaro.storage import private_lock
+
+            with private_lock(manager.repository.root / ".codaro/agent.lock"):
+                manager.apply(proposal.id)
             message = "Edição desfeita. " + proposal.checkpoint_warning
             console.print(message)
             from codaro.memory import ConversationMemory
@@ -499,6 +591,104 @@ def save_review(agent, proposal, message):
         agent.memory.record_change(proposal, message)
     except (ValueError, OSError) as exc:
         errors.print(f"Revisão concluída; memória não salva: {exc}", markup=False)
+
+
+@app.command()
+def plan(
+    question: str,
+    repo: Root = Path("."),
+    tls_insecure: TLSInsecure = None,
+    context_window: ContextWindow = None,
+):
+    """Investiga e registra um plano persistente, sem alterações ou comandos."""
+    run_question(
+        question,
+        repo,
+        allow_edits=False,
+        mode=Mode.PLAN,
+        tls_insecure=tls_insecure,
+        context_window=context_window,
+    )
+
+
+@app.command(name="execute")
+def execute_task(
+    question: str,
+    repo: Root = Path("."),
+    tls_insecure: TLSInsecure = None,
+    context_window: ContextWindow = None,
+    approval: Annotated[str, typer.Option(help="action ou task.")] = "action",
+    scope: Annotated[
+        list[str] | None, typer.Option(help="Caminho relativo autorizado; repetível.")
+    ] = None,
+    allow_command: Annotated[
+        list[str] | None,
+        typer.Option(help='Comando exato como array JSON, por exemplo ["pytest","-q"]. Repetível.'),
+    ] = None,
+    max_steps: Annotated[int | None, typer.Option(min=1, max=200)] = None,
+    max_seconds: Annotated[int, typer.Option(min=1, max=7200)] = 1800,
+    max_corrections: Annotated[int, typer.Option(min=1, max=10)] = 3,
+):
+    """Implementa uma atividade e valida o resultado, com autorização humana."""
+    run_question(
+        question,
+        repo,
+        allow_edits=True,
+        mode=Mode.EXECUTE,
+        approval=approval,
+        scopes=scope,
+        commands=allow_command,
+        max_steps=max_steps,
+        max_seconds=max_seconds,
+        max_corrections=max_corrections,
+        tls_insecure=tls_insecure,
+        context_window=context_window,
+    )
+
+
+@app.command()
+def task(
+    action: Annotated[str, typer.Argument()] = "show",
+    value: Annotated[str, typer.Argument()] = "",
+    repo: Root = Path("."),
+):
+    """Consulta tarefas, inicia uma nova ou seleciona uma para retomada."""
+    try:
+        from codaro.sessions import SessionStore
+
+        repository = Repository(repo)
+        store = TaskStore(
+            repository.root,
+            redact=SessionStore(repository.root, os.getenv("CODARO_API_KEY", "")).redact,
+        )
+        from contextlib import nullcontext
+
+        from codaro.storage import private_lock
+
+        guard = (
+            private_lock(repository.root / ".codaro/agent.lock")
+            if action in {"new", "resume"}
+            else nullcontext()
+        )
+        with guard:
+            if action == "new":
+                if not value.strip() or len(value) > 8000:
+                    raise ValueError("Use task new OBJETIVO.")
+                result = store.start(value, new=True)
+            elif action == "resume":
+                result = store.select(value)
+            elif action == "list":
+                result = [
+                    {key: item[key] for key in ("id", "objective", "state")}
+                    for item in store.load()["tasks"]
+                ]
+            elif action == "show":
+                result = store.current()
+            else:
+                raise ValueError("Use show, list, new ou resume.")
+        typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+    except (ValueError, OSError) as exc:
+        fail(exc)
 
 
 if __name__ == "__main__":

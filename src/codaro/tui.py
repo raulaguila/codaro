@@ -8,6 +8,7 @@ import sqlite3
 import threading
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 from rich.syntax import Syntax
 from textual import work
@@ -22,8 +23,10 @@ from codaro.agent import Agent, AgentEvent, InvestigationCancelled
 from codaro.edits import EditProposal
 from codaro.index import CodeIndex, safe_preview
 from codaro.interaction import COMMANDS, InputHistory, completions
+from codaro.policies import ApprovalPolicy, Mode
 from codaro.provider import ModelError, OpenAICompatible
 from codaro.sessions import SessionStore
+from codaro.storage import private_lock
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -127,7 +130,10 @@ class EditReview(ModalScreen[str]):
     def compose(self) -> ComposeResult:
         with Vertical(id="review"):
             yield Static(
-                safe_preview(f"Revisar edição · {self.proposal.path}\n{self.proposal.reason}"),
+                safe_preview(
+                    f"Revisar · {getattr(self.proposal, 'operation', 'Conjunto')} · "
+                    f"{self.proposal.path}\n{self.proposal.reason}"
+                ),
                 id="review-title",
                 markup=False,
             )
@@ -151,6 +157,73 @@ class EditReview(ModalScreen[str]):
 
     def action_back(self):
         self.dismiss("back")
+
+
+class ChangesReview(EditReview):
+    def __init__(self, proposals):
+        combined = SimpleNamespace(
+            path=f"{len(proposals)} arquivo(s)",
+            reason="Aprovar aplica este conjunto; o agente continuará para validar.",
+            diff="\n".join(
+                f"{item.operation} · {item.path} · {item.reason}\n{item.diff}" for item in proposals
+            ),
+        )
+        super().__init__(combined)
+
+
+class ScopeReview(ModalScreen[dict | None]):
+    DEFAULT_CSS = """
+    ScopeReview { align: center middle; }
+    #scope-review { width: 90%; height: 80%; border: round #fbbf24; padding: 1; }
+    #scope-review TextArea { height: 1fr; }
+    #scope-review Horizontal { height: auto; }
+    """
+    BINDINGS = [Binding("escape", "reject", "Cancelar")]
+
+    def __init__(self, task):
+        super().__init__()
+        self.scope_task = task
+
+    def compose(self):
+        with Vertical(id="scope-review"):
+            yield Static("Autorizar escopo desta tarefa/sessão", markup=False)
+            yield Static(
+                safe_preview(self.scope_task["id"] + " · " + self.scope_task["objective"]),
+                markup=False,
+            )
+            yield Static(
+                "Permite criar/alterar/remover/renomear nos caminhos e executar os "
+                "comandos exatos. Fora do escopo exige nova aprovação.",
+                markup=False,
+            )
+            yield TextArea('{"paths": ["src", "tests"], "commands": []}', id="scope-json")
+            yield Static("", id="scope-error", markup=False)
+            with Horizontal():
+                yield Button("Autorizar escopo", id="grant-scope", variant="warning")
+                yield Button("Cancelar", id="cancel-scope")
+
+    def on_mount(self):
+        self.query_one("#cancel-scope", Button).focus()
+
+    def action_reject(self):
+        self.dismiss(None)
+
+    def on_button_pressed(self, event):
+        if event.button.id != "grant-scope":
+            self.dismiss(None)
+            return
+        try:
+            text = self.query_one("#scope-json", TextArea).text
+            if len(text) > 8000:
+                raise ValueError("Escopo grande demais.")
+            value = json.loads(text)
+            if not isinstance(value, dict) or set(value) != {"paths", "commands"}:
+                raise ValueError("Use paths e commands.")
+            ApprovalPolicy().grant("preview", value["paths"], value["commands"])
+        except (ValueError, TypeError) as exc:
+            self.query_one("#scope-error", Static).update(safe_preview(str(exc)))
+            return
+        self.dismiss(value)
 
 
 class CommandReview(ModalScreen[bool]):
@@ -379,8 +452,11 @@ class CodaroApp(App):
         )
         self.session_turns: list[list[dict]] = list(agent.turns)
         self.approval_dialog: CommandReview | None = None
-        if agent.allow_edits:
+        if not agent.legacy or agent.allow_edits:
             agent.approve_command = self.approve_command
+        if not agent.legacy:
+            agent.approve_edit = self.approve_changes
+        self.plan_card: Collapsible | None = None
 
     def welcome(self) -> Vertical:
         return Vertical(
@@ -427,10 +503,18 @@ class CodaroApp(App):
         self.refresh_reference_paths()
         if self.resume_requested:
             await self.restore_session()
+        try:
+            self.show_plan()
+        except (ValueError, OSError) as exc:
+            self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
 
     def update_session_header(self):
         settings = self.agent.provider.settings
-        mode = "Com aprovação" if self.agent.allow_edits else "Somente leitura"
+        mode = (
+            self.agent.mode.label
+            + " · "
+            + ("Aprovação por tarefa" if self.agent.policy.kind == "task" else "Aprovação por ação")
+        )
         tls = "TLS sem verificação" if settings.tls_insecure else "TLS verificação ativa"
         if settings.base_url.startswith("http://"):
             tls = "HTTP"
@@ -516,7 +600,15 @@ class CodaroApp(App):
         if name not in COMMANDS:
             self.mount_message(Static("Comando desconhecido. Use /help.", classes="notice"))
             return
-        if argument and name not in {"/model", "/history", "/memory", "/undo"}:
+        if argument and name not in {
+            "/model",
+            "/history",
+            "/memory",
+            "/undo",
+            "/mode",
+            "/task",
+            "/permissions",
+        }:
             self.mount_message(Static("Este comando não recebe argumentos.", classes="notice"))
             return
         if name in {"/resume", "/compact", "/model", "/undo"} and self.agent.edits.pending:
@@ -530,7 +622,62 @@ class CodaroApp(App):
             await self.restore_session()
             return
         self.hide_welcome()
-        if name == "/help":
+        if name in {"/mode", "/ask", "/plan", "/execute"}:
+            try:
+                selected = argument if name == "/mode" else name[1:]
+                if selected:
+                    self.agent.set_mode(selected)
+                    self.update_session_header()
+                    for button in self.query("#suggest-edit"):
+                        button.disabled = not self.agent.allow_edits
+                text = f"Modo: {self.agent.mode.label}. Permissões: {self.agent.policy.kind}."
+                if name == "/execute" and self.agent.tasks.current():
+                    self.query_one(
+                        Prompt
+                    ).value = "Execute o plano da tarefa ativa e valide o resultado."
+            except (ValueError, OSError) as exc:
+                text = str(exc)
+        elif name == "/task":
+            try:
+                action, _, value = argument.partition(" ")
+                if action == "new":
+                    if not value.strip() or len(value) > 8000:
+                        raise ValueError("Use /task new OBJETIVO.")
+                    task = self.agent.tasks.start(value, new=True)
+                    self.agent.policy.reset()
+                elif action == "resume":
+                    task = self.agent.tasks.select(value)
+                    self.agent.policy.reset()
+                elif action == "list":
+                    task = [
+                        {key: item[key] for key in ("id", "objective", "state")}
+                        for item in self.agent.tasks.load()["tasks"]
+                    ]
+                elif not action:
+                    task = self.agent.tasks.current()
+                else:
+                    raise ValueError("Use /task, /task list, /task new ou /task resume.")
+                text = json.dumps(task, ensure_ascii=False, indent=2)
+                self.update_session_header()
+            except (ValueError, OSError) as exc:
+                text = str(exc)
+        elif name == "/permissions":
+            if argument == "action":
+                self.agent.policy.reset()
+                self.update_session_header()
+                text = "Aprovação por ação ativada."
+            elif argument == "task":
+                if self.agent.mode != Mode.EXECUTE or not self.agent.tasks.current():
+                    text = "Use Executar e defina /task new OBJETIVO antes de autorizar o escopo."
+                else:
+                    task = self.agent.tasks.current()
+                    self.push_screen(
+                        ScopeReview(task), lambda value: self.scope_decision(value, task["id"])
+                    )
+                    return
+            else:
+                text = "Use /permissions action ou /permissions task."
+        elif name == "/help":
             text = "\n".join(f"{key} · {description}" for key, description in COMMANDS.items())
             text += "\n\nTab completa · ↑↓ escolhem sugestões/histórico · Alt+↑↓ histórico\n"
             text += 'Referências: @src/main.py ou @"pasta com espaços/main.py"\n'
@@ -599,7 +746,7 @@ class CodaroApp(App):
             text = (
                 f"Projeto: {self.agent.repository.root}\n"
                 f"Modelo: {self.agent.provider.settings.model}\n"
-                f"Modo: {'Com aprovação' if self.agent.allow_edits else 'Somente leitura'}\n"
+                f"Modo: {self.agent.mode.label} · aprovação {self.agent.policy.kind}\n"
                 f"Turnos no contexto: {len(self.agent.turns)}\n"
                 f"Turnos da conversa: {len(self.session_turns)}\n"
                 f"Último contexto enviado: {self.context_chars} "
@@ -688,6 +835,45 @@ class CodaroApp(App):
                 return False
         return bool(decision and decision[0])
 
+    def approve_changes(self, proposals, cancelled):
+        decision, ready = [], threading.Event()
+
+        def show():
+            dialog = ChangesReview(proposals)
+            self.approval_dialog = dialog
+            self.query_one("#status", Static).update("Aguardando revisão das alterações")
+
+            def resolved(value):
+                decision.append(value == "apply")
+                self.approval_dialog = None
+                ready.set()
+
+            self.push_screen(dialog, resolved)
+
+        self.deliver(show)
+        while not ready.wait(0.05):
+            if not self.is_running or cancelled is not None and cancelled.is_set():
+                self.deliver(self.dismiss_command)
+                return False
+        return bool(decision and decision[0])
+
+    def scope_decision(self, value, task_id):
+        if value is None:
+            return
+        try:
+            task = self.agent.tasks.current()
+            if task is None or task["id"] != task_id:
+                raise ValueError("A tarefa mudou; revise novamente o escopo.")
+            self.agent.policy.grant(task["id"], value["paths"], value["commands"])
+            self.agent.tasks.event("scope_approval", value)
+            self.update_session_header()
+            self.mount_message(
+                Static("Escopo autorizado para esta tarefa/sessão.", classes="notice")
+            )
+        except (ValueError, OSError) as exc:
+            self.agent.policy.reset()
+            self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
+
     def dismiss_command(self):
         if self.approval_dialog is not None and self.screen is self.approval_dialog:
             self.approval_dialog.dismiss(False)
@@ -744,6 +930,8 @@ class CodaroApp(App):
             )
             return
         self.hide_welcome()
+        for button in self.query("#execute-plan"):
+            button.disabled = True
         for card in self.proposal_cards.values():
             for button in card.query(Button):
                 button.disabled = True
@@ -751,6 +939,7 @@ class CodaroApp(App):
         self.history.push(question)
         self.active_question = question
         self.activity_group = None
+        self.plan_card = None
         self.busy = True
         self.cancelled.clear()
         self.response_text = self.rendered_text = ""
@@ -794,7 +983,10 @@ class CodaroApp(App):
         self.deliver(self.finish, answer, successful)
 
     def activity(self, event: AgentEvent):
-        if event.kind == "model_start":
+        if event.kind == "plan":
+            self.show_plan()
+        elif event.kind == "model_start":
+            self.update_session_header()
             self.finish_preview("retry")
             self.context_chars = event.context_chars or 0
             self.context_tokens = event.context_tokens or 0
@@ -804,6 +996,7 @@ class CodaroApp(App):
                 f"Consultando modelo… · contexto ≈ {self.context_tokens:,} / "
                 f"{self.context_limit:,} tokens"
             )
+
         elif event.reported_tokens is not None:
             self.reported_tokens = event.reported_tokens
             self.query_one("#status", Static).update(safe_preview(event.detail))
@@ -824,6 +1017,24 @@ class CodaroApp(App):
             self.query_one("#status", Static).update(
                 safe_preview(f"{event.title} · {event.detail}".rstrip(" ·"))
             )
+
+    def show_plan(self):
+        task = self.agent.tasks.current()
+        if not task or not task["plan"]:
+            return
+        symbols = {"todo": "○", "doing": "◉", "done": "✓"}
+        text = "\n".join(f"{symbols[step['state']]} {step['title']}" for step in task["plan"])
+        text += "\n\nCritérios de aceite:\n" + "\n".join(task["criteria"])
+        if self.plan_card is None:
+            self.plan_card = Collapsible(
+                Static(safe_preview(text), markup=False),
+                Button("Executar plano", id="execute-plan"),
+                title="Plano da tarefa",
+                collapsed=False,
+            )
+            self.mount_message(self.plan_card)
+        else:
+            self.plan_card.query_one(Static).update(safe_preview(text))
 
     def append_delta(self, delta: str):
         # A content delta may precede native tool_calls in the same message.
@@ -885,6 +1096,7 @@ class CodaroApp(App):
         if self.activity_group is not None:
             self.activity_group.finish(successful)
         if successful:
+            self.show_plan()
             self.response_text = safe_preview(answer)
             self.flush_response()
         else:
@@ -903,6 +1115,20 @@ class CodaroApp(App):
             "Aguardando revisão de edições" if self.agent.edits.pending else "Pronto"
         )
 
+        if not self.agent.legacy:
+            try:
+                task = self.agent.tasks.current()
+                if task:
+                    labels = {
+                        "planned": "Plano pronto · /execute para continuar",
+                        "completed": "Pronto · tarefa concluída",
+                        "blocked": "Tarefa bloqueada · /task para detalhes",
+                        "cancelled": "Tarefa cancelada · alterações anteriores foram mantidas",
+                    }
+                    self.query_one("#status", Static).update(labels.get(task["state"], "Pronto"))
+            except (ValueError, OSError):
+                pass
+
         if successful:
             self.session_turns.append(
                 [
@@ -914,12 +1140,13 @@ class CodaroApp(App):
             self.save_session()
 
     async def action_clear_chat(self):
-        if self.busy or isinstance(self.screen, (EditReview, CommandReview)):
+        if self.busy or isinstance(self.screen, (EditReview, CommandReview, ScopeReview)):
             return
         for proposal in self.agent.edits.pending:
             self.agent.edits.reject(proposal.id)
         self.proposal_cards.clear()
         self.activity_group = None
+        self.plan_card = None
         self.agent.turns.clear()
         self.session_turns.clear()
         self.response_text = self.rendered_text = ""
@@ -932,6 +1159,14 @@ class CodaroApp(App):
         self.query_one("#status", Static).update("Pronto · conversa limpa")
 
     def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "execute-plan":
+            if self.busy:
+                return
+            self.agent.set_mode(Mode.EXECUTE)
+            self.update_session_header()
+            self.query_one(Prompt).value = "Execute o plano da tarefa ativa e valide o resultado."
+            self.query_one(Prompt).focus()
+            return
         suggestions = {
             "suggest-explore": "Explique a estrutura deste projeto e seus pontos de entrada.",
             "suggest-search": "Localize as validações de entrada e explique onde elas são usadas.",
@@ -982,7 +1217,8 @@ class CodaroApp(App):
     @work(thread=True, exclusive=True, group="edits")
     def apply_edit(self, identifier: str):
         try:
-            self.agent.edits.apply(identifier)
+            with private_lock(self.agent.repository.root / ".codaro/agent.lock"):
+                self.agent.edits.apply(identifier)
             proposal = self.agent.edits.proposals[identifier]
             message = (
                 "Edição aplicada. Testes não foram executados. "

@@ -47,11 +47,21 @@ _LOCKS_GUARD = threading.Lock()
 
 
 @contextmanager
+def thread_lock(lock):
+    if not lock.acquire(timeout=5):
+        raise ValueError("Armazenamento em uso por outra sessão; tente novamente.")
+    try:
+        yield
+    finally:
+        lock.release()
+
+
+@contextmanager
 def private_lock(path: Path):
     """Serialize archive updates, including other POSIX processes, without following links."""
     with _LOCKS_GUARD:
         lock = _LOCKS.setdefault(str(path), threading.RLock())
-    with lock:
+    with thread_lock(lock):
         if os.name != "posix":
             yield
             return
