@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 from rich.syntax import Syntax
 from textual import work
-from textual.app import App, ComposeResult
+from textual.app import App, ComposeResult, SystemCommand
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
@@ -461,6 +461,37 @@ class CodaroApp(App):
         Binding("escape", "cancel", "Cancelar", show=False),
         Binding("ctrl+p", "command_palette", "Comandos", priority=True, key_display="Ctrl+P"),
     ]
+
+    def get_system_commands(self, screen):
+        yield from super().get_system_commands(screen)
+        if self.busy or isinstance(screen, ModalScreen):
+            return
+        yield SystemCommand(
+            "Cadastrar provedor",
+            "Cadastrar API key e listar modelos do provedor (BYOK).",
+            self.action_register_provider,
+        )
+        yield SystemCommand(
+            "Selecionar provedor e modelo",
+            "Escolher entre os provedores cadastrados e seus modelos.",
+            self.action_select_provider_model,
+        )
+
+    async def open_provider_menu(self, command: str):
+        if self.busy or isinstance(self.screen, ModalScreen):
+            return
+        prompt = self.query_one(Prompt)
+        draft = prompt.value
+        try:
+            await self.local_command(command)
+        finally:
+            prompt.value = draft
+
+    async def action_register_provider(self):
+        await self.open_provider_menu("/providers")
+
+    async def action_select_provider_model(self):
+        await self.open_provider_menu("/models")
 
     def __init__(self, agent: Agent, *, resume: bool = False):
         super().__init__()

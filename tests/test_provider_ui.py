@@ -1,5 +1,6 @@
 import httpx
 from test_tui import UIModel, run_ui
+from textual.command import CommandPalette
 from textual.widgets import Checkbox, Input, Select, Static
 
 from codaro.agent import Agent
@@ -7,7 +8,7 @@ from codaro.provider import create_provider
 from codaro.provider_ui import ModelPicker, ProviderSetup
 from codaro.providers import ProviderStore
 from codaro.repository import Repository
-from codaro.tui import CodaroApp
+from codaro.tui import CodaroApp, Prompt
 
 
 def test_chat_registration_and_model_selection_updates_live_budgets(tmp_path, monkeypatch):
@@ -28,9 +29,15 @@ def test_chat_registration_and_model_selection_updates_live_budgets(tmp_path, mo
 
     async def scenario():
         async with app.run_test(size=(120, 50)) as pilot:
-            await app.local_command("/providers")
+            app.query_one(Prompt).value = "Meu rascunho"
+            await pilot.press("ctrl+p")
+            assert isinstance(app.screen, CommandPalette)
+            await pilot.press(*"Cadastrar provedor")
+            await pilot.pause()
+            await pilot.press("enter")
             await pilot.pause()
             assert isinstance(app.screen, ProviderSetup)
+            assert app.query_one(Prompt).value == "Meu rascunho"
             key = app.screen.query_one("#provider-key", Input)
             assert key.password
             app.screen.query_one("#provider-kind", Select).value = "openai-compatible"
@@ -67,6 +74,14 @@ def test_chat_registration_and_model_selection_updates_live_budgets(tmp_path, mo
             )
             app.activate_provider(store.select("openai-compatible", "small-test"))
             assert not app.agent.provider.settings.tls_insecure
+            await pilot.press("ctrl+p")
+            await pilot.press(*"Selecionar provedor e modelo")
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            assert isinstance(app.screen, ModelPicker)
+            assert app.query_one(Prompt).value == "Meu rascunho"
+            await pilot.press("escape")
 
     run_ui(scenario())
 

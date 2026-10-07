@@ -154,6 +154,8 @@ Chamadas de ferramentas devem chegar no campo nativo `tool_calls`, com nomes e a
 
 ## Provedores e BYOK
 
+O menu **Ctrl+P** (ou **⌘P** no macOS com suporte do terminal) oferece **Cadastrar provedor** para abrir o formulário BYOK e **Selecionar provedor e modelo** para escolher entre os perfis já cadastrados. Abrir esses formulários pelo menu preserva o rascunho da mensagem.
+
 No chat, `/providers` abre o cadastro: escolha **OpenAI Compatible, OpenAI, Ollama, Anthropic, Gemini ou Groq**, informe a chave com entrada oculta e clique em **Cadastrar e listar modelos**. Os provedores conhecidos já têm URL preenchida; OpenAI Compatible precisa da URL base do seu servidor. O formulário inclui **TLS Insecure**, também disponível como flag na CLI. Ollama local não exige chave. Depois do cadastro, escolha um modelo na lista recebida da API. `/models` ou `/model` reabre a seleção; **Atualizar API** consulta novamente o catálogo.
 
 Também funciona sem abrir o chat:
