@@ -36,14 +36,22 @@ def capture_wire(kind: str, value):
     flow = current_flow.get()
     if flow is not None and flow.turn is not None and flow.turn["http_attempts"]:
         attempt = flow.turn["http_attempts"][-1]
-        if kind == "sse":
-            attempt.setdefault("sse_events", []).append(value)
+        if kind in {"sse", "ndjson"}:
+            attempt.setdefault("sse_events" if kind == "sse" else "ndjson_events", []).append(value)
         else:
             attempt[kind] = value
 
 
 class ModelError(RuntimeError):
     """Provider failure with a user-facing message that excludes remote error bodies."""
+
+
+class OllamaMemoryError(ModelError):
+    """Requested native window exceeds available server memory; retry a smaller window."""
+
+
+class ContextCapacityError(ModelError):
+    """The irreducible turn cannot fit after automatic recovery."""
 
 
 class ContextLimitError(ModelError):
@@ -136,7 +144,7 @@ class Settings:
     model_max_output_tokens: int | None = None
 
     def __post_init__(self):
-        if self.api_style not in {"openai", "anthropic"}:
+        if self.api_style not in {"openai", "anthropic", "ollama"}:
             raise ValueError("API do provedor inválida.")
         if len(self.api_key) > 16384:
             raise ValueError("Credencial excede o limite permitido.")
@@ -314,6 +322,12 @@ def validate_message(message: object) -> dict:
 
 
 class OpenAICompatible:
+    streaming_content_type = "text/event-stream"
+
+    @property
+    def chat_url(self):
+        return f"{self.settings.base_url.rstrip('/')}/chat/completions"
+
     @staticmethod
     def wire_payload(payload):
         return payload
@@ -420,6 +434,7 @@ class OpenAICompatible:
             streaming=on_delta is not None,
             max_tokens=self.settings.max_output_tokens,
         )
+        payload = self.wire_payload(payload)
         headers = {"Content-Type": "application/json"}
         if self.settings.api_key:
             headers["Authorization"] = f"Bearer {self.settings.api_key}"
@@ -436,7 +451,7 @@ class OpenAICompatible:
                         flow.turn["http_attempts"].append({"attempt": attempt + 1})
                     with client.stream(
                         "POST",
-                        f"{self.settings.base_url.rstrip('/')}/chat/completions",
+                        self.chat_url,
                         headers=headers,
                         json=payload,
                     ) as response:
@@ -451,7 +466,22 @@ class OpenAICompatible:
                                 if len(raw_error) >= 64_000:
                                     break
                             capture_wire("error_body", raw_error.decode("utf-8", errors="replace"))
-                            if response.status_code in {400, 413, 422} and is_context_error(
+                            if self.settings.api_style == "ollama" and any(
+                                phrase in raw_error.decode("utf-8", errors="replace").lower()
+                                for phrase in (
+                                    "requires more system memory",
+                                    "out of memory",
+                                    "unable to allocate",
+                                    "failed to allocate",
+                                )
+                            ):
+                                raise OllamaMemoryError(
+                                    "A janela solicitada excede a memória do Ollama."
+                                )
+                            context_status = response.status_code in {400, 413, 422} or (
+                                self.settings.api_style == "ollama" and response.status_code == 500
+                            )
+                            if context_status and is_context_error(
                                 raw_error.decode("utf-8", errors="replace")
                             ):
                                 raise ContextLimitError(
@@ -468,8 +498,10 @@ class OpenAICompatible:
                                 check_cancelled(cancelled)
                             continue
                         response.raise_for_status()
-                        if on_delta is not None and "text/event-stream" in response.headers.get(
-                            "content-type", ""
+                        if (
+                            on_delta is not None
+                            and self.streaming_content_type
+                            in response.headers.get("content-type", "")
                         ):
                             return self._read_stream(response, on_delta, cancelled, on_reasoning)
                         message = self._read_json(response, cancelled, on_reasoning)
@@ -662,6 +694,10 @@ def check_cancelled(cancelled: threading.Event | None):
 
 
 def create_provider(settings, *, transport=None):
+    if settings.api_style == "ollama":
+        from codaro.ollama import Ollama
+
+        return Ollama(settings, transport)
     if settings.api_style == "anthropic":
         from codaro.anthropic import Anthropic
 

@@ -205,7 +205,28 @@ class ModelCatalog:
         capabilities = data.get("capabilities")
         if isinstance(capabilities, list):
             result["tools"] = "tools" in capabilities
-        # Architectural context_length is not the running server's num_ctx.
+        if not match:
+            info = data.get("model_info", {})
+            if isinstance(info, dict):
+                architecture = info.get("general.architecture")
+                primary = positive(info.get(f"{architecture}.context_length"))
+                limits = (
+                    [primary]
+                    if primary
+                    else [
+                        positive(value)
+                        for key, value in info.items()
+                        if key.endswith(".context_length")
+                    ]
+                )
+                # Vision encoders may also report a tiny context_length.
+                limits = [value for value in limits if value and value >= 4096]
+                if limits:
+                    result.update(
+                        context_window=min(limits),
+                        context_source="API: model_info.context_length → options.num_ctx",
+                    )
+        # Native chat explicitly requests this window; the /v1 API cannot set num_ctx.
         return result
 
 
@@ -461,7 +482,7 @@ class ProviderStore:
             context_window=window,
             max_output_tokens=output,
             provider_id=name,
-            api_style="anthropic" if profile["kind"] == "anthropic" else "openai",
+            api_style=profile["kind"] if profile["kind"] in {"anthropic", "ollama"} else "openai",
             model_max_output_tokens=model["max_output_tokens"],
             context_source="configuração do usuário"
             if override
@@ -475,6 +496,13 @@ class ProviderStore:
         model = next((item for item in profile["models"] if item["id"] == profile["model"]), None)
         if model is None:
             raise ValueError("Selecione um modelo com codaro models use ID --provider PERFIL.")
+        if profile["kind"] == "ollama":
+            # Refresh persisted legacy fallbacks and changed Modelfile parameters.
+            try:
+                return self.select(name, model["id"])
+            except ModelError:
+                # Offline startup keeps the last valid profile available for recovery.
+                pass
         return self.settings_for(name, profile, model)
 
     def remove(self, name):

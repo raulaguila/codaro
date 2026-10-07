@@ -28,7 +28,13 @@ from codaro.edits import EditProposal
 from codaro.index import CodeIndex, safe_preview
 from codaro.interaction import COMMANDS, InputHistory, completions
 from codaro.policies import ApprovalPolicy, Mode
-from codaro.provider import MAX_MESSAGE_CHARS, ModelError, Settings, create_provider
+from codaro.provider import (
+    MAX_MESSAGE_CHARS,
+    ContextCapacityError,
+    ModelError,
+    Settings,
+    create_provider,
+)
 from codaro.sessions import SessionStore
 from codaro.storage import private_lock
 
@@ -1414,6 +1420,8 @@ class CodaroApp(App):
             successful = True
         except InvestigationCancelled:
             answer = "Investigação cancelada."
+        except ContextCapacityError as exc:
+            answer = str(exc)
         except (ModelError, ValueError, OSError) as exc:
             message = str(exc)
             if self.agent.provider.settings.provider_id:

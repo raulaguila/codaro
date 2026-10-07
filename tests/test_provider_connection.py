@@ -17,28 +17,24 @@ def ollama_handler(request):
         return httpx.Response(200, json={"models": [{"name": "llama3.1:8b"}]})
     if request.url.path == "/api/show":
         return httpx.Response(200, json={"parameters": "", "capabilities": ["tools"]})
-    assert request.url.path == "/v1/chat/completions"
+    assert request.url.path == "/api/chat"
     payload = json.loads(request.content)
+    assert payload["options"]["num_ctx"] == 4096
     if payload["messages"][-1]["role"] == "tool":
+        assert payload["messages"][-1]["tool_name"] == "codaro_probe"
         marker = json.loads(payload["messages"][-1]["content"])["probe_result"]
-        return httpx.Response(200, json={"choices": [{"message": {"content": marker}}]})
+        return httpx.Response(
+            200, json={"done": True, "message": {"role": "assistant", "content": marker}}
+        )
     return httpx.Response(
         200,
         json={
-            "choices": [
-                {
-                    "message": {
-                        "tool_calls": [
-                            {
-                                "id": "probe",
-                                "type": "function",
-                                "function": {"name": "codaro_probe", "arguments": "{}"},
-                            }
-                        ],
-                        "content": None,
-                    }
-                }
-            ]
+            "done": True,
+            "message": {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{"function": {"name": "codaro_probe", "arguments": {}}}],
+            },
         },
     )
 
@@ -72,7 +68,7 @@ def test_connection_checks_catalog_and_tool_round_trip_without_saving(tmp_path):
 
 def test_successful_catalog_does_not_hide_inference_404(tmp_path):
     def handler(request):
-        if request.url.path.endswith("chat/completions"):
+        if request.url.path == "/api/chat":
             return httpx.Response(404, json={"error": "fake-key-do-not-display"})
         return ollama_handler(request)
 

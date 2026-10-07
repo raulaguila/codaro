@@ -9,6 +9,7 @@ from test_agent import FakeModel, call
 from codaro.agent import Agent, serialize
 from codaro.context import COMPACT_PREFIX, TokenCounter, compact_batch
 from codaro.provider import (
+    ContextCapacityError,
     ContextLimitError,
     ModelError,
     OpenAICompatible,
@@ -211,7 +212,7 @@ def test_context_retry_is_bounded_and_fixed_base_is_reported(tmp_path):
         Settings("https://test.invalid/v1", "test"), httpx.MockTransport(handle)
     )
     agent = Agent(Repository(tmp_path), provider)
-    with pytest.raises(ModelError, match="não cabem|rejeitou"):
+    with pytest.raises(ContextCapacityError, match="preservadas"):
         agent.ask("Investigue.")
     assert len(requests) <= 3
     assert not agent.turns
@@ -342,7 +343,7 @@ def test_impossible_fixed_context_fails_before_contacting_server(tmp_path):
     model = configured_model([])
     model.settings = Settings("https://test.invalid/v1", "test", context_window=4096)
     agent = Agent(Repository(tmp_path), model)
-    with pytest.raises(ModelError, match="não cabem"):
+    with pytest.raises(ContextCapacityError, match="preservadas"):
         agent.ask("x" * 8000)
     assert not model.requests
 
