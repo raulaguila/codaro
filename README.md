@@ -182,6 +182,7 @@ O registro fica **sempre ativo**, sem flag: cada pergunta em `ask`, `edit` ou no
 - `turns`: todas as requisições com mensagens e schemas de ferramentas, orçamento de contexto, resposta estruturada, resultado de cada ferramenta, argumentos normalizados e duração.
 - `http_attempts`: tentativas HTTP, status, corpo JSON original ou eventos SSE recebidos, motivo de conclusão e consumo de tokens quando informado pelo servidor. Respostas inválidas e reasoning separado também ficam disponíveis no dump para diagnóstico.
 - `events`: atividade do agente; `final_answer` nas conclusões bem-sucedidas e `error` nas falhas/cancelamentos. Uma resposta parcial não vira uma resposta concluída no histórico.
+- `compactions`: grupos de ferramentas/histórico removidos, registro das ações e estimativa de tokens antes/depois. Os resultados completos já obtidos continuam em `turns`; erros de contexto e tentativas de recuperação também são registrados.
 
 ```bash
 # Execute na pasta que você abriu com codaro .
@@ -232,11 +233,42 @@ A busca inicial é textual e estrutural. Embeddings, reranking e LSP serão adic
 - Leituras de até 160 linhas e 6.000 caracteres, com indicação de truncamento e próxima linha. `partial_line` indica que uma única linha excedeu o orçamento; não conclua sobre a parte omitida.
 - Até 12 resultados por busca, com previews de 240 caracteres.
 - Orçamento de 24.000 caracteres de resultados por pergunta. É uma aproximação de volume, não uma contagem exata de tokens.
-- Histórico de perguntas e respostas limitado a 16.000 caracteres, sem reter corpos de ferramentas entre turnos. Antes de cada chamada, turnos antigos são removidos para respeitar o limite de 64.000 caracteres da requisição serializada, incluindo mensagens e schemas. Isso não garante caber na janela de tokens de todo modelo; ajuste os limites do `Agent` conforme o provedor.
-- Leituras idênticas não repetem o conteúdo dentro do mesmo turno quando o hash do arquivo não mudou. Erros podem ser tentados novamente; buscas continuam verificando o conteúdo atual.
+- Histórico de perguntas e respostas limitado a 16.000 caracteres, sem reter corpos de ferramentas entre turnos. A requisição completa respeita o teto adicional de 64.000 caracteres e o orçamento estimado de tokens, incluindo instruções, mensagens e schemas.
+- Janela configurável em tokens: padrão **16.384**, reserva de saída **1.400** e margem **512**. Esses valores são limites do cliente; configure a janela realmente habilitada no servidor. O tamanho arquitetural anunciado do modelo não garante a configuração do endpoint.
+- A partir de 85% do orçamento, o agente remove turnos antigos e compacta grupos completos de chamadas/respostas da investigação atual. Um registro limitado preserva caminhos, ações e status de comandos/propostas, sem tratar código removido como prova. A conversa salva e os resultados no JSON de debug são preservados. Trechos descartados precisam ser relidos antes de justificar conclusões/edições; pares `tool_calls`/`tool` nunca são quebrados.
+- Leituras, buscas e listagens são reduzidas conforme o espaço restante. Leituras idênticas/contidas não repetem conteúdo quando o arquivo não mudou; intervalos com prefixo sobreposto enviam somente as novas linhas. Após compactação, as leituras podem ser feitas novamente. Comandos/propostas idênticos reutilizam o resultado dentro da mesma investigação; para repetir uma execução, inicie nova pergunta. Erros de leitura podem ser tentados novamente.
+- Rejeições reconhecidas de contexto do servidor reduzem o orçamento e permitem até duas novas tentativas ao modelo, sem reexecutar ferramentas. Outros erros HTTP mantêm seu tratamento normal. Se pergunta, instruções e schemas não couberem, o agente explica a configuração necessária em vez de enviar uma requisição localmente excessiva. A investigação continua limitada a oito etapas e ao volume total de resultados por pergunta; compactação não significa análise ilimitada.
 - Até 20.000 arquivos de 512 KB cada. Caminhos externos e links simbólicos são rejeitados. No POSIX, leituras usam descritores de diretório e `O_NOFOLLOW`; o caminho alternativo para plataformas sem esse recurso não oferece a mesma proteção contra substituições concorrentes de diretórios.
 - Além das extensões de código/configuração, são permitidos nomes conhecidos como `.gitignore`, `.dockerignore`, `.codaroignore`, `.gitattributes`, `.editorconfig`, `go.mod`, `go.sum`, `Makefile`, `Dockerfile`, `Containerfile`, `Justfile`, `Procfile`, `Gemfile`, `Rakefile`, `Jenkinsfile`, `CMakeLists.txt`, `README` e `LICENSE`. Caminhos absolutos dentro da raiz selecionada funcionam; as mesmas regras de ignore, tamanho, arquivos binários e links continuam aplicadas.
 - `.env*`, nomes contendo `secret`/`credential`, chaves privadas e diretórios gerados são excluídos. Isso não detecta todos os segredos; revise as exclusões antes de usar uma API externa.
+
+Configure a janela real do seu servidor, por exemplo **8.192 tokens**, e abra o projeto:
+
+```bash
+codaro . --context-window 8192
+# Ou configure o padrão para chat, ask, edit e doctor:
+export CODARO_CONTEXT_WINDOW=8192
+export CODARO_MAX_OUTPUT_TOKENS=1400
+codaro .
+```
+
+Para janelas pequenas, uma reserva de saída menor deixa mais espaço para investigar:
+
+```bash
+export CODARO_MAX_OUTPUT_TOKENS=512
+codaro . --context-window 4096 --read-only
+```
+
+O padrão usa uma **estimativa conservadora baseada em bytes UTF-8**, não uma contagem exata: tokenização e framing variam por servidor. `/status` mostra a estimativa enviada, orçamento ativo (que pode diminuir após rejeições), janela, saída e método; a barra de status mostra o uso durante as consultas. `codaro doctor` mostra a configuração sem consultar a API. `/compact` continua limitando o histórico aos quatro turnos recentes; a compactação durante a investigação é automática.
+
+Opcionalmente, para um endpoint que use uma das codificações OpenAI suportadas:
+
+```bash
+python -m pip install -e '.[tokenizer]'
+export CODARO_TOKEN_ENCODING=cl100k_base  # ou o200k_base, conforme o modelo
+```
+
+Isso tokeniza o payload serializado, com margem para mensagens/schemas, e ainda é uma estimativa da entrada real do servidor. Não use essas codificações como se fossem o tokenizer exato do Llama. O primeiro carregamento pode baixar os dados de vocabulário; sem essa opção, não há dependência nem download de tokenizer. O corpo da resposta enviada ao modelo usa `max_tokens` igual à reserva configurada.
 
 Para excluir arquivos adicionais, crie `.codaroignore` na raiz do projeto:
 

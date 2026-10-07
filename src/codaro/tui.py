@@ -304,6 +304,8 @@ class CodaroApp(App):
         self.reply: Markdown | None = None
         self.speaker: Static | None = None
         self.context_chars = 0
+        self.context_tokens = 0
+        self.context_limit = agent.adaptive_input_limit
         self.proposal_cards: dict[str, ProposalCard] = {}
         self.prompt_too_long = False
         self.active_question = ""
@@ -507,6 +509,10 @@ class CodaroApp(App):
                 f"Turnos da conversa: {len(self.session_turns)}\n"
                 f"Último contexto enviado: {self.context_chars} "
                 f"caracteres / limite {self.agent.context_budget}\n"
+                f"Entrada estimada: {self.context_tokens} / {self.context_limit} tokens\n"
+                f"Janela configurada: {self.agent.context_window} tokens · "
+                f"reserva de saída: {self.agent.max_output_tokens} · margem: 512\n"
+                f"Contagem: {self.agent.counter.method}\n"
                 f"Sessão: {self.session.path}\nDebug: .codaro/prompt.json"
             )
         self.mount_message(Static(safe_preview(text), classes="question", markup=False))
@@ -696,7 +702,12 @@ class CodaroApp(App):
             self.reply = None
             self.speaker = None
             self.context_chars = event.context_chars or 0
-            self.query_one("#status", Static).update("Consultando modelo…")
+            self.context_tokens = event.context_tokens or 0
+            self.context_limit = event.context_limit or self.agent.adaptive_input_limit
+            self.query_one("#status", Static).update(
+                f"Consultando modelo… · contexto ≈ {self.context_tokens:,} / "
+                f"{self.context_limit:,} tokens"
+            )
         elif event.kind == "model_end":
             if event.state == "answer":
                 self.flush_response()

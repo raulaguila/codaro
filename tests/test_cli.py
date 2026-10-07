@@ -327,3 +327,17 @@ def test_doctor_tool_probe_is_explicit_and_supports_tls_flag(monkeypatch):
     assert result.exit_code == 0, result.output
     assert captured == [True]
     assert "resultado e resposta final confirmados" in result.stdout
+
+
+def test_context_window_flag_reaches_chat_and_overrides_environment(tmp_path, monkeypatch):
+    captured = []
+    monkeypatch.setenv("CODARO_CONTEXT_WINDOW", "8192")
+    monkeypatch.setattr("codaro.tui.CodaroApp.run", lambda self: captured.append(self))
+    result = runner.invoke(app, [str(tmp_path), "--context-window", "32768"])
+    assert result.exit_code == 0, result.output
+    assert captured[0].agent.context_window == 32768
+    assert captured[0].agent.input_limit == 32768 - 1400 - 512
+    result = runner.invoke(app, ["doctor", "--context-window", "8192"])
+    assert result.exit_code == 0, result.output
+    assert "8192 tokens" in result.output
+    assert runner.invoke(app, [str(tmp_path), "--context-window", "100"]).exit_code != 0

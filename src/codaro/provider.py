@@ -19,9 +19,11 @@ MAX_MESSAGE_CHARS = 16_000
 MAX_STREAM_BYTES = 2_000_000
 
 
-def build_payload(model: str, messages: list[dict], tools: list[dict] | None, *, streaming=False):
+def build_payload(
+    model: str, messages: list[dict], tools: list[dict] | None, *, streaming=False, max_tokens=1400
+):
     """One wire format for requests, context accounting and debug dumps."""
-    payload = {"model": model, "messages": messages, "temperature": 0.1, "max_tokens": 1400}
+    payload = {"model": model, "messages": messages, "temperature": 0.1, "max_tokens": max_tokens}
     if tools:
         payload.update(tools=tools, tool_choice="auto")
     if streaming:
@@ -43,6 +45,42 @@ class ModelError(RuntimeError):
     """Provider failure with a user-facing message that excludes remote error bodies."""
 
 
+class ContextLimitError(ModelError):
+    """Recognized context rejection; retry only the model, never executed tools."""
+
+
+def is_context_error(body: str) -> bool:
+    try:
+        value = json.loads(body)
+    except (ValueError, RecursionError):
+        return False
+    error = value.get("error") if isinstance(value, dict) else None
+    if isinstance(error, dict):
+        code = error.get("code")
+        if code in ("context_length_exceeded", "context_window_exceeded"):
+            return True
+        message = error.get("message", "")
+    else:
+        message = error if isinstance(error, str) else ""
+    if not isinstance(message, str):
+        return False
+    message = message.lower()
+    return any(
+        phrase in message
+        for phrase in (
+            "maximum context length",
+            "context length exceeded",
+            "context window exceeded",
+            "exceeds the context",
+            "exceed the context",
+            "exceeds context",
+            "input length exceeds",
+            "too many tokens",
+            "context_length_exceeded",
+        )
+    )
+
+
 class RequestCancelled(RuntimeError):
     pass
 
@@ -54,8 +92,21 @@ class Settings:
     api_key: str = ""
     timeout: float = 90.0
     tls_insecure: bool = False
+    context_window: int = 16_384
+    max_output_tokens: int = 1400
+    token_encoding: str | None = None
 
     def __post_init__(self):
+        if (
+            type(self.context_window) is not int
+            or not 4096 <= self.context_window <= 2_000_000
+            or type(self.max_output_tokens) is not int
+            or not 1 <= self.max_output_tokens <= 32_768
+            or self.max_output_tokens + 512 >= self.context_window
+        ):
+            raise ValueError("Janela de contexto/limite de saída inválidos; reserve 512 tokens.")
+        if self.token_encoding not in (None, "cl100k_base", "o200k_base"):
+            raise ValueError("CODARO_TOKEN_ENCODING deve ser cl100k_base ou o200k_base.")
         if type(self.tls_insecure) is not bool:
             raise ValueError("TLS insecure deve ser booleano.")
         try:
@@ -86,7 +137,9 @@ class Settings:
             raise ValueError("Credencial contém caracteres inválidos.")
 
     @classmethod
-    def from_env(cls, *, tls_insecure: bool | None = None) -> Settings:
+    def from_env(
+        cls, *, tls_insecure: bool | None = None, context_window: int | None = None
+    ) -> Settings:
         if tls_insecure is None:
             raw = os.getenv("CODARO_TLS_INSECURE", "false").strip().lower()
             values = {
@@ -106,12 +159,26 @@ class Settings:
             timeout = float(os.getenv("CODARO_TIMEOUT", "90"))
         except ValueError as exc:
             raise ValueError("CODARO_TIMEOUT deve ser um número.") from exc
+        try:
+            window = (
+                context_window
+                if context_window is not None
+                else int(os.getenv("CODARO_CONTEXT_WINDOW", "16384"))
+            )
+            output = int(os.getenv("CODARO_MAX_OUTPUT_TOKENS", "1400"))
+        except ValueError as exc:
+            raise ValueError(
+                "CODARO_CONTEXT_WINDOW e CODARO_MAX_OUTPUT_TOKENS: use inteiros."
+            ) from exc
         return cls(
             base_url=os.getenv("CODARO_BASE_URL", "http://localhost:11434/v1").strip().rstrip("/"),
             model=os.getenv("CODARO_MODEL", "qwen2.5:7b").strip(),
             api_key=os.getenv("CODARO_API_KEY", "").strip(),
             timeout=timeout,
             tls_insecure=tls_insecure,
+            context_window=window,
+            max_output_tokens=output,
+            token_encoding=os.getenv("CODARO_TOKEN_ENCODING", "").strip() or None,
         )
 
 
@@ -246,7 +313,11 @@ class OpenAICompatible:
         cancelled: threading.Event | None = None,
     ) -> dict:
         payload = build_payload(
-            self.settings.model, messages, tools, streaming=on_delta is not None
+            self.settings.model,
+            messages,
+            tools,
+            streaming=on_delta is not None,
+            max_tokens=self.settings.max_output_tokens,
         )
         headers = {"Content-Type": "application/json"}
         if self.settings.api_key:
@@ -279,6 +350,13 @@ class OpenAICompatible:
                                 if len(raw_error) >= 64_000:
                                     break
                             capture_wire("error_body", raw_error.decode("utf-8", errors="replace"))
+                            if response.status_code in {400, 413, 422} and is_context_error(
+                                raw_error.decode("utf-8", errors="replace")
+                            ):
+                                raise ContextLimitError(
+                                    "O servidor rejeitou o contexto. Confira CODARO_CONTEXT_WINDOW "
+                                    "e a janela realmente configurada no modelo."
+                                )
                         if response.status_code in {429, 502, 503, 504} and attempt < 2:
                             if cancelled is None:
                                 time.sleep(0.25 * 2**attempt)
@@ -360,6 +438,10 @@ class OpenAICompatible:
                 finished = True
                 break
             event = json.loads(data)
+            if not content and not calls and is_context_error(data):
+                raise ContextLimitError(
+                    "O servidor rejeitou o contexto. Confira CODARO_CONTEXT_WINDOW."
+                )
             if not isinstance(event, dict) or "error" in event:
                 raise ModelError("O servidor interrompeu o stream com uma resposta inválida.")
             if "usage" in event:

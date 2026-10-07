@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "ruff>=0.11,<1"]
+tokenizer = ["tiktoken>=0.8,<1"]
 
 [project.scripts]
 codaro = "codaro.cli:app"

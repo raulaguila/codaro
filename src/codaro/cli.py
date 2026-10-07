@@ -56,6 +56,16 @@ TLSInsecure = Annotated[
     ),
 ]
 
+ContextWindow = Annotated[
+    int | None,
+    typer.Option(
+        "--context-window",
+        min=4096,
+        max=2_000_000,
+        help="Janela real do servidor em tokens; reserva saída e margem de segurança.",
+    ),
+]
+
 
 @app.callback(invoke_without_command=True)
 def main(
@@ -174,22 +184,45 @@ def read(
 
 
 @app.command()
-def ask(question: str, repo: Root = Path("."), tls_insecure: TLSInsecure = None):
+def ask(
+    question: str,
+    repo: Root = Path("."),
+    tls_insecure: TLSInsecure = None,
+    context_window: ContextWindow = None,
+):
     """Investiga uma pergunta usando ferramentas e o modelo configurado (somente leitura)."""
-    run_question(question, repo, allow_edits=False, tls_insecure=tls_insecure)
+    run_question(
+        question, repo, allow_edits=False, tls_insecure=tls_insecure, context_window=context_window
+    )
 
 
 @app.command()
-def edit(question: str, repo: Root = Path("."), tls_insecure: TLSInsecure = None):
+def edit(
+    question: str,
+    repo: Root = Path("."),
+    tls_insecure: TLSInsecure = None,
+    context_window: ContextWindow = None,
+):
     """Propõe mudanças e solicita aprovação para diffs e comandos."""
-    run_question(question, repo, allow_edits=True, tls_insecure=tls_insecure)
+    run_question(
+        question, repo, allow_edits=True, tls_insecure=tls_insecure, context_window=context_window
+    )
 
 
-def run_question(question: str, repo: Path, *, allow_edits: bool, tls_insecure: bool | None = None):
+def run_question(
+    question: str,
+    repo: Path,
+    *,
+    allow_edits: bool,
+    tls_insecure: bool | None = None,
+    context_window: int | None = None,
+):
     try:
         agent = Agent(
             Repository(repo),
-            OpenAICompatible(Settings.from_env(tls_insecure=tls_insecure)),
+            OpenAICompatible(
+                Settings.from_env(tls_insecure=tls_insecure, context_window=context_window)
+            ),
             allow_edits=allow_edits,
             approve_command=(
                 lambda argv, timeout, cancelled: approve_command(
@@ -254,6 +287,7 @@ def chat(
         bool, typer.Option("--read-only", help="Somente leitura: desabilita edições e comandos.")
     ] = False,
     tls_insecure: TLSInsecure = None,
+    context_window: ContextWindow = None,
     resume: Annotated[
         bool, typer.Option("--resume", help="Retoma a última conversa deste projeto.")
     ] = False,
@@ -265,7 +299,9 @@ def chat(
         CodaroApp(
             Agent(
                 Repository(repo),
-                OpenAICompatible(Settings.from_env(tls_insecure=tls_insecure)),
+                OpenAICompatible(
+                    Settings.from_env(tls_insecure=tls_insecure, context_window=context_window)
+                ),
                 allow_edits=not read_only,
             ),
             resume=resume,
@@ -277,6 +313,7 @@ def chat(
 @app.command()
 def doctor(
     tls_insecure: TLSInsecure = None,
+    context_window: ContextWindow = None,
     check_tools: Annotated[
         bool,
         typer.Option(
@@ -286,7 +323,7 @@ def doctor(
 ):
     """Mostra configuração e disponibilidade do ripgrep sem expor a chave."""
     try:
-        settings = Settings.from_env(tls_insecure=tls_insecure)
+        settings = Settings.from_env(tls_insecure=tls_insecure, context_window=context_window)
     except ValueError as exc:
         fail(exc)
     sqlite_ready = True
@@ -303,6 +340,9 @@ def doctor(
                 f"SQLite FTS5: {'disponível' if sqlite_ready else 'ausente'}\n"
                 f"modelo: {settings.model}\n"
                 f"timeout: {settings.timeout:g}s\n"
+                f"janela configurada: {settings.context_window} tokens\n"
+                f"reserva de saída: {settings.max_output_tokens} tokens; margem: 512\n"
+                f"contagem: {settings.token_encoding or 'estimativa UTF-8 / 2'}\n"
                 f"TLS: {'sem verificação' if settings.tls_insecure else 'verificação ativa'}\n"
                 f"credencial: {'configurada' if settings.api_key else 'não configurada'}\n"
                 "Configuração: CODARO_BASE_URL, CODARO_MODEL, CODARO_API_KEY"
