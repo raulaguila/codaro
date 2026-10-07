@@ -292,3 +292,46 @@ def test_reasoning_channel_is_not_rendered_as_answer():
     answer = provider.stream([], on_delta=received.append)
     assert answer["content"] == "Resposta final."
     assert "".join(received) == "Resposta final."
+
+
+@pytest.mark.parametrize("field", ["reasoning_content", "reasoning"])
+def test_reasoning_stream_uses_separate_optional_callback(field):
+    provider, _ = model(
+        [
+            encode(
+                [
+                    chunk({field: "Nota provisória."}),
+                    chunk({"content": "Final."}),
+                    chunk(reason="stop"),
+                ]
+            )
+        ]
+    )
+    reasoning, content = [], []
+    answer = provider.stream([], on_delta=content.append, on_reasoning=reasoning.append)
+    assert reasoning == ["Nota provisória."]
+    assert "".join(content) == answer["content"] == "Final."
+    assert "reasoning" not in answer and "reasoning_content" not in answer
+
+
+def test_reasoning_callback_can_cancel_before_response_content():
+    provider, _ = model(
+        [
+            encode(
+                [
+                    chunk({"reasoning_content": "Nota provisória."}),
+                    chunk({"content": "Final."}),
+                    chunk(reason="stop"),
+                ]
+            )
+        ]
+    )
+    cancelled, content = threading.Event(), []
+    with pytest.raises(RequestCancelled):
+        provider.stream(
+            [],
+            on_delta=content.append,
+            cancelled=cancelled,
+            on_reasoning=lambda _: cancelled.set(),
+        )
+    assert not content

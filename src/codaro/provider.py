@@ -243,9 +243,15 @@ class OpenAICompatible:
         tools: list[dict] | None = None,
         on_delta: Callable[[str], None] | None = None,
         cancelled: threading.Event | None = None,
+        *,
+        on_reasoning: Callable[[str], None] | None = None,
     ) -> dict:
         return self._request(
-            messages, tools, on_delta=on_delta or (lambda _: None), cancelled=cancelled
+            messages,
+            tools,
+            on_delta=on_delta or (lambda _: None),
+            cancelled=cancelled,
+            on_reasoning=on_reasoning,
         )
 
     def check_tool_calling(self):
@@ -311,6 +317,7 @@ class OpenAICompatible:
         tools: list[dict] | None,
         on_delta: Callable[[str], None] | None = None,
         cancelled: threading.Event | None = None,
+        on_reasoning: Callable[[str], None] | None = None,
     ) -> dict:
         payload = build_payload(
             self.settings.model,
@@ -367,8 +374,8 @@ class OpenAICompatible:
                         if on_delta is not None and "text/event-stream" in response.headers.get(
                             "content-type", ""
                         ):
-                            return self._read_stream(response, on_delta, cancelled)
-                        message = self._read_json(response, cancelled)
+                            return self._read_stream(response, on_delta, cancelled, on_reasoning)
+                        message = self._read_json(response, cancelled, on_reasoning)
                         if on_delta is not None and message.get("content"):
                             on_delta(message["content"])
                             check_cancelled(cancelled)
@@ -392,7 +399,11 @@ class OpenAICompatible:
         raise ModelError("Não foi possível obter uma resposta do modelo.")
 
     @staticmethod
-    def _read_json(response: httpx.Response, cancelled: threading.Event | None) -> dict:
+    def _read_json(
+        response: httpx.Response,
+        cancelled: threading.Event | None,
+        on_reasoning: Callable[[str], None] | None = None,
+    ) -> dict:
         raw = bytearray()
         try:
             for part in response.iter_bytes():
@@ -416,11 +427,20 @@ class OpenAICompatible:
             raise ModelError(
                 "O servidor finalizou com tool_calls sem enviar chamadas de ferramentas."
             )
+        if on_reasoning is not None:
+            raw_message = choices[0]["message"]
+            reasoning = raw_message.get("reasoning_content") or raw_message.get("reasoning")
+            if isinstance(reasoning, str) and reasoning:
+                on_reasoning(reasoning[:MAX_MESSAGE_CHARS])
+                check_cancelled(cancelled)
         return message
 
     @staticmethod
     def _read_stream(
-        response: httpx.Response, on_delta: Callable[[str], None], cancelled: threading.Event | None
+        response: httpx.Response,
+        on_delta: Callable[[str], None],
+        cancelled: threading.Event | None,
+        on_reasoning: Callable[[str], None] | None = None,
     ) -> dict:
         content = ""
         calls: dict[int, dict] = {}
@@ -428,6 +448,7 @@ class OpenAICompatible:
         last_emit = 0.0
         finished = False
         event_count = 0
+        reasoning_chars = 0
         for data in sse_events(response, cancelled):
             capture_wire("sse", data)
             check_cancelled(cancelled)
@@ -457,8 +478,20 @@ class OpenAICompatible:
             delta = choice.get("delta")
             if not isinstance(delta, dict) or delta.get("role", "assistant") != "assistant":
                 raise ValueError("invalid delta")
-            if finished and (delta.get("content") or delta.get("tool_calls")):
+            reasoning = delta.get("reasoning_content")
+            if reasoning is None:
+                reasoning = delta.get("reasoning")
+            if finished and (delta.get("content") or delta.get("tool_calls") or reasoning):
                 raise ModelError("O stream enviou conteúdo após concluir a resposta.")
+            if reasoning is not None:
+                if not isinstance(reasoning, str):
+                    raise ValueError("invalid reasoning delta")
+                # Reasoning is a separate, optional preview, never part of content/history.
+                visible = reasoning[: max(0, MAX_MESSAGE_CHARS - reasoning_chars)]
+                reasoning_chars += len(visible)
+                if visible and on_reasoning is not None:
+                    on_reasoning(visible)
+                    check_cancelled(cancelled)
             fragment = delta.get("content")
             if fragment is not None:
                 if not isinstance(fragment, str):

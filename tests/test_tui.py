@@ -209,12 +209,10 @@ def test_chat_keeps_streaming_preview_separate_from_final_markdown(tmp_path):
             preview = app.generation_preview
             assert preview is not None
             assert "Parcial" in preview.text
-            assert "não validada" in preview.title
-            assert preview.collapsed
+            assert "não validado" in preview.title
+            assert not preview.collapsed
             assert app.activity_group.collapsed
-            # Streaming remains available by explicitly expanding the investigation.
-            app.activity_group.collapsed = False
-            preview.collapsed = False
+            # Live generation is visible without expanding the activity summary.
             await pilot.pause()
             assert preview.content.visible
             model.release.set()
@@ -222,8 +220,11 @@ def test_chat_keeps_streaming_preview_separate_from_final_markdown(tmp_path):
             await pilot.pause(0.1)
             assert len(app.query("MarkdownFence")) == 1
             assert app.rendered_text.count("Parcial") == 1
-            assert preview.collapsed
-            assert "geração concluída" in preview.title
+            assert not preview.collapsed
+            assert preview.state == "accepted"
+            assert "resposta final" in preview.title
+            assert app.reply.parent.parent is preview
+            assert not preview.content.display
             assert app.session_turns[-1][-1]["content"] == app.response_text
 
     run_ui(scenario())
@@ -306,7 +307,10 @@ def test_streamed_tool_iteration_never_becomes_a_chat_answer(tmp_path):
             assert len(app.query("Markdown")) == 1
             assert len(app.query(".speaker")) == 1
             assert len(app.query(GenerationPreview)) == 2
-            assert all(preview.collapsed for preview in app.query(GenerationPreview))
+            previews = list(app.query(GenerationPreview))
+            assert previews[0].collapsed
+            assert not previews[1].collapsed
+            assert previews[1].state == "accepted"
             assert "Vou listar" not in app.session_turns[-1][-1]["content"]
 
     run_ui(scenario())
@@ -389,28 +393,84 @@ def test_rejected_stream_is_labeled_and_prior_answer_stays_visible(tmp_path):
     run_ui(scenario())
 
 
-def test_large_preview_is_bounded_without_truncating_final_answer(tmp_path):
+def test_stream_keeps_showing_fragments_beyond_old_preview_limit(tmp_path):
     class LargeStream(UIModel):
         def stream(self, messages, tools=None, on_delta=None, cancelled=None):
             on_delta("a" * 3500)
             on_delta("b" * 3500)
+            self.started.set()
+            self.release.wait(10)
             on_delta("FINAL")
             return {"content": "a" * 3500 + "b" * 3500 + "FINAL"}
 
-    app = CodaroApp(Agent(Repository(tmp_path), LargeStream()))
+    model = LargeStream()
+    app = CodaroApp(Agent(Repository(tmp_path), model))
 
     async def scenario():
         from codaro.tui import GenerationPreview
 
         async with app.run_test(size=(120, 35)) as pilot:
-            await pilot.press("o", "i", "enter")
+            try:
+                await pilot.press("o", "i", "enter")
+                assert await asyncio.to_thread(model.started.wait, 10)
+                await pilot.pause(0.15)
+                live = app.generation_preview
+                assert live.content.visible and not live.collapsed
+                assert len(live.text) == 7000
+                assert live.text.endswith("b" * 100)
+                assert app.busy and app.reply is None
+            finally:
+                model.release.set()
             await wait_ready(app, pilot)
             await pilot.pause()
             preview = app.query_one(GenerationPreview)
-            assert len(preview.text) == 4000
-            assert "prévia limitada" in str(preview.content.render())
+            assert len(preview.text) == 7005
+            assert preview.text.endswith("FINAL")
             assert app.response_text.endswith("FINAL")
             assert len(app.response_text) == 7005
+
+    run_ui(scenario())
+
+
+def test_reasoning_and_live_answer_have_distinct_visible_blocks(tmp_path):
+    from codaro.tui import GenerationPreview
+
+    class ReasoningModel(UIModel):
+        def stream(self, messages, tools=None, on_delta=None, cancelled=None, *, on_reasoning=None):
+            on_reasoning("Nota provisória do modelo.")
+            on_delta("Resposta parcial")
+            self.started.set()
+            self.release.wait(10)
+            on_delta(" concluída.")
+            return {"content": "Resposta parcial concluída."}
+
+    model = ReasoningModel()
+    app = CodaroApp(Agent(Repository(tmp_path), model))
+
+    async def scenario():
+        async with app.run_test(size=(120, 35)) as pilot:
+            try:
+                await pilot.press("o", "i", "enter")
+                assert await asyncio.to_thread(model.started.wait, 10)
+                await pilot.pause()
+                reasoning = app.reasoning_preview
+                answer = app.generation_preview
+                assert reasoning is not None and answer is not None
+                assert "Raciocínio" in reasoning.title
+                assert reasoning.content.visible and answer.content.visible
+                assert "Nota provisória" in reasoning.text
+                assert "Nota provisória" not in answer.text
+                assert app.reply is None
+            finally:
+                model.release.set()
+            await wait_ready(app, pilot)
+            await pilot.pause()
+            assert reasoning.collapsed
+            assert answer.state == "accepted" and not answer.collapsed
+            assert len(app.query(GenerationPreview)) == 2
+            assert "Nota provisória" not in str(app.agent.turns)
+            assert "Nota provisória" not in str(app.session_turns)
+            assert app.response_text == "Resposta parcial concluída."
 
     run_ui(scenario())
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import logging
 import re
@@ -637,6 +638,7 @@ class Agent:
         *,
         on_delta: Callable[[str], None] | None = None,
         on_detail: Callable[[AgentEvent], None] | None = None,
+        on_reasoning: Callable[[str], None] | None = None,
     ) -> str:
         if not isinstance(question, str) or not question.strip() or len(question) > 8000:
             raise ValueError("A pergunta deve ter entre 1 e 8000 caracteres.")
@@ -724,6 +726,7 @@ class Agent:
                 cancelled,
                 on_delta,
                 record_detail,
+                on_reasoning,
             )
             if self.mode != Mode.ASK:
                 task = self.tasks.current()
@@ -816,6 +819,7 @@ class Agent:
         cancelled: threading.Event | None,
         on_delta: Callable[[str], None] | None,
         detail: Callable[[AgentEvent], None],
+        on_reasoning: Callable[[str], None] | None = None,
     ):
         def check_cancelled():
             if cancelled is not None and cancelled.is_set():
@@ -1051,8 +1055,16 @@ class Agent:
                         )
                     try:
                         if streaming:
+                            options = {}
+                            # Preserve compatibility with providers exposing the older signature.
+                            if (
+                                on_reasoning is not None
+                                and "on_reasoning"
+                                in inspect.signature(self.provider.stream).parameters
+                            ):
+                                options["on_reasoning"] = on_reasoning
                             message = self.provider.stream(
-                                payload["messages"], tools, on_delta, cancelled
+                                payload["messages"], tools, on_delta, cancelled, **options
                             )
                         else:
                             message = self.provider.complete(payload["messages"], tools)
