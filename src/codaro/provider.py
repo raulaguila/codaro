@@ -23,10 +23,12 @@ MAX_STREAM_BYTES = 2_000_000
 
 
 def build_payload(
-    model: str, messages: list[dict], tools: list[dict] | None, *, streaming=False, max_tokens=1400
+    model: str, messages: list[dict], tools: list[dict] | None, *, streaming=False, max_tokens=None
 ):
     """One wire format for requests, context accounting and debug dumps."""
-    payload = {"model": model, "messages": messages, "temperature": 0.1, "max_tokens": max_tokens}
+    payload = {"model": model, "messages": messages, "temperature": 0.1}
+    if max_tokens is not None:
+        payload["max_tokens"] = max_tokens
     if tools:
         payload.update(tools=tools, tool_choice="auto")
     if streaming:
@@ -45,7 +47,13 @@ class ModelError(RuntimeError):
 
 
 class OutputLimitError(ModelError):
-    """Incomplete output must be regenerated, never executed as tool arguments."""
+    """Carry only plain text; incomplete tool arguments must never be executed."""
+
+    def __init__(self, message, *, partial_text="", has_tool_calls=False):
+        super().__init__(message)
+        self.partial_text = (
+            partial_text if isinstance(partial_text, str) and not has_tool_calls else ""
+        )
 
 
 class OllamaMemoryError(ModelError):
@@ -138,7 +146,7 @@ class Settings:
     timeout: float = 90.0
     tls_insecure: bool = False
     context_window: int = 16_384
-    max_output_tokens: int = 1400
+    max_output_tokens: int | None = None
     token_encoding: str | None = None
     provider_id: str = ""
     context_source: str = "configuração padrão/ambiente"
@@ -154,11 +162,24 @@ class Settings:
         if (
             type(self.context_window) is not int
             or not 4096 <= self.context_window <= 2_000_000
-            or type(self.max_output_tokens) is not int
-            or not 1 <= self.max_output_tokens <= 32_768
-            or self.max_output_tokens + 512 >= self.context_window
+            or (
+                self.max_output_tokens is not None
+                and (
+                    type(self.max_output_tokens) is not int
+                    or not 1 <= self.max_output_tokens <= 32_768
+                    or self.max_output_tokens + 512 >= self.context_window
+                )
+            )
         ):
             raise ValueError("Janela de contexto/limite de saída inválidos; reserve 512 tokens.")
+        if self.model_max_output_tokens is not None and (
+            type(self.model_max_output_tokens) is not int or self.model_max_output_tokens < 1
+        ):
+            raise ValueError("Limite de saída do modelo inválido.")
+        if self.max_output_tokens is not None and self.model_max_output_tokens is not None:
+            object.__setattr__(
+                self, "max_output_tokens", min(self.max_output_tokens, self.model_max_output_tokens)
+            )
         if self.token_encoding not in (None, "cl100k_base", "o200k_base"):
             raise ValueError("CODARO_TOKEN_ENCODING deve ser cl100k_base ou o200k_base.")
         if type(self.include_stream_usage) is not bool:
@@ -191,6 +212,13 @@ class Settings:
             raise ValueError("CODARO_TIMEOUT deve ficar entre 1 e 300 segundos.")
         if any(ord(c) < 32 or ord(c) == 127 for c in self.api_key):
             raise ValueError("Credencial contém caracteres inválidos.")
+
+    @property
+    def output_reserve(self) -> int:
+        """Planning headroom, separate from the optional wire generation limit."""
+        if self.max_output_tokens is not None:
+            return min(self.max_output_tokens, self.model_max_output_tokens or 32_768)
+        return min(8192, self.context_window // 4, self.model_max_output_tokens or 8192)
 
     @classmethod
     def from_env(
@@ -241,17 +269,19 @@ class Settings:
                     )
                 )
             )
-            output = int(
-                os.getenv(
-                    "CODARO_MAX_OUTPUT_TOKENS",
-                    str(configured.max_output_tokens) if configured else "1400",
-                )
+            raw_output = os.getenv(
+                "CODARO_MAX_OUTPUT_TOKENS",
+                str(configured.max_output_tokens)
+                if configured and configured.max_output_tokens is not None
+                else "auto",
             )
+            output = None if raw_output.strip().casefold() in {"", "auto"} else int(raw_output)
         except ValueError as exc:
             raise ValueError(
-                "CODARO_CONTEXT_WINDOW e CODARO_MAX_OUTPUT_TOKENS: use inteiros."
+                "Use inteiros para CODARO_CONTEXT_WINDOW e CODARO_MAX_OUTPUT_TOKENS; "
+                "a saída também aceita auto."
             ) from exc
-        if configured and configured.model_max_output_tokens:
+        if output is not None and configured and configured.model_max_output_tokens:
             output = min(output, configured.model_max_output_tokens, 32768)
         return cls(
             base_url=configured.base_url
@@ -594,7 +624,14 @@ class OpenAICompatible:
             raise ValueError("invalid choices")
         capture_wire("finish_reason", choices[0].get("finish_reason"))
         capture_wire("usage", data.get("usage"))
-        check_finish_reason(choices[0].get("finish_reason"))
+        raw_message = choices[0].get("message", {})
+        if not isinstance(raw_message, dict):
+            raise ModelError("Resposta sem mensagem válida do modelo.")
+        check_finish_reason(
+            choices[0].get("finish_reason"),
+            partial_text=raw_message.get("content", ""),
+            has_tool_calls=bool(raw_message.get("tool_calls") or raw_message.get("function_call")),
+        )
         message = validate_message(choices[0]["message"])
         if choices[0].get("finish_reason") == "tool_calls" and not message.get("tool_calls"):
             raise ModelError(
@@ -716,7 +753,11 @@ class OpenAICompatible:
             reason = choice.get("finish_reason")
             if reason is not None:
                 capture_wire("finish_reason", reason)
-                check_finish_reason(reason)
+                if reason == "length" and pending:
+                    on_delta(pending)
+                    pending = ""
+                    check_cancelled(cancelled)
+                check_finish_reason(reason, partial_text=content, has_tool_calls=bool(calls))
                 if reason == "tool_calls" and not calls:
                     raise ModelError(
                         "O servidor finalizou com tool_calls sem enviar chamadas de ferramentas."
@@ -755,9 +796,13 @@ def create_provider(settings, *, transport=None):
     return OpenAICompatible(settings, transport)
 
 
-def check_finish_reason(reason: str | None):
+def check_finish_reason(reason: str | None, *, partial_text="", has_tool_calls=False):
     if reason == "length":
-        raise OutputLimitError("O modelo atingiu o limite de saída.")
+        raise OutputLimitError(
+            "O modelo atingiu o limite de saída.",
+            partial_text=partial_text,
+            has_tool_calls=has_tool_calls,
+        )
     if reason == "content_filter":
         raise ModelError("O provedor interrompeu a geração da resposta.")
     if reason == "function_call":

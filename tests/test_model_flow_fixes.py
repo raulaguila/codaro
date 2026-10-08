@@ -435,7 +435,25 @@ def test_m12_output_recovery_is_bounded_and_keeps_failure_history(tmp_path):
     def handler(request):
         requests.append(request)
         return httpx.Response(
-            200, json={"choices": [{"message": {"content": "Parcial"}, "finish_reason": "length"}]}
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": "Parcial",
+                            "tool_calls": [
+                                {
+                                    "function": {
+                                        "name": "apply_changes",
+                                        "arguments": '{"operations":[',
+                                    }
+                                }
+                            ],
+                        },
+                        "finish_reason": "length",
+                    }
+                ]
+            },
         )
 
     provider = OpenAICompatible(

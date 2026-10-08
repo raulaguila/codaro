@@ -473,14 +473,13 @@ class ProviderStore:
         override = profile.get("context_overrides", {}).get(model["id"])
         fallback = 4096 if profile["kind"] == "ollama" else 16_384
         window = min(override or model["context_window"] or fallback, 2_000_000)
-        output = min(1400, model["max_output_tokens"] or 1400, window - 513)
         return Settings(
             provider_base_url(profile["kind"], profile["base_url"]),
             model["id"],
             profile["api_key"],
             tls_insecure=profile["tls_insecure"],
             context_window=window,
-            max_output_tokens=output,
+            max_output_tokens=None,
             provider_id=name,
             include_stream_usage=profile["kind"] == "openai",
             api_style=profile["kind"] if profile["kind"] in {"anthropic", "ollama"} else "openai",

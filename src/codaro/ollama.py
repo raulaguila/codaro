@@ -49,10 +49,11 @@ class Ollama(OpenAICompatible):
             "stream": payload.get("stream", False),
             "options": {
                 "num_ctx": self.settings.context_window,
-                "num_predict": payload.get("max_tokens", self.settings.max_output_tokens),
                 "temperature": payload.get("temperature", 0.1),
             },
         }
+        if payload.get("max_tokens") is not None:
+            result["options"]["num_predict"] = payload["max_tokens"]
         if payload.get("tools"):
             result["tools"] = payload["tools"]
         return result
@@ -82,7 +83,7 @@ class Ollama(OpenAICompatible):
         return validate_message(message)
 
     @staticmethod
-    def _completion(data):
+    def _completion(data, *, partial_text="", has_tool_calls=False):
         if "error" in data:
             body = json.dumps(data)
             if any(
@@ -110,7 +111,9 @@ class Ollama(OpenAICompatible):
                 },
             )
             # Preserve the terminal reason and usage even when validation raises.
-            check_finish_reason(data.get("done_reason"))
+            check_finish_reason(
+                data.get("done_reason"), partial_text=partial_text, has_tool_calls=has_tool_calls
+            )
 
     def _read_json(self, response, cancelled, on_reasoning=None):
         raw = bytearray()
@@ -121,7 +124,11 @@ class Ollama(OpenAICompatible):
                 raise ModelError("Resposta da API excede o limite de 256 KB.")
         capture_wire("response_body", raw.decode("utf-8", errors="replace"))
         data = json.loads(raw)
-        self._completion(data)
+        self._completion(
+            data,
+            partial_text=data.get("message", {}).get("content", ""),
+            has_tool_calls=bool(data.get("message", {}).get("tool_calls")),
+        )
         if data.get("done") is not True:
             raise ModelError("O Ollama não confirmou a conclusão da resposta.")
         reasoning = data.get("message", {}).get("thinking")
@@ -143,7 +150,8 @@ class Ollama(OpenAICompatible):
             check_cancelled(cancelled)
             data = json.loads(line)
             capture_wire("ndjson", data)
-            self._completion(data)
+            if "error" in data:
+                self._completion(data)
             message = data.get("message", {})
             fragment = message.get("content", "")
             if not isinstance(fragment, str):
@@ -164,6 +172,7 @@ class Ollama(OpenAICompatible):
             calls.extend(message.get("tool_calls", []))
             if len(calls) > 8:
                 raise ModelError("Lote de ferramentas excede o limite permitido.")
+            self._completion(data, partial_text=content, has_tool_calls=bool(calls))
             finished = data.get("done") is True
 
         for part in response.iter_bytes():

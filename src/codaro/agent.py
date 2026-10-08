@@ -27,6 +27,7 @@ from codaro.memory import ConversationMemory
 from codaro.policies import ApprovalPolicy, Mode
 from codaro.project_map import ProjectMap
 from codaro.provider import (
+    MAX_MESSAGE_CHARS,
     ContextCapacityError,
     ContextLimitError,
     ModelError,
@@ -375,6 +376,13 @@ def is_project_overview(question: str) -> bool:
 def is_information_request(question: str) -> bool:
     """Only explicit consultations bypass a pending implementation task."""
     text = question.strip().casefold()
+    text_continuation = re.match(
+        r"(?:continue|continuar)\s+(?:(?:a|essa|esta|the)\s+)?"
+        r"(?:resposta|explicação|explicacao|texto|answer|explanation|text)\b",
+        text,
+    )
+    if text_continuation:
+        text = text[text_continuation.end() :]
     if re.search(
         r"\b(implemente|implementar|crie|criar|corrija|corrigir|altere|alterar|"
         r"adicione|adicionar|remova|remover|execute|executar|continue|continuar|"
@@ -385,7 +393,8 @@ def is_information_request(question: str) -> bool:
     ):
         return False
     return bool(
-        re.match(
+        text_continuation
+        or re.match(
             r"(?:explique|descreva|fale sobre|o que|qual|quais|quem|como|onde|"
             r"explain|describe|what|which|who|how|where)\b",
             text,
@@ -606,7 +615,10 @@ class Agent:
         settings = getattr(provider, "settings", None)
         self._original_settings = settings
         self.context_window = getattr(settings, "context_window", 16_384)
-        self.max_output_tokens = getattr(settings, "max_output_tokens", 1400)
+        # Internal reservation; automatic mode does not send this as a generation cap.
+        self.max_output_tokens = getattr(settings, "output_reserve", None) or (
+            getattr(settings, "max_output_tokens", None) or min(8192, self.context_window // 4)
+        )
         self.input_limit = self.context_window - self.max_output_tokens - 512
         self.local_read_budget = min(6000, max(1200, self.input_limit // 3))
         self.counter = TokenCounter(getattr(settings, "token_encoding", None))
@@ -621,6 +633,7 @@ class Agent:
         self._detail = lambda event: None
         self._cancelled = None
         self.last_run_intent = "task"
+        self._pending_text_continuation = False
         self.edits = EditManager(repository)
         self.turns: list[list[dict]] = []
         self._lock = threading.Lock()
@@ -709,7 +722,7 @@ class Agent:
         if self._original_settings is not None:
             self.provider.settings = self._original_settings
             self.context_window = self._original_settings.context_window
-            self.max_output_tokens = self._original_settings.max_output_tokens
+            self.max_output_tokens = self._original_settings.output_reserve
         self.input_limit = self.context_window - self.max_output_tokens - 512
         self.adaptive_input_limit = self.input_limit
         self.counter.scale, self.counter.samples = 1.0, []
@@ -720,6 +733,7 @@ class Agent:
             raise ValueError("Conclua/cancele a ação atual antes de trocar de modo.")
         self.mode = Mode(mode)
         self.allow_edits = self.mode == Mode.EXECUTE
+        self._pending_text_continuation = False
         self.policy.reset()
         self.max_steps = (
             self._configured_steps
@@ -746,7 +760,7 @@ class Agent:
         self._original_settings = settings
         self.context_window, self.max_output_tokens = (
             settings.context_window,
-            settings.max_output_tokens,
+            settings.output_reserve,
         )
         self.input_limit = self.context_window - self.max_output_tokens - 512
         self.adaptive_input_limit = self.input_limit
@@ -861,7 +875,10 @@ class Agent:
                 "history_budget": self.history_budget,
                 "context_budget": self.context_budget,
                 "context_window_tokens": self.context_window,
-                "output_tokens": self.max_output_tokens,
+                "output_tokens": getattr(
+                    getattr(self.provider, "settings", None), "max_output_tokens", None
+                ),
+                "output_reserve_tokens": self.max_output_tokens,
                 "safety_tokens": 512,
                 "token_counter": self.counter.method,
             },
@@ -880,9 +897,16 @@ class Agent:
         self.context.attempts = self.context.failures = 0
         configured_mode, configured_edits = self.mode, self.allow_edits
         consultation = (
-            not self.legacy and self.mode == Mode.EXECUTE and is_information_request(question)
+            not self.legacy
+            and self.mode == Mode.EXECUTE
+            and (
+                is_information_request(question)
+                or self._pending_text_continuation
+                and question.strip().casefold().rstrip(".! ") in {"continue", "continuar"}
+            )
         )
         self.last_run_intent = "consultation" if consultation or self.mode == Mode.ASK else "task"
+        self._pending_text_continuation = False
         if consultation:
             self.mode, self.allow_edits = Mode.ASK, False
             flow.data["configured_mode"] = configured_mode.value
@@ -935,7 +959,7 @@ class Agent:
                         getattr(settings, "token_encoding", None),
                         getattr(settings, "api_style", "openai"),
                         self.context_window,
-                        self.max_output_tokens,
+                        getattr(settings, "max_output_tokens", None),
                     ]
                 ).encode()
             ).hexdigest()
@@ -962,7 +986,11 @@ class Agent:
                     self.provider.settings = replace(
                         settings,
                         context_window=learned_window,
-                        max_output_tokens=self.max_output_tokens,
+                        max_output_tokens=(
+                            self.max_output_tokens
+                            if settings.max_output_tokens is not None
+                            else None
+                        ),
                         context_source="Janela aprendida do Ollama (24h)",
                     )
                     self.input_limit = learned_window - self.max_output_tokens - 512
@@ -1031,9 +1059,15 @@ class Agent:
                     session_store.save(self.turns, getattr(settings, "model", ""))
                 except (OSError, ValueError) as exc:
                     record_detail(AgentEvent("status", "Sessão não salva", str(exc)))
+            self._pending_text_continuation = (
+                flow.data.get("output_completion") == "incomplete"
+                and self.last_run_intent == "consultation"
+            )
             flow.finish(
                 "blocked"
                 if self.mode != Mode.ASK and self.tasks.current()["state"] == "blocked"
+                else "incomplete"
+                if flow.data.get("output_completion") == "incomplete"
                 else "success",
                 answer=answer,
             )
@@ -1205,7 +1239,7 @@ class Agent:
             execution_cache: dict[str, dict] = {}
             context, used, evidence = self.initial_context(index, question, detail, cancelled)
             if context:
-                instructions.append(context)
+                (pinned if references(question) else instructions).append(context)
             if project_overview and not evidence:
                 recovered, charge = self.overview_context(index, used, detail, cancelled)
                 used += charge
@@ -1223,6 +1257,8 @@ class Agent:
             last_validation_progress = None
             output_recoveries = 0
             output_instruction = ""
+            continuation_prefix = ""
+            continuation_messages = []
             repeated = 0
             last_result = None
             stalled = False
@@ -1365,7 +1401,9 @@ class Agent:
                     ],
                     tools,
                     streaming=streaming,
-                    max_tokens=self.max_output_tokens,
+                    max_tokens=getattr(
+                        getattr(self.provider, "settings", None), "max_output_tokens", None
+                    ),
                 )
 
             def fits(payload, ratio=1.0):
@@ -1561,7 +1599,15 @@ class Agent:
                                     or (item.get("content") or "").startswith(COMPACT_PREFIX)
                                 ]
                                 record = {"kind": "minimal_tool_context"}
-                            elif self.max_output_tokens > 256:
+                            elif (
+                                self.max_output_tokens > 256
+                                and getattr(
+                                    getattr(self.provider, "settings", None),
+                                    "max_output_tokens",
+                                    None,
+                                )
+                                is not None
+                            ):
                                 saved_output = self.max_output_tokens
                                 self.max_output_tokens = 256
                                 if getattr(self.provider, "settings", None) is not None:
@@ -1658,9 +1704,51 @@ class Agent:
                             )
                         else:
                             message = self.provider.complete(payload["messages"], tools)
+                        if continuation_prefix:
+                            if message.get("tool_calls"):
+                                raise ModelError(
+                                    "Ferramentas não são permitidas ao continuar texto."
+                                )
+                            combined = continuation_prefix + (message.get("content") or "")
+                            if len(combined) > MAX_MESSAGE_CHARS:
+                                raise ModelError("Resposta continuada excede o limite permitido.")
+                            message = {**message, "content": combined}
+                            continuation_prefix = ""
                         break
                     except OutputLimitError as exc:
+                        partial = exc.partial_text
+                        can_continue = bool(partial.strip()) and not (
+                            textual_tool_call(partial)
+                            or re.search(
+                                r'<tool_call>|"(?:tool_calls|function|arguments|parameters)"\s*:',
+                                partial,
+                            )
+                        )
+                        if flow is not None and flow.turn is not None:
+                            flow.turn["error"] = {"type": type(exc).__name__, "message": str(exc)}
+                            if can_continue:
+                                flow.turn["partial_response"] = partial
                         if output_recoveries >= 2:
+                            if can_continue and continuation_prefix:
+                                combined = continuation_prefix + partial
+                                if len(combined) <= MAX_MESSAGE_CHARS:
+                                    notice = (
+                                        "\n\nResposta parcial: o provedor "
+                                        "interrompeu a geração novamente. "
+                                        "O texto foi preservado; peça para continuar."
+                                    )
+                                    message = {
+                                        "role": "assistant",
+                                        "content": combined[: MAX_MESSAGE_CHARS - len(notice)]
+                                        + notice,
+                                    }
+                                    if flow is not None:
+                                        flow.data["output_completion"] = "incomplete"
+                                    if self.mode == Mode.EXECUTE and not self.legacy:
+                                        self.tasks.state(
+                                            "blocked", "Resposta interrompida pelo provedor."
+                                        )
+                                    break
                             raise ContextCapacityError(
                                 "O modelo não finalizou esta etapa. O progresso foi salvo; "
                                 "podemos continuar com uma parte menor da tarefa."
@@ -1669,14 +1757,57 @@ class Agent:
                         detail(
                             AgentEvent(
                                 "model_end",
-                                "Limite de resposta atingido",
-                                "Gerando uma versão mais curta",
+                                "Resposta interrompida"
+                                if can_continue
+                                else "Limite de resposta atingido",
+                                "Continuando o texto preservado"
+                                if can_continue
+                                else "Gerando uma versão mais curta",
                                 state="retry",
                             )
                         )
                         if flow is not None and flow.turn is not None:
                             flow.turn["error"] = {"type": type(exc).__name__, "message": str(exc)}
+                            if can_continue:
+                                flow.turn["partial_response"] = partial
+                                flow.turn["outcome"] = "output_continuation"
                             flow.checkpoint()
+                        if can_continue:
+                            if len(continuation_prefix) + len(partial) > MAX_MESSAGE_CHARS:
+                                raise ModelError(
+                                    "Resposta continuada excede o limite permitido."
+                                ) from exc
+                            continuation_prefix += partial
+                            # Keep a bounded tail in the request, while retaining the full
+                            # answer locally and in the trace. Do not accumulate continuations.
+                            turn[:] = [
+                                item
+                                for item in turn
+                                if not any(item is old for old in continuation_messages)
+                            ]
+                            tail = continuation_prefix[
+                                -min(2400, max(256, self.adaptive_input_limit // 2)) :
+                            ]
+                            continuation_messages = [
+                                {"role": "assistant", "content": tail},
+                                {
+                                    "role": "user",
+                                    "content": (
+                                        "A resposta foi interrompida pelo limite de geração. "
+                                        "O trecho acima é o final do texto já apresentado. "
+                                        "Continue exatamente de onde parou, sem repetir o início. "
+                                        "Conclua brevemente, sem novas ferramentas ou ações. "
+                                        "Esta continuação não autoriza mudanças no projeto."
+                                    ),
+                                },
+                            ]
+                            turn.extend(continuation_messages)
+                            tools = None
+                            output_instruction = (
+                                "Continue apenas a resposta textual interrompida e conclua. "
+                                "Não repita o início nem simule ferramentas."
+                            )
+                            continue
                         output_instruction = (
                             "A saída anterior foi truncada e não foi aceita. "
                             "Responda em até 400 palavras, priorizando a conclusão. "
@@ -1712,7 +1843,11 @@ class Agent:
                             self.provider.settings = replace(
                                 self.provider.settings,
                                 context_window=self.context_window,
-                                max_output_tokens=self.max_output_tokens,
+                                max_output_tokens=(
+                                    self.max_output_tokens
+                                    if self.provider.settings.max_output_tokens is not None
+                                    else None
+                                ),
                                 context_source="Janela ajustada à memória do Ollama",
                             )
                             self.adaptive_input_limit = min(
@@ -1723,6 +1858,17 @@ class Agent:
                                 int(self.adaptive_input_limit * 0.75), int(tokens * 0.75)
                             )
                         if isinstance(exc, ContextLimitError) and exc.context_window:
+                            provider_settings = getattr(self.provider, "settings", None)
+                            if provider_settings and provider_settings.max_output_tokens is None:
+                                # A server can have a smaller window than its model metadata.
+                                self.max_output_tokens = min(
+                                    self.max_output_tokens, max(128, exc.context_window // 4)
+                                )
+                                if self.provider.settings.api_style == "anthropic":
+                                    self.provider.settings = replace(
+                                        self.provider.settings,
+                                        context_window=exc.context_window,
+                                    )
                             available = exc.context_window - self.max_output_tokens - 512
                             self.adaptive_input_limit = min(
                                 self.adaptive_input_limit, max(512, int(available * 0.85))
@@ -2845,6 +2991,7 @@ class Agent:
     def activate_session(self, identifier):
         if self._lock.locked() or self.edits.pending:
             raise ValueError("Aguarde a execução e revise propostas antes de trocar sessão.")
+        self._pending_text_continuation = False
         store = self.sessions.store(identifier)
         try:
             turns = store.load()

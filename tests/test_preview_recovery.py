@@ -99,7 +99,10 @@ def test_ollama_truncation_retains_reason_usage_and_explicit_preview_event(tmp_p
                 "done_reason": "length" if len(calls) == 1 else "stop",
                 "prompt_eval_count": 3000,
                 "eval_count": 1400 if len(calls) == 1 else 10,
-                "message": {"role": "assistant", "content": "Resposta curta."},
+                "message": {
+                    "role": "assistant",
+                    "content": "Início. " if len(calls) == 1 else "Fim.",
+                },
             },
         )
 
@@ -109,14 +112,15 @@ def test_ollama_truncation_retains_reason_usage_and_explicit_preview_event(tmp_p
     )
     events = []
     agent = Agent(Repository(tmp_path), provider, mode="ask")
-    assert agent.ask("Olá", on_detail=events.append) == "Resposta curta."
+    assert agent.ask("Olá", on_detail=events.append) == "Início. Fim."
     flow = json.loads((tmp_path / ".codaro/prompt.json").read_text())
     attempt = flow["turns"][0]["http_attempts"][0]
     assert attempt["finish_reason"] == "length"
     assert attempt["usage"]["completion_tokens"] == 1400
     retry = next(event for event in events if event.state == "retry")
-    assert retry.title == "Limite de resposta atingido"
-    assert "até 400 palavras" in calls[1]["messages"][0]["content"]
+    assert retry.title == "Resposta interrompida"
+    assert "Continue apenas a resposta" in calls[1]["messages"][0]["content"]
+    assert "tools" not in calls[1]
 
 
 def test_preview_displays_specific_retry_reason():

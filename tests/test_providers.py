@@ -44,7 +44,8 @@ def test_registration_selection_and_env_precedence(tmp_path, monkeypatch):
     models = store.register("groq", "test-secret")
     assert [item["id"] for item in models] == ["large", "small"]
     settings = store.select("groq", "small")
-    assert settings.context_window == 8192 and settings.max_output_tokens == 512
+    assert settings.context_window == 8192 and settings.max_output_tokens is None
+    assert settings.output_reserve == 512
     assert "API" in settings.context_source and "test-secret" not in repr(settings)
     assert Settings.from_env() == settings
     monkeypatch.setenv("CODARO_MAX_OUTPUT_TOKENS", "2048")

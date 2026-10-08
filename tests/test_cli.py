@@ -348,7 +348,7 @@ def test_context_window_flag_reaches_chat_and_overrides_environment(tmp_path, mo
     result = runner.invoke(app, [str(tmp_path), "--context-window", "32768"])
     assert result.exit_code == 0, result.output
     assert captured[0].agent.context_window == 32768
-    assert captured[0].agent.input_limit == 32768 - 1400 - 512
+    assert captured[0].agent.input_limit == 32768 - 8192 - 512
     result = runner.invoke(app, ["doctor", "--context-window", "8192"])
     assert result.exit_code == 0, result.output
     assert "8192 tokens" in result.output

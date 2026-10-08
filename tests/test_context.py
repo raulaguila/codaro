@@ -271,6 +271,7 @@ def test_identical_commands_do_not_execute_twice_after_compaction(tmp_path):
     model = configured_model(
         [
             call("run_command", {"argv": argv}, "one"),
+            call("request_tools", {"names": ["run_command"]}, "reload"),
             call("run_command", {"argv": argv}, "two"),
             {"content": "Concluído."},
         ]
@@ -281,7 +282,12 @@ def test_identical_commands_do_not_execute_twice_after_compaction(tmp_path):
     agent.ask("Execute uma vez.")
     assert len(approvals) == 1
     flow = json.loads((tmp_path / ".codaro/prompt.json").read_text())
-    results = [entry["result"] for step in flow["turns"] for entry in step["tool_results"]]
+    results = [
+        entry["result"]
+        for step in flow["turns"]
+        for entry in step["tool_results"]
+        if entry["message"]["name"] == "run_command"
+    ]
     assert results[1]["reused_result"]
     assert results[1]["exit_code"] == 0
 

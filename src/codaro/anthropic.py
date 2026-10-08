@@ -27,8 +27,7 @@ from codaro.runtime import redact_request, remaining_seconds
 
 
 class Anthropic(OpenAICompatible):
-    @staticmethod
-    def wire_payload(payload):
+    def wire_payload(self, payload):
         system, messages = [], []
         for message in payload["messages"]:
             role, blocks = message["role"], []
@@ -63,7 +62,8 @@ class Anthropic(OpenAICompatible):
         result = {
             "model": payload["model"],
             "messages": messages,
-            "max_tokens": payload["max_tokens"],
+            # Messages API requires this field; use metadata-aware context headroom.
+            "max_tokens": payload.get("max_tokens") or self.settings.output_reserve,
             "temperature": payload["temperature"],
         }
         if system:
@@ -89,7 +89,18 @@ class Anthropic(OpenAICompatible):
         reason = data.get("stop_reason")
         capture_wire("finish_reason", reason)
         if reason == "max_tokens":
-            raise OutputLimitError("A Anthropic atingiu o limite de saída.")
+            raise OutputLimitError(
+                "A Anthropic atingiu o limite de saída.",
+                partial_text="".join(
+                    block.get("text", "")
+                    for block in data["content"]
+                    if isinstance(block, dict) and block.get("type") == "text"
+                ),
+                has_tool_calls=any(
+                    isinstance(block, dict) and block.get("type") == "tool_use"
+                    for block in data["content"]
+                ),
+            )
         if reason not in {"end_turn", "tool_use", "stop_sequence"}:
             raise ModelError("A Anthropic não concluiu a resposta; confira o limite de saída.")
         content, calls = [], []
@@ -280,8 +291,6 @@ class Anthropic(OpenAICompatible):
                 if event["index"] in closed:
                     raise ModelError("Stream concluiu um bloco Anthropic duas vezes.")
                 closed.add(event["index"])
-                if block.get("type") == "tool_use" and block.get("partial_json"):
-                    block["input"] = json.loads(block.pop("partial_json"))
             elif kind == "message_delta":
                 reason = event["delta"].get("stop_reason", reason)
                 usage.update(event.get("usage", {}))
@@ -291,6 +300,10 @@ class Anthropic(OpenAICompatible):
             check_cancelled(cancelled)
         if not finished or closed != set(blocks):
             raise ModelError("Conexão Anthropic interrompida antes de concluir a resposta.")
+        if reason != "max_tokens":
+            for block in blocks.values():
+                if block.get("type") == "tool_use" and block.get("partial_json"):
+                    block["input"] = json.loads(block.pop("partial_json"))
         return self.message(
             {"content": [blocks[index] for index in sorted(blocks)], "stop_reason": reason}
         )
