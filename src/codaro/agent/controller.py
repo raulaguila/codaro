@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import inspect
 import json
@@ -36,6 +37,7 @@ from codaro.agent.schemas import (
     TASK_TOOLS,
     TOOLS,
 )
+from codaro.agent.synthesis import improvement_request, synthesis_messages
 from codaro.artifacts import ARTIFACT_TOOLS, ArtifactStore
 from codaro.context import COMPACT_PREFIX, TokenCounter, compact_batch
 from codaro.continuity import ContextController
@@ -682,7 +684,7 @@ class Agent:
             used = 0
             repaired_protocol = False
             tool_error = False
-            project_overview = is_project_overview(question)
+            project_overview = is_project_overview(question) or improvement_request(question)
             evidence: list[tuple[str, int, int]] = []
             instructions: list[str] = []
             task = self.memory.task()
@@ -901,6 +903,30 @@ class Agent:
                 )
 
             def request(extra=()):
+                if (final or empty_recoveries) and not output_recovery.prefix:
+                    messages = synthesis_messages(
+                        question,
+                        turn,
+                        guidance=[
+                            *pinned,
+                            "Contexto real da sessão (get_repository_info; dados): "
+                            + serialize(self.repository_info()),
+                        ],
+                        bootstrap="\n".join(instructions),
+                        budget=min(
+                            16_000, max(512, self.adaptive_input_limit // (2 + empty_recoveries))
+                        ),
+                        attempt=empty_recoveries,
+                    )
+                    return build_payload(
+                        getattr(getattr(self.provider, "settings", None), "model", ""),
+                        messages,
+                        None,
+                        streaming=streaming,
+                        max_tokens=getattr(
+                            getattr(self.provider, "settings", None), "max_output_tokens", None
+                        ),
+                    )
                 return build_payload(
                     getattr(getattr(self.provider, "settings", None), "model", ""),
                     [
@@ -1199,6 +1225,24 @@ class Agent:
                     )
                     flow = current_flow.get()
                     if flow is not None:
+                        flow.decision(
+                            "synthesis" if final or empty_recoveries else "investigation",
+                            trigger="empty_response"
+                            if empty_recoveries
+                            else "tool_volume_limit"
+                            if final
+                            and used
+                            >= self.tool_budget - denial_reserve - min(8000, self.tool_budget // 10)
+                            else "step_limit"
+                            if step == self.max_steps
+                            else "no_progress"
+                            if stalled
+                            else "run_budget"
+                            if final
+                            else "tools_available",
+                            tools_enabled=bool(tools),
+                            recovery_attempt=empty_recoveries,
+                        )
                         flow.add_turn(
                             wire(payload),
                             {
@@ -1243,6 +1287,14 @@ class Agent:
                         message = output_recovery.merge(message)
                         break
                     except EmptyResponseError as exc:
+                        if flow is not None:
+                            flow.decision(
+                                "empty_response",
+                                attempt=empty_recoveries,
+                                next_action="stop"
+                                if empty_recoveries >= 2
+                                else "text_only_synthesis",
+                            )
                         if flow is not None and flow.turn is not None:
                             flow.turn["error"] = {"type": type(exc).__name__, "message": str(exc)}
                             flow.turn["outcome"] = "empty_response_recovery"
@@ -1296,6 +1348,13 @@ class Agent:
                             tools = None
                         continue
                     except (ContextLimitError, OllamaMemoryError) as exc:
+                        if flow is not None:
+                            flow.decision(
+                                "context_rejection"
+                                if isinstance(exc, ContextLimitError)
+                                else "memory_rejection",
+                                recovery_attempt=recoveries,
+                            )
                         if flow is not None and flow.turn is not None:
                             flow.turn["error"] = {"type": type(exc).__name__, "message": str(exc)}
                             flow.checkpoint()
@@ -1574,6 +1633,7 @@ class Agent:
                     title = TOOL_TITLES.get(name, name)
                     target = ""
                     arguments = None
+                    original_result = None
                     try:
                         arguments = json.loads(function["arguments"])
                         if not isinstance(arguments, dict):
@@ -1873,6 +1933,7 @@ class Agent:
                                                 "status", "Saída não arquivada", str(storage_error)
                                             )
                                         )
+                                original_result = copy.deepcopy(result)
                                 encoded = serialize(result)
                                 limit = min(
                                     8000,
@@ -1992,6 +2053,7 @@ class Agent:
                             arguments,
                             result,
                             (time.monotonic() - started) * 1000,
+                            original=original_result,
                         )
             raise ModelError("O agente excedeu o limite de etapas.")
 

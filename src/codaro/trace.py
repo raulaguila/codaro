@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import platform
 import stat
 import tempfile
 import time
@@ -12,6 +13,17 @@ import uuid
 from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
+
+from codaro import __version__
+from codaro.diagnostics import (
+    breakdown,
+    encoded,
+    fingerprint,
+    historical,
+    implementation_path,
+    observe_stream,
+    source_fingerprint,
+)
 
 MAX_TRACE_BYTES = 2_000_000
 MAX_EVENT_BYTES = 8_000_000
@@ -83,7 +95,35 @@ class PromptFlow:
         self.started = time.monotonic()
         self.write_error: str | None = None
         self.data = {
-            "schema_version": 1,
+            "schema_version": 2,
+            "runtime": {
+                "codaro_version": __version__,
+                "diagnostic_source_fingerprint": source_fingerprint(),
+                "python_version": platform.python_version(),
+                "platform": platform.system(),
+            },
+            "effective_settings": {
+                name: getattr(settings, name, None)
+                for name in (
+                    "timeout",
+                    "token_encoding",
+                    "context_window",
+                    "max_output_tokens",
+                    "api_style",
+                    "include_stream_usage",
+                )
+            },
+            "decisions": [],
+            "diagnosis": {
+                "empty_response_attempts": 0,
+                "identical_retry_payloads": 0,
+                "context_rejections": 0,
+                "tool_results": 0,
+                "truncated_results": 0,
+                "read_files": {},
+                "historical_audit_chars": 0,
+                "tool_result_chars": 0,
+            },
             "run_id": str(uuid.uuid4()),
             "repository_root": str(root),
             "mode": "edit" if allow_edits else "read_only",
@@ -100,6 +140,7 @@ class PromptFlow:
             "turns": [],
             "events": [],
         }
+        self._last_request_fingerprint = None
         self.actions = []
         self.event_bytes = 0
         self.event_sequence = 0
@@ -168,6 +209,24 @@ class PromptFlow:
     def capture(self, kind, value):
         self.append_event(kind, value)
         attempt = self.turn["http_attempts"][-1]
+        owner = getattr(self, "parent", self)
+        elapsed_ms = round((time.monotonic() - owner.started) * 1000, 3)
+        if kind == "http_request":
+            attempt["request_started_ms"] = elapsed_ms
+            attempt["payload_fingerprint"] = fingerprint(owner.redact(owner._redact(value)))
+        try:
+            observe_stream(
+                attempt,
+                kind,
+                value,
+                round(elapsed_ms - attempt.get("request_started_ms", elapsed_ms), 3),
+            )
+        except (ValueError, TypeError, KeyError, RecursionError) as exc:
+            attempt["metrics_error"] = type(exc).__name__
+        if kind in {"finish_reason", "usage", "status_code"}:
+            attempt["elapsed_ms"] = round(
+                elapsed_ms - attempt.get("request_started_ms", elapsed_ms), 3
+            )
         if kind in {"sse", "ndjson"}:
             key = "sse_events" if kind == "sse" else "ndjson_events"
             events = attempt.setdefault(key, [])
@@ -215,11 +274,33 @@ class PromptFlow:
     def turn(self) -> dict | None:
         return self.data["turns"][-1] if self.data["turns"] else None
 
+    def decision(self, reason, **details):
+        record = {
+            "reason": reason,
+            "elapsed_ms": round((time.monotonic() - self.started) * 1000, 3),
+            **details,
+        }
+        self.data["decisions"].append(record)
+        self.data["decisions"] = self.data["decisions"][-128:]
+        if reason == "empty_response":
+            self.data["diagnosis"]["empty_response_attempts"] += 1
+        if reason == "context_rejection":
+            self.data["diagnosis"]["context_rejections"] += 1
+        self.append_event("decision", record)
+
     def add_turn(self, request: dict, budget: dict):
         self.turn_sequence += 1
+        digest = fingerprint(self.redact(self._redact(request)))
+        repeated = digest == self._last_request_fingerprint
+        self._last_request_fingerprint = digest
+        if repeated:
+            self.data["diagnosis"]["identical_retry_payloads"] += 1
+        budget = {**budget, "breakdown": breakdown(request)}
         self.data["turns"].append(
             {
                 "iteration": self.turn_sequence,
+                "payload_fingerprint": digest,
+                "same_as_previous_request": repeated,
                 "kind": "stream" if request.get("stream") else "chat",
                 "started_at": timestamp(),
                 "request": snapshot(request),
@@ -238,7 +319,37 @@ class PromptFlow:
             self.turn["responded_at"] = timestamp()
             self.checkpoint()
 
-    def tool_result(self, message: dict, arguments, result: dict, elapsed_ms: float):
+    def tool_result(self, message: dict, arguments, result: dict, elapsed_ms: float, original=None):
+        diagnosis = self.data["diagnosis"]
+        diagnosis["tool_results"] += 1
+        diagnosis["truncated_results"] += bool(result.get("truncated"))
+        sent_chars = len(message.get("content") or "")
+        diagnosis["tool_result_chars"] += sent_chars
+        path = result.get("path")
+        if message.get("name") in {"read_lines", "read_symbol"} and path and result.get("content"):
+            reads = diagnosis["read_files"]
+            if path in reads or len(reads) < 100:
+                reads[path] = reads.get(path, 0) + 1
+            else:
+                diagnosis["read_file_limit_reached"] = True
+            if historical(path):
+                diagnosis["historical_audit_chars"] += sent_chars
+        original = original if original is not None else result
+        reduction = {
+            "original_measurement_available": original is not result,
+            "original_serialized_chars": len(encoded(original)),
+            "sent_serialized_chars": sent_chars,
+            "result_reduced": original != result,
+            "truncated": bool(result.get("truncated")),
+            "original_items": len(original["results"])
+            if isinstance(original.get("results"), list)
+            else None,
+            "sent_items": len(result["results"])
+            if isinstance(result.get("results"), list)
+            else None,
+            "artifact_id": result.get("artifact_id"),
+            "next_start_line": result.get("next_start_line"),
+        }
         self.actions.append(
             {
                 "tool": message.get("name"),
@@ -274,6 +385,7 @@ class PromptFlow:
                     "normalized_arguments": snapshot(arguments),
                     "result": snapshot(result),
                     "duration_ms": elapsed_ms,
+                    "reduction": reduction,
                 }
             )
             self.checkpoint()
@@ -290,6 +402,25 @@ class PromptFlow:
             self.data["error"] = {"type": type(error).__name__, "message": str(error)}
             if self.turn is not None:
                 self.turn["error"] = self.data["error"]
+        diagnosis = self.data["diagnosis"]
+        paths = diagnosis["read_files"]
+        diagnosis["implementation_files_read"] = sum(implementation_path(path) for path in paths)
+        diagnosis["implementation_classification"] = "path_based"
+        if error and diagnosis["empty_response_attempts"]:
+            attempts = self.turn.get("http_attempts", []) if self.turn else []
+            summary = attempts[-1].get("stream_summary", {}) if attempts else {}
+            diagnosis["reason"] = (
+                "reasoning_only_response"
+                if summary.get("classification") == "reasoning_only"
+                else "empty_response"
+            )
+        else:
+            diagnosis["reason"] = status
+        diagnosis["historical_audit_share"] = round(
+            diagnosis["historical_audit_chars"] / max(1, diagnosis["tool_result_chars"]), 4
+        )
+        diagnosis["context_overflow_detected"] = diagnosis["context_rejections"] > 0
+        diagnosis["termination"] = type(error).__name__ if error else status
         self.append_event(
             "finish",
             {

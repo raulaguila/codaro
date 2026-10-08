@@ -22,9 +22,10 @@ def test_empty_response_recovers_without_repeating_tools(tmp_path):
     assert len(model.requests) == 3
     assert model.requests[-1][1] is None
     assert "O orçamento de investigação terminou" not in model.requests[-1][0][0]["content"]
-    results = [m for m in model.requests[-1][0] if m["role"] == "tool"]
+    assert all(m["role"] in {"system", "user"} for m in model.requests[-1][0])
+    results = json.loads(model.requests[-1][0][1]["content"].split("\n", 2)[1])["observed_results"]
     assert len(results) == 1
-    assert "hello" in results[0]["content"]
+    assert "hello" in results[0]["result"]["content"]
     trace = json.loads((tmp_path / ".codaro/prompt.json").read_text())
     assert any(t.get("outcome") == "empty_response_recovery" for t in trace["turns"])
 
@@ -46,7 +47,9 @@ def test_tool_volume_stops_with_useful_result_before_exhaustion(tmp_path):
     )
     Agent(Repository(tmp_path), model, tool_budget=6000).ask("Analise app.py")
     assert model.requests[-1][1] is None
-    result = json.loads(next(m["content"] for m in model.requests[-1][0] if m["role"] == "tool"))
+    result = json.loads(model.requests[-1][0][1]["content"].split("\n", 2)[1])["observed_results"][
+        0
+    ]["result"]
     assert result["content"] and result["truncated"]
     assert "error" not in result
 

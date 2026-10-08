@@ -138,7 +138,9 @@ def test_tool_output_budget_includes_escaping(tmp_path):
         ]
     )
     Agent(Repository(tmp_path), model, tool_budget=1024).ask("Leia x.")
-    output = next(item for item in model.requests[-1][0] if item["role"] == "tool")
+    output = json.loads((tmp_path / ".codaro/prompt.json").read_text())["turns"][0]["tool_results"][
+        0
+    ]["message"]
     assert len(output["content"]) <= 1024
     assert json.loads(output["content"])["truncated"]
 

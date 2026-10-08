@@ -64,6 +64,12 @@ def initial_context(agent, index, question, detail, cancelled):
                     "duration_ms": elapsed,
                 }
             )
+            flow.tool_result(
+                {"role": "local_retrieval", "name": "read_lines", "content": serialize(result)},
+                args,
+                result,
+                elapsed,
+            )
             flow.checkpoint()
         if failure is not None:
             raise ValueError(f"Referência @{name}: {result['error']}") from failure
@@ -177,6 +183,12 @@ def overview_context(agent, index, used, detail, cancelled):
             {"name": "read_lines", "arguments": args, "result": result, "duration_ms": elapsed}
         )
         if flow is not None:
+            flow.tool_result(
+                {"role": "local_retrieval", "name": "read_lines", "content": encoded},
+                args,
+                result,
+                elapsed,
+            )
             flow.checkpoint()
         state, outcome = tool_outcome(result)
         detail(
