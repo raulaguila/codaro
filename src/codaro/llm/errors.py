@@ -8,6 +8,10 @@ class ModelError(RuntimeError):
     """Provider failure with a user-facing message that excludes remote error bodies."""
 
 
+class EmptyResponseError(ModelError):
+    """Completed model response with neither usable text nor native tool calls."""
+
+
 class OutputLimitError(ModelError):
     """Carry only plain text; incomplete tool arguments must never be executed."""
 

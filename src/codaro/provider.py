@@ -6,6 +6,7 @@ from codaro.llm import MAX_STREAM_BYTES as MAX_STREAM_BYTES
 from codaro.llm import MAX_TOOL_ARGUMENT_BYTES as MAX_TOOL_ARGUMENT_BYTES
 from codaro.llm import ContextCapacityError as ContextCapacityError
 from codaro.llm import ContextLimitError as ContextLimitError
+from codaro.llm import EmptyResponseError as EmptyResponseError
 from codaro.llm import ModelError as ModelError
 from codaro.llm import OllamaMemoryError as OllamaMemoryError
 from codaro.llm import OpenAICompatible as OpenAICompatible
@@ -26,6 +27,7 @@ from codaro.llm import validate_message as validate_message
 __all__ = [
     "Settings",
     "ModelError",
+    "EmptyResponseError",
     "OutputLimitError",
     "OllamaMemoryError",
     "ContextCapacityError",

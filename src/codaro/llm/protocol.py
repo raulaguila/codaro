@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from codaro.llm.errors import ModelError, OutputLimitError
+from codaro.llm.errors import EmptyResponseError, ModelError, OutputLimitError
 from codaro.trace import current_flow
 
 MAX_RESPONSE_BYTES = 256_000
@@ -72,7 +72,7 @@ def validate_message(message: object) -> dict:
             raise ModelError("Nome ou argumentos da ferramenta inválidos.")
         ids.add(identifier)
     if not calls and not (content and content.strip()):
-        raise ModelError("O modelo retornou uma resposta vazia.")
+        raise EmptyResponseError("O modelo retornou uma resposta vazia.")
     result = {"role": "assistant", "content": content}
     if calls:
         result["tool_calls"] = calls

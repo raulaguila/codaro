@@ -39,7 +39,7 @@ from codaro.ui.reviews import (
     ExternalToolReview,
     ScopeReview,
 )
-from codaro.ui.widgets import ActivityGroup, GenerationPreview, ProposalCard
+from codaro.ui.widgets import ActivityGroup, GenerationPreview, ProposalCard, ReasoningGroup
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -67,8 +67,8 @@ class CodaroApp(App):
 
     def toggle_reasoning(self):
         self.show_reasoning = not self.show_reasoning
-        if self.reasoning_preview is not None:
-            self.reasoning_preview.collapsed = not self.show_reasoning
+        if self.reasoning_group is not None:
+            self.reasoning_group.collapsed = not self.show_reasoning
         self.query_one("#status", Static).update(
             "Raciocínio expandido" if self.show_reasoning else "Raciocínio recolhido"
         )
@@ -142,7 +142,8 @@ class CodaroApp(App):
         agent.approve_external = self.approve_external
         self.plan_card: Collapsible | None = None
         self.clear_backup = None
-        self.show_reasoning = True
+        self.show_reasoning = False
+        self.reasoning_group: ReasoningGroup | None = None
         self.provider_available = True
 
     def shortcut_display(self, key: str) -> str:
@@ -776,6 +777,7 @@ class CodaroApp(App):
         self.reply = self.speaker = None
         self.response_text = self.rendered_text = ""
         self.activity_group = None
+        self.reasoning_group = None
         conversation = self.query_one("#conversation", VerticalScroll)
         await conversation.remove_children()
         for turn in turns[-30:]:
@@ -1003,6 +1005,7 @@ class CodaroApp(App):
         self.history.push(question)
         self.active_question = question
         self.activity_group = None
+        self.reasoning_group = None
         self.plan_card = None
         self.answer_preview = None
         self.busy = True
@@ -1147,8 +1150,14 @@ class CodaroApp(App):
     def append_reasoning(self, delta: str):
         if self.reasoning_preview is None:
             self.reasoning_preview = GenerationPreview(reasoning=True)
-            self.reasoning_preview.collapsed = not self.show_reasoning
-            self.mount_message(self.reasoning_preview)
+            self.reasoning_preview.collapsed = False
+            if self.reasoning_group is None:
+                self.reasoning_group = ReasoningGroup(
+                    self.reasoning_preview, collapsed=not self.show_reasoning
+                )
+                self.mount_message(self.reasoning_group)
+            else:
+                self.reasoning_group.add_preview(self.reasoning_preview)
         self.reasoning_preview.update_text(
             (self.reasoning_preview.text + safe_preview(delta))[:4001]
         )
@@ -1292,6 +1301,7 @@ class CodaroApp(App):
         self.response_text = self.rendered_text = ""
         self.reply = self.speaker = None
         self.activity_group = self.plan_card = None
+        self.reasoning_group = None
         self.answer_preview = self.generation_preview = self.reasoning_preview = None
         conversation = self.query_one("#conversation", VerticalScroll)
         await conversation.remove_children()

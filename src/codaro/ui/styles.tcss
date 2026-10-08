@@ -35,6 +35,8 @@ Screen { background: $background; }
 .generation-text { height: auto; color: $text; }
 .generation-preview CollapsibleTitle { color: $text-muted; }
 .reasoning-preview { margin: 0 1 1 1; }
+.reasoning-group { height: auto; border: none; margin: 0; padding: 0; }
+.reasoning-group > CollapsibleTitle { color: $text-muted; }
 .reasoning-preview .generation-text { color: $text-muted; text-style: italic;
                                      max-height: 8; overflow-y: auto; }
 .response-preview { margin: 1 0; }

@@ -67,7 +67,7 @@ class GenerationPreview(Collapsible):
             self.title = (
                 "Raciocínio enviado pelo modelo · interrompido"
                 if state in {"retry", "cancelled"}
-                else "Raciocínio enviado pelo modelo · concluído"
+                else "Raciocínio · etapa encerrada"
             )
             self.collapsed = True
             return
@@ -106,6 +106,21 @@ class GenerationPreview(Collapsible):
         return reply
 
 
+class ReasoningGroup(Collapsible):
+    """One quiet reasoning archive per interaction; updates respect manual toggles."""
+
+    def __init__(self, preview, *, collapsed=True):
+        self.steps = 1
+        super().__init__(
+            preview, title="Raciocínio · 1 etapa", collapsed=collapsed, classes="reasoning-group"
+        )
+
+    def add_preview(self, preview):
+        self.steps += 1
+        self.title = f"Raciocínio · {self.steps} etapas"
+        self.call_after_refresh(self.mount, preview)
+
+
 class ActivityGroup(Collapsible):
     """One expandable activity summary per turn; errors remain visible."""
 
@@ -138,7 +153,6 @@ class ActivityGroup(Collapsible):
             parts.append(f"{searches} {'busca' if searches == 1 else 'buscas'}")
         if errors:
             parts.append(f"{errors} {'erro' if errors == 1 else 'erros'}")
-            self.collapsed = False
         self.title = (
             " · ".join(parts) + f" · {sum(item.elapsed_ms or 0 for item in self.events):.0f} ms"
         )

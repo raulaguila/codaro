@@ -505,6 +505,9 @@ def test_reasoning_and_live_answer_have_distinct_visible_blocks(tmp_path):
                 answer = app.generation_preview
                 assert reasoning is not None and answer is not None
                 assert "Raciocínio" in reasoning.title
+                assert app.reasoning_group.collapsed
+                app.reasoning_group.collapsed = False
+                await pilot.pause()
                 assert reasoning.content.visible and answer.content.visible
                 assert "Nota provisória" in reasoning.text
                 assert "Nota provisória" not in answer.text
@@ -880,7 +883,7 @@ def test_file_completion_is_local_and_multiline_navigation_is_preserved(tmp_path
     run_ui(scenario())
 
 
-def test_activity_group_summarizes_multiple_tools_and_opens_errors(tmp_path):
+def test_activity_group_summarizes_multiple_tools_and_marks_errors(tmp_path):
     from codaro.agent import AgentEvent
     from codaro.tui import ActivityGroup
 
@@ -902,7 +905,7 @@ def test_activity_group_summarizes_multiple_tools_and_opens_errors(tmp_path):
                 AgentEvent("tool_end", "Ler linhas", "missing.py\nInexistente", "error", 1)
             )
             await pilot.pause()
-            assert not group.collapsed
+            assert group.collapsed
             assert len(app.query(ActivityGroup)) == 1
             assert "Inexistente" in str(group.details.render())
 

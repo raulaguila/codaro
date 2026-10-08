@@ -82,9 +82,23 @@ def fit_result(result: dict, budget: int) -> dict:
     elif "results" in result:
         result = dict(result)
         result["results"] = list(result["results"])
+        available = len(result["results"])
         result["truncated"] = True
+        # Prefer references to real matches over removing every oversized snippet.
+        result["results"] = [
+            {**item, "preview": item["preview"][:120]}
+            if isinstance(item, dict) and item.get("path") and isinstance(item.get("preview"), str)
+            else item
+            for item in result["results"]
+        ]
         while result["results"] and len(serialize(result)) > budget:
             result["results"].pop()
+        if available and not result["results"]:
+            result["omitted_results"] = available
+            result["notice"] = (
+                "Resultados encontrados, omitidos por orçamento; "
+                "reduza limit ou recupere o artefato."
+            )
     elif "tools" in result:
         result = dict(result)
         result["tools"] = list(result["tools"])

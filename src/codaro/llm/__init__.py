@@ -3,6 +3,7 @@
 from codaro.llm.config import Settings as Settings
 from codaro.llm.errors import ContextCapacityError as ContextCapacityError
 from codaro.llm.errors import ContextLimitError as ContextLimitError
+from codaro.llm.errors import EmptyResponseError as EmptyResponseError
 from codaro.llm.errors import ModelError as ModelError
 from codaro.llm.errors import OllamaMemoryError as OllamaMemoryError
 from codaro.llm.errors import OutputLimitError as OutputLimitError
@@ -26,6 +27,7 @@ from codaro.llm.streaming import sse_events as sse_events
 __all__ = [
     "Settings",
     "ModelError",
+    "EmptyResponseError",
     "OutputLimitError",
     "OllamaMemoryError",
     "ContextCapacityError",

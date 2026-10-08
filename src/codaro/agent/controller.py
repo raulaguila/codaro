@@ -46,6 +46,7 @@ from codaro.interaction import references
 from codaro.llm import (
     ContextCapacityError,
     ContextLimitError,
+    EmptyResponseError,
     ModelError,
     OllamaMemoryError,
     OpenAICompatible,
@@ -81,7 +82,7 @@ class Agent:
         max_steps: int | None = None,
         tool_budget: int | None = None,
         history_budget: int = 16_000,
-        context_budget: int = 64_000,
+        context_budget: int | None = None,
         *,
         allow_edits: bool = False,
         persist_memory: bool = True,
@@ -96,6 +97,7 @@ class Agent:
         self.legacy = mode is None
         self._configured_steps = max_steps
         self._configured_tool_budget = tool_budget
+        self._configured_context_budget = context_budget
         self.mode = Mode(mode) if mode is not None else Mode.EXECUTE if allow_edits else Mode.ASK
         if max_steps is None:
             max_steps = (
@@ -103,6 +105,11 @@ class Agent:
             )
         if tool_budget is None:
             tool_budget = 24_000 if self.legacy or self.mode == Mode.ASK else 96_000
+        if context_budget is None:
+            settings = getattr(provider, "settings", None)
+            context_budget = max(
+                64_000, min(512_000, getattr(settings, "context_window", 16384) * 3)
+            )
         if (
             type(max_steps) is not int
             or not 0 <= max_steps <= 200
@@ -237,6 +244,8 @@ class Agent:
             self.max_output_tokens = self._original_settings.output_reserve
         self.input_limit = self.context_window - self.max_output_tokens - 512
         self.adaptive_input_limit = self.input_limit
+        if self._configured_context_budget is None:
+            self.context_budget = max(64_000, min(512_000, self.context_window * 3))
         self.counter.scale, self.counter.samples = 1.0, []
         self._calibration_key = ""
 
@@ -274,6 +283,8 @@ class Agent:
             settings.context_window,
             settings.output_reserve,
         )
+        if self._configured_context_budget is None:
+            self.context_budget = max(64_000, min(512_000, self.context_window * 3))
         self.input_limit = self.context_window - self.max_output_tokens - 512
         self.adaptive_input_limit = self.input_limit
         self.local_read_budget = min(6000, max(1200, self.input_limit // 3))
@@ -767,6 +778,7 @@ class Agent:
             validation_repairs = 0
             last_validation_answer = None
             last_validation_progress = None
+            empty_recoveries = 0
             output_recovery = OutputRecovery()
             output_instruction = ""
             repeated = 0
@@ -903,7 +915,7 @@ class Agent:
                             + output_instruction
                             + "\n"
                             + "\n".join(instructions)
-                            + ("\n" + FINAL_INSTRUCTION if final else ""),
+                            + ("\n" + FINAL_INSTRUCTION if final and not empty_recoveries else ""),
                         },
                         *(item for previous in retained for item in previous),
                         *turn,
@@ -1155,7 +1167,7 @@ class Agent:
                 check_cancelled()
                 final = (
                     step == self.max_steps
-                    or used >= self.tool_budget - denial_reserve
+                    or used >= self.tool_budget - denial_reserve - min(8000, self.tool_budget // 10)
                     or stalled
                     or request_budget.get().near_limit(self.context_window)
                 )
@@ -1192,6 +1204,13 @@ class Agent:
                             {
                                 "context_chars": size,
                                 "tool_chars_used": used,
+                                "tool_volume_limit": self.tool_budget,
+                                "active_tool_chars": sum(
+                                    len(item.get("content") or "")
+                                    for item in turn
+                                    if item.get("role") == "tool"
+                                ),
+                                "context_char_limit": self.context_budget,
                                 "input_tokens_estimate": tokens,
                                 "input_token_limit": self.adaptive_input_limit,
                                 "counter_method": self.counter.method,
@@ -1214,8 +1233,44 @@ class Agent:
                             )
                         else:
                             message = self.provider.complete(payload["messages"], tools)
+                        # Adapters validate their own responses. Detect empty responses from
+                        # custom providers here, but retain malformed responses in the normal
+                        # diagnostic path before validating the rest of their contract.
+                        if isinstance(message, dict) and not message.get("tool_calls"):
+                            content = message.get("content")
+                            if content is None or isinstance(content, str) and not content.strip():
+                                validate_message(message)
                         message = output_recovery.merge(message)
                         break
+                    except EmptyResponseError as exc:
+                        if flow is not None and flow.turn is not None:
+                            flow.turn["error"] = {"type": type(exc).__name__, "message": str(exc)}
+                            flow.turn["outcome"] = "empty_response_recovery"
+                            flow.checkpoint()
+                        if empty_recoveries >= 2:
+                            raise ContextCapacityError(
+                                "O provedor encerrou esta etapa sem uma resposta após "
+                                "as tentativas "
+                                "automáticas. O progresso foi salvo para continuar."
+                            ) from exc
+                        empty_recoveries += 1
+                        tools = None
+                        final = True
+                        output_instruction = (
+                            "A chamada anterior terminou sem resposta utilizável. "
+                            "Apresente agora uma conclusão breve para o pedido atual com os "
+                            "resultados disponíveis, distinguindo limitações. Não solicite "
+                            "nem simule ferramentas. Não repita operações já executadas."
+                        )
+                        detail(
+                            AgentEvent(
+                                "model_end",
+                                "Preparando conclusão",
+                                "Recuperando resposta ausente",
+                                state="retry",
+                            )
+                        )
+                        continue
                     except OutputLimitError as exc:
                         if flow is not None and flow.turn is not None:
                             flow.turn["error"] = {"type": type(exc).__name__, "message": str(exc)}
@@ -1819,7 +1874,12 @@ class Agent:
                                             )
                                         )
                                 encoded = serialize(result)
-                                limit = min(8000, remaining - denial_reserve)
+                                limit = min(
+                                    8000,
+                                    max(
+                                        0, (remaining - denial_reserve) // (len(calls) - call_index)
+                                    ),
+                                )
                                 low, high = 0, min(len(encoded), limit)
                                 while low < high:
                                     middle = (low + high + 1) // 2
