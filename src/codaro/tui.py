@@ -35,7 +35,6 @@ from codaro.provider import (
     Settings,
     create_provider,
 )
-from codaro.sessions import SessionStore
 from codaro.storage import private_lock
 
 logger = logging.getLogger(__name__)
@@ -336,6 +335,36 @@ class CommandReview(ModalScreen[bool]):
         self.dismiss(False)
 
 
+class ExternalToolReview(CommandReview):
+    """Dedicated approval text: an external call is not a shell command."""
+
+    def __init__(self, root, source, name, arguments):
+        super().__init__(root, [], 30)
+        self.source, self.tool_name, self.arguments = source, name, arguments
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="command-review"):
+            yield Static("Autorizar ferramenta externa", markup=False)
+            with VerticalScroll(id="command-fields"):
+                yield Static(
+                    safe_preview(
+                        self.source
+                        + " / "
+                        + self.tool_name
+                        + "\n"
+                        + json.dumps(self.arguments, ensure_ascii=False, indent=2)
+                    ),
+                    markup=False,
+                )
+                yield Static(
+                    "Pode produzir efeitos externos. Aprovação válida para esta chamada.",
+                    markup=False,
+                )
+            with Horizontal():
+                yield Button("Autorizar", id="approve-command", variant="warning")
+                yield Button("Rejeitar", id="reject-command")
+
+
 class GenerationPreview(Collapsible):
     """Visible live text, promoted only after the agent accepts an answer."""
 
@@ -595,6 +624,17 @@ class CodaroApp(App):
             "Contexto": ("/status", "Orçamento, origem e contagem"),
             "Recalibrar contexto": ("/recalibrate", "Reaprender limites do servidor"),
             "Compactar contexto": ("/compact", "Reduzir histórico enviado ao modelo"),
+            "Cadastrar MCP ou plugin": (
+                "/integrations",
+                "Confiar, testar e cadastrar uma integração",
+            ),
+            "Desfazer interação": ("/undo-turn", "Revisar reversão de todos os arquivos"),
+            "Refazer interação": ("/redo", "Revisar reaplicação da interação desfeita"),
+            "Sessões": ("/sessions", "Conversas independentes neste projeto"),
+            "Funcionalidades e integrações": (
+                "/features",
+                "Contexto, exploração, MCP, plugins e LSP",
+            ),
             "Histórico": ("/history", "Consultar a memória da conversa"),
             "Tarefas": ("/task list", "Ver tarefas deste projeto"),
             "Desfazer limpeza": ("/restore-clear", "Restaurar mensagens e contexto"),
@@ -698,8 +738,8 @@ class CodaroApp(App):
         self.completion_index = 0
         self.activity_group: ActivityGroup | None = None
         self.resume_requested = resume
-        self.session = SessionStore(
-            agent.repository.root, getattr(getattr(agent.provider, "settings", None), "api_key", "")
+        self.session = agent.sessions.store(
+            agent.session_id, getattr(getattr(agent.provider, "settings", None), "api_key", "")
         )
         self.session_turns: list[list[dict]] = list(agent.turns)
         self.approval_dialog: CommandReview | None = None
@@ -707,6 +747,7 @@ class CodaroApp(App):
             agent.approve_command = self.approve_command
         if not agent.legacy:
             agent.approve_edit = self.approve_changes
+        agent.approve_external = self.approve_external
         self.plan_card: Collapsible | None = None
         self.clear_backup = None
         self.show_reasoning = True
@@ -898,6 +939,8 @@ class CodaroApp(App):
             "/mode",
             "/task",
             "/permissions",
+            "/session",
+            "/features",
         }:
             self.mount_message(Static("Este comando não recebe argumentos.", classes="notice"))
             return
@@ -918,6 +961,115 @@ class CodaroApp(App):
             self.mount_message(Static("Revise as edições pendentes primeiro.", classes="notice"))
             return
         self.query_one(Prompt).value = ""
+        if name == "/integrations":
+            if self.busy or self.agent.edits.pending:
+                self.mount_message(
+                    Static(
+                        "Aguarde a atividade e revise propostas primeiro.",
+                        classes="notice",
+                        markup=False,
+                    )
+                )
+                return
+            from codaro.extension_screens import IntegrationRegistration
+
+            def configured(saved):
+                if saved:
+                    from codaro.features import FeatureStore
+
+                    self.agent.features = FeatureStore(self.agent.repository.root).load()
+                    self.agent.context.features = self.agent.features
+                    self.mount_message(
+                        Static(
+                            "Integração cadastrada; disponível na próxima atividade.",
+                            classes="notice",
+                            markup=False,
+                        )
+                    )
+
+            self.push_screen(IntegrationRegistration(self.agent.repository.root), configured)
+            return
+        if name in {"/undo-turn", "/redo"}:
+            if self.busy or self.agent.edits.pending:
+                self.mount_message(
+                    Static(
+                        "Aguarde a atividade e revise propostas primeiro.",
+                        classes="notice",
+                        markup=False,
+                    )
+                )
+                return
+            self.busy = True
+            self.cancelled.clear()
+            self.reverse_interaction(name == "/redo")
+            return
+        if name in {"/sessions", "/session", "/features"}:
+            try:
+                if self.busy or self.agent.edits.pending:
+                    raise ValueError("Aguarde a atividade e revise propostas primeiro.")
+                if name == "/features":
+                    from codaro.features import FeatureStore
+
+                    store = FeatureStore(self.agent.repository.root)
+                    if argument:
+                        feature, _, action = argument.partition(" ")
+                        if action not in {"on", "off"}:
+                            raise ValueError("Use /features nome on|off.")
+                        self.agent.features = store.toggle(feature, action == "on")
+                        self.agent.context.features = self.agent.features
+                    content = json.dumps(store.load(), ensure_ascii=False, indent=2)
+                    self.mount_message(
+                        Static(
+                            "Funcionalidades (on/off) e integrações:\n" + content,
+                            classes="notice",
+                            markup=False,
+                        )
+                    )
+                    return
+                if name == "/sessions" or not argument:
+                    data = self.agent.sessions.load()
+                    content = "\n".join(
+                        ("● " if item["id"] == self.agent.session_id else "  ")
+                        + item["id"]
+                        + " · "
+                        + item["title"]
+                        for item in data["items"]
+                    )
+                    self.mount_message(
+                        Static(
+                            content + "\n/session new título ou /session identificador",
+                            classes="notice",
+                            markup=False,
+                        )
+                    )
+                    return
+                self.save_session()
+                if argument == "new" or argument.startswith("new "):
+                    identifier = self.agent.sessions.create(argument[4:].strip() or "Nova conversa")
+                else:
+                    identifier = argument
+                self.session = self.agent.activate_session(identifier)
+                self.session.secret = getattr(self.agent.provider.settings, "api_key", "")
+                try:
+                    self.session_turns = self.session.load()
+                except FileNotFoundError:
+                    self.session_turns = []
+                    self.session.save([], self.agent.provider.settings.model)
+                if self.session_turns:
+                    await self.restore_session()
+                else:
+                    await self.query_one("#conversation", VerticalScroll).remove_children()
+                self.mount_message(
+                    Static(
+                        "Sessão ativa: " + identifier + ". Permissões anteriores revogadas.",
+                        classes="notice",
+                        markup=False,
+                    )
+                )
+                self.update_session_header()
+            except (OSError, ValueError) as exc:
+                self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
+            return
         if name == "/new":
             await self.action_new_conversation()
             return
@@ -1257,6 +1409,70 @@ class CodaroApp(App):
             dialog = CommandReview(self.agent.repository.root, argv, timeout)
             self.approval_dialog = dialog
             self.query_one("#status", Static).update("Aguardando aprovação do comando")
+
+            def resolved(value):
+                decision.append(value)
+                self.approval_dialog = None
+                ready.set()
+
+            self.push_screen(dialog, resolved)
+
+        self.deliver(show)
+        while not ready.wait(0.05):
+            if not self.is_running or cancelled is not None and cancelled.is_set():
+                self.deliver(self.dismiss_command)
+                return False
+        return bool(decision and decision[0])
+
+    @work(thread=True, exclusive=True, group="reversal")
+    def reverse_interaction(self, redo):
+        from codaro.storage import private_lock
+        from codaro.undo_history import UndoHistory
+
+        try:
+            with private_lock(self.agent.repository.root / ".codaro/agent.lock"):
+                history = UndoHistory(self.agent.edits, self.agent.session_id)
+                record, proposals = history.preview(redo=redo)
+                if not self.approve_changes(proposals, self.cancelled):
+                    message = "Reversão cancelada; nenhum arquivo alterado."
+                elif self.cancelled.is_set():
+                    message = "Reversão cancelada; nenhum arquivo alterado."
+                else:
+                    history.apply(record, proposals, redo=redo)
+                    self.agent.turns.clear()
+                    self.agent.context.summary = None
+                    self.agent.sessions.summary_path(self.agent.session_id).unlink(missing_ok=True)
+                    self.agent.edits.observed.clear()
+                    self.agent.policy.reset()
+                    with CodeIndex(self.agent.repository) as index:
+                        self.agent.sync_workspace(index)
+                    message = (
+                        "Interação refeita." if redo else "Interação desfeita."
+                    ) + " Contexto e permissões reiniciados; histórico mantido para consulta."
+            self.deliver(self.reversal_finished, message)
+        except (OSError, ValueError) as exc:
+            self.deliver(self.reversal_finished, safe_preview(str(exc)))
+
+    def reversal_finished(self, message):
+        self.busy = False
+        self.session_turns.append(
+            [
+                {"role": "user", "content": "Reversão de interação"},
+                {"role": "assistant", "content": message},
+            ]
+        )
+        self.save_session()
+        self.mount_message(Static(message, classes="notice", markup=False))
+        self.query_one("#status", Static).update("Pronto · revisão concluída")
+        self.update_session_header()
+
+    def approve_external(self, source, name, arguments, cancelled):
+        decision, ready = [], threading.Event()
+
+        def show():
+            dialog = ExternalToolReview(self.agent.repository.root, source, name, arguments)
+            self.approval_dialog = dialog
+            self.query_one("#status", Static).update("Aguardando aprovação da ferramenta externa")
 
             def resolved(value):
                 decision.append(value)

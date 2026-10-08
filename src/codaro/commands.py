@@ -12,7 +12,7 @@ from pathlib import Path
 
 from codaro.index import safe_preview
 from codaro.provider import RequestCancelled
-from codaro.runtime import remaining_seconds
+from codaro.runtime import remaining_seconds, request_artifacts
 
 
 def validate_command(argv: list[str], timeout: int):
@@ -44,6 +44,8 @@ def run_command(root: Path, argv: list[str], timeout=60, cancelled=None) -> dict
     started = time.monotonic()
     # A pipe drained by a reader thread avoids unbounded disk writes and pipe deadlocks.
     captured = bytearray()
+    store = request_artifacts.get()
+    capture_limit = 2_000_000 if store else 12_000
     total = 0
 
     def consume(pipe):
@@ -51,7 +53,7 @@ def run_command(root: Path, argv: list[str], timeout=60, cancelled=None) -> dict
         with pipe:
             while chunk := pipe.read(4096):
                 total += len(chunk)
-                captured.extend(chunk[: max(0, 12_000 - len(captured))])
+                captured.extend(chunk[: max(0, capture_limit - len(captured))])
 
     with tempfile.TemporaryFile() as empty_input:
         process = subprocess.Popen(
@@ -84,7 +86,23 @@ def run_command(root: Path, argv: list[str], timeout=60, cancelled=None) -> dict
         reader.join(timeout=2)
     if cancelled.is_set():
         raise RequestCancelled("Comando cancelado.")
+    artifact = None
+    if store and total > 8000:
+        try:
+            artifact = store.save(
+                bytes(captured).decode("utf-8", errors="replace"),
+                source="run_command",
+                complete=total <= capture_limit,
+            )
+        except (OSError, ValueError):
+            # Persistence failure cannot erase the receipt of an executed command.
+            pass
     return {
+        **(
+            {"artifact_id": artifact["id"], "artifact_complete": artifact["complete"]}
+            if artifact
+            else {}
+        ),
         "argv": argv,
         "cwd": str(root),
         "exit_code": process.returncode,

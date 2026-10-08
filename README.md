@@ -4,6 +4,15 @@ Agente de desenvolvimento no terminal para perguntar, planejar e executar ativid
 
 > Busca, planejamento persistente, alterações com revisão de diff, comandos com aprovação, validação e retomada de tarefas por projeto. Referências via LSP e interrupção imediata de conexões HTTP ociosas estão no roadmap.
 
+Também estão disponíveis sessões independentes, undo/redo por interação, saídas
+grandes recuperáveis, continuidade semântica opcional, exploração delegada somente
+leitura, MCP, plugins explícitos, diagnósticos LSP opcionais e benchmarks de
+implementação. Veja configuração, exemplos e limites em
+[Plataforma do agente](docs/AGENT_PLATFORM.md).
+
+No chat, Ctrl+P inclui **Sessões**, **Cadastrar MCP ou plugin**, **Desfazer
+interação**, **Refazer interação** e **Funcionalidades e integrações**.
+
 ## Instalação
 
 Requisitos: Python 3.11+ e [ripgrep](https://github.com/BurntSushi/ripgrep).

@@ -15,9 +15,12 @@ from contextlib import nullcontext
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
+from codaro.artifacts import ARTIFACT_TOOLS, ArtifactStore
 from codaro.commands import run_command, validate_command
 from codaro.context import COMPACT_PREFIX, TokenCounter, compact_batch
+from codaro.continuity import ContextController
 from codaro.edits import EditManager
+from codaro.features import FeatureStore
 from codaro.index import CodeIndex
 from codaro.interaction import references
 from codaro.memory import ConversationMemory
@@ -35,9 +38,18 @@ from codaro.provider import (
     validate_message,
 )
 from codaro.repository import IGNORE_RULE_FILES, Repository
-from codaro.runtime import request_deadline, request_redactor
+from codaro.runtime import (
+    RunBudget,
+    request_artifacts,
+    request_budget,
+    request_deadline,
+    request_redactor,
+)
+from codaro.session_catalog import SessionCatalog
 from codaro.storage import private_lock
 from codaro.tasks import TaskStore
+from codaro.tool_registry import Tool, ToolRegistry
+from codaro.tool_registry import definition as tool_definition
 from codaro.trace import PromptFlow, current_flow
 
 SYSTEM = """Você é Codaro, um agente de desenvolvimento. Responda em português,
@@ -532,6 +544,8 @@ class Agent:
         approve_edit: Callable | None = None,
         max_seconds: int = 1800,
         max_corrections: int = 3,
+        features: dict | None = None,
+        approve_external: Callable | None = None,
     ):
         self.legacy = mode is None
         self._configured_steps = max_steps
@@ -590,9 +604,77 @@ class Agent:
         )
         self.project_map = ProjectMap()
         self._calibration_key = ""
+        from codaro.features import DEFAULTS
+
+        self.features = {
+            **DEFAULTS,
+            **(features if features is not None else FeatureStore(repository.root).load()),
+        }
+        FeatureStore.validate(self.features)
+        self.context = ContextController(self.counter, self.features)
+        self.sessions = SessionCatalog(repository.root)
+        self.session_id = "default"
+        self.artifacts = ArtifactStore(repository.root, redact=self.memory.redact)
+        self.approve_external = approve_external
+        self._known_integration_secrets = set()
+        self.registry = ToolRegistry()
+        for definition in ALL_DEFINITIONS:
+            name = definition["function"]["name"]
+            self.registry.register(
+                Tool(
+                    definition,
+                    read_only=name not in {"apply_changes", "propose_edit", "run_command"},
+                )
+            )
+        for definition in ARTIFACT_TOOLS:
+            self.registry.register(Tool(definition, lazy=True))
         self.tasks = TaskStore(
             repository.root, ephemeral=not persist_memory, redact=self.memory.redact
         )
+
+        from codaro.exploration import register_exploration
+
+        register_exploration(self)
+        from codaro.integrations import IntegrationHub
+        from codaro.lsp import register_lsp
+
+        self.integrations = IntegrationHub(self)
+        register_lsp(self)
+        self.registry.register(
+            Tool(
+                tool_definition(
+                    "get_tools_catalog",
+                    "Lista ferramentas disponíveis; carregue nomes com request_tools.",
+                    {
+                        "offset": {"type": "integer", "minimum": 0},
+                        "limit": {"type": "integer", "minimum": 1, "maximum": 12},
+                    },
+                )
+            )
+        )
+        self._trace_name = "prompt.json"
+        if persist_memory and (active := self.sessions.load()["active"]) != "default":
+            self.activate_session(active)
+
+    def trim_history(self):
+        discarded = []
+        while self.turns and len(serialize(self.turns)) > self.history_budget:
+            discarded.extend(self.turns.pop(0))
+        if discarded and self.features["semantic_compaction"]:
+            self.context.summarize(
+                self.provider,
+                discarded,
+                input_limit=self.adaptive_input_limit,
+                redact=self.memory.redact,
+                cancelled=self._cancelled,
+            )
+            if not self.tasks.ephemeral:
+                try:
+                    self.context.save(
+                        self.sessions.summary_path(self.session_id), self.memory.redact
+                    )
+                except (OSError, ValueError):
+                    pass
 
     def reset_calibration(self):
         if self._lock.locked() or self.edits.pending:
@@ -644,6 +726,8 @@ class Agent:
         self.adaptive_input_limit = self.input_limit
         self.local_read_budget = min(6000, max(1200, self.input_limit // 3))
         self.counter = TokenCounter(settings.token_encoding)
+        self.context.counter = self.counter
+        self.artifacts.redact = self.memory.redact
         self._calibration_key = ""
         from codaro.sessions import SessionStore
 
@@ -654,6 +738,7 @@ class Agent:
         self.memory.redact = lambda value: current(previous(value))
         self.tasks.redact = self.memory.redact
         self.turns = self.memory.redact(self.turns)
+        self.artifacts.redact = self.memory.redact
         self.policy.reset()
 
     def repository_info(self) -> dict:
@@ -742,6 +827,7 @@ class Agent:
             question,
             getattr(self.provider, "settings", None),
             allow_edits=self.allow_edits,
+            trace_name=self._trace_name,
             redact=self.memory.redact,
             limits={
                 "max_steps": self.max_steps,
@@ -755,8 +841,17 @@ class Agent:
             },
         )
         token = current_flow.set(flow)
+        inherited_deadline = request_deadline.get()
         deadline_token = request_deadline.set(lambda: self._deadline)
+        budget_token = request_budget.set(
+            request_budget.get()
+            or RunBudget(self.features["max_run_requests"], self.features["max_run_tokens"])
+        )
         redactor_token = request_redactor.set(self.memory.redact)
+        artifact_token = request_artifacts.set(
+            self.artifacts if self.features["artifacts"] and not self.tasks.ephemeral else None
+        )
+        self.context.attempts = self.context.failures = 0
         if not self.legacy:
             flow.data["mode"] = self.mode.value
 
@@ -770,8 +865,18 @@ class Agent:
         try:
             self._cancelled = cancelled
             self._deadline = time.monotonic() + self.max_seconds
+            if inherited_deadline:
+                self._deadline = min(self._deadline, inherited_deadline())
             self._failures_run = 0
             self._detail = record_detail
+            self.integrations.discover()
+            flow.redact = self.memory.redact
+            self.tasks.redact = self.memory.redact
+            request_redactor.set(self.memory.redact)
+            for source, error in self.integrations.errors.items():
+                record_detail(
+                    AgentEvent("status", "Integração indisponível", source + ": " + error)
+                )
             if self.mode != Mode.ASK:
                 active = self.tasks.start(question)
                 if self.policy.task_id and self.policy.task_id != active["id"]:
@@ -871,8 +976,7 @@ class Agent:
                 flow.data["task"] = self.tasks.current()
             if self.turns and self.turns[-1][0]["content"] == question:
                 self.turns[-1][-1]["content"] = answer
-                while self.turns and len(serialize(self.turns)) > self.history_budget:
-                    self.turns.pop(0)
+                self.trim_history()
             answer = self.memory.redact(answer)
             self.turns = self.memory.redact(self.turns)
             try:
@@ -883,6 +987,15 @@ class Agent:
                 flow.data["conversation_turn_id"] = identifier
             except (ValueError, OSError) as exc:
                 record_detail(AgentEvent("status", "Memória não salva", str(exc)))
+            flow.data["session_id"] = self.session_id
+            flow.data["global_budget"] = vars(request_budget.get())
+            if not self.tasks.ephemeral:
+                try:
+                    session_store = self.sessions.store(self.session_id)
+                    session_store.redact = self.memory.redact
+                    session_store.save(self.turns, getattr(settings, "model", ""))
+                except (OSError, ValueError) as exc:
+                    record_detail(AgentEvent("status", "Sessão não salva", str(exc)))
             flow.finish("success", answer=answer)
             return answer
         except BaseException as exc:
@@ -926,6 +1039,10 @@ class Agent:
             current_flow.reset(token)
             request_deadline.reset(deadline_token)
             request_redactor.reset(redactor_token)
+            self.integrations.event("run_finished", {"session_id": self.session_id})
+            self.integrations.close()
+            request_budget.reset(budget_token)
+            request_artifacts.reset(artifact_token)
             self._lock.release()
             guard.__exit__(None, None, None)
             if flow.write_error:
@@ -961,8 +1078,7 @@ class Agent:
                 )
             )
             check_cancelled()
-            while self.turns and len(serialize(self.turns)) > self.history_budget:
-                self.turns.pop(0)
+            self.trim_history()
             retained = list(self.turns)
             turn: list[dict] = [{"role": "user", "content": question}]
             used = 0
@@ -1078,6 +1194,24 @@ class Agent:
                     *TOOLS,
                     *MEMORY_TOOLS,
                     *CONTEXT_TOOLS,
+                    self.registry.tools["get_tools_catalog"].schema,
+                    *(ARTIFACT_TOOLS if self.features["artifacts"] else []),
+                    *(
+                        [self.registry.tools["explore_code"].schema]
+                        if self.features["exploration"]
+                        else []
+                    ),
+                    *(
+                        [self.registry.tools["get_diagnostics"].schema]
+                        if self.features["lsp"]["enabled"]
+                        else []
+                    ),
+                    *(
+                        tool.schema
+                        for tool in self.registry.tools.values()
+                        if tool.source.startswith(("mcp:", "plugin:"))
+                        and (tool.read_only or self.mode == Mode.EXECUTE)
+                    ),
                     *([] if self.mode == Mode.ASK else TASK_TOOLS),
                     *([EDIT_TOOL, CHANGES_TOOL] if self.allow_edits else []),
                     *([COMMAND_TOOL] if self.commands_available else []),
@@ -1086,7 +1220,12 @@ class Agent:
             def select_tools():
                 definitions = available_tools()
                 if not slim:
-                    return definitions
+                    return [
+                        tool
+                        for tool in definitions
+                        if not self.registry.tools[tool["function"]["name"]].lazy
+                        or tool["function"]["name"] in requested_tools
+                    ]
                 if micro:
                     core = {"request_tools"}
                     # One capability at a time leaves room for its result on small models.
@@ -1098,6 +1237,7 @@ class Agent:
                     ]
                 core = {
                     "get_context_status",
+                    "get_tools_catalog",
                     "compact_context",
                     "request_tools",
                 }
@@ -1112,7 +1252,11 @@ class Agent:
             def prompt():
                 if not slim:
                     return self.system_prompt()
-                names = [tool["function"]["name"] for tool in available_tools()]
+                names = [
+                    tool["function"]["name"]
+                    for tool in available_tools()
+                    if not self.registry.tools[tool["function"]["name"]].lazy
+                ]
                 if micro:
                     return (
                         "Você é Codaro. Responda em português usando fatos verificados. "
@@ -1121,6 +1265,7 @@ class Agent:
                         "Use tool_calls; request_tools carrega nomes: "
                         + serialize(names)
                         + ". Antes de editar, leia o código atual; respeite aprovações/rejeições. "
+                        "Para capacidades adicionais, carregue get_tools_catalog. "
                         "Valide mudanças; nunca invente resultados. Modo: "
                         + self.mode.value
                         + ". "
@@ -1151,6 +1296,7 @@ class Agent:
                     + str(self.repository.root)
                     + "\nFerramentas disponíveis via request_tools: "
                     + serialize(names)
+                    + ". Mais capacidades via get_tools_catalog."
                 )
 
             def request(extra=()):
@@ -1162,6 +1308,8 @@ class Agent:
                             "content": prompt()
                             + "\n"
                             + "\n".join(pinned)
+                            + "\n"
+                            + self.context.text(max(300, self.adaptive_input_limit // 6))
                             + "\n"
                             + output_instruction
                             + "\n"
@@ -1179,9 +1327,12 @@ class Agent:
 
             def fits(payload, ratio=1.0):
                 payload = wire(payload)
-                return len(serialize(payload)) <= int(
-                    self.context_budget * ratio
-                ) and self.counter.count(payload) <= int(self.adaptive_input_limit * ratio)
+                return self.context.fits(
+                    payload,
+                    chars=self.context_budget,
+                    tokens=self.adaptive_input_limit,
+                    ratio=ratio,
+                )
 
             def wire(payload):
                 convert = getattr(self.provider, "wire_payload", None)
@@ -1220,17 +1371,83 @@ class Agent:
                 cache.clear()
                 coverage.clear()
 
+            def compact_completed():
+                before = list(turn)
+                record = compact_batch(turn)
+                if (
+                    record
+                    and record["kind"] == "tool_batch"
+                    and self.features["semantic_compaction"]
+                ):
+                    retained_ids = {id(message) for message in turn}
+                    discarded = [message for message in before if id(message) not in retained_ids]
+                    summary = self.context.summarize(
+                        self.provider,
+                        discarded,
+                        input_limit=self.adaptive_input_limit,
+                        redact=self.memory.redact,
+                        cancelled=cancelled,
+                    )
+                    if summary:
+                        record["continuity_summary"] = summary
+                        if not self.tasks.ephemeral:
+                            try:
+                                self.context.save(
+                                    self.sessions.summary_path(self.session_id), self.memory.redact
+                                )
+                            except (OSError, ValueError):
+                                pass
+                return record
+
             def make_room(extra=(), ratio=0.85):
                 nonlocal slim, micro, tools, bootstrap_count, compact_requested
+                if (
+                    self.features["semantic_compaction"]
+                    and retained
+                    and (
+                        compact_requested
+                        or self.context.due(wire(request(extra)), self.adaptive_input_limit)
+                    )
+                ):
+                    keep = self.context.tail_count(retained, self.adaptive_input_limit)
+                    old = retained[:-keep] if keep else list(retained)
+                    if old:
+                        summary = self.context.summarize(
+                            self.provider,
+                            [item for previous in old for item in previous],
+                            input_limit=self.adaptive_input_limit,
+                            redact=self.memory.redact,
+                            cancelled=cancelled,
+                        )
+                        if summary:
+                            del retained[: len(old)]
+                            if not self.tasks.ephemeral:
+                                try:
+                                    self.context.save(
+                                        self.sessions.summary_path(self.session_id),
+                                        self.memory.redact,
+                                    )
+                                except (OSError, ValueError):
+                                    pass
+                            if flow := current_flow.get():
+                                flow.data.setdefault("compactions", []).append(
+                                    {
+                                        "kind": "semantic_continuity",
+                                        "summary": summary,
+                                        "retained_turns": len(retained),
+                                    }
+                                )
+                            detail(AgentEvent("compaction", "Continuidade preservada"))
                 if compact_requested:
                     before_tokens = self.counter.count(wire(request(extra)))
-                    retained.clear()
+                    if not self.context.summary:
+                        retained.clear()
                     while bootstrap_count > 1:
                         instructions.pop(bootstrap_count - 1)
                         bootstrap_count -= 1
                     local_evidence.clear()
                     local_observed.clear()
-                    while compact_batch(turn) is not None:
+                    while compact_completed() is not None:
                         refresh_evidence()
                     refresh_evidence()
                     compact_requested = False
@@ -1252,6 +1469,14 @@ class Agent:
                             f"{before_tokens} → {after_tokens} tokens estimados.",
                         )
                     )
+                if self.features["semantic_compaction"] and not retained:
+                    while (
+                        self.context.due(wire(request(extra)), self.adaptive_input_limit)
+                        and sum(bool(item.get("tool_calls")) for item in turn) > 1
+                    ):
+                        if compact_completed() is None:
+                            break
+                        refresh_evidence()
                 while not fits(request(extra), ratio):
                     check_cancelled()
                     before = request(extra)
@@ -1259,7 +1484,7 @@ class Agent:
                         retained.pop(0)
                         record = {"kind": "history_turn"}
                     else:
-                        record = compact_batch(turn)
+                        record = compact_completed()
                         if record is None:
                             if bootstrap_count > 1:
                                 # Initial source/map excerpts can be recovered through tools.
@@ -1330,7 +1555,10 @@ class Agent:
             for step in range(self.max_steps + 1):
                 check_cancelled()
                 final = (
-                    step == self.max_steps or used >= self.tool_budget - denial_reserve or stalled
+                    step == self.max_steps
+                    or used >= self.tool_budget - denial_reserve
+                    or stalled
+                    or request_budget.get().near_limit(self.context_window)
                 )
                 tools = None if final else select_tools()
                 while True:
@@ -1372,6 +1600,7 @@ class Agent:
                         )
                     advertised = {tool["function"]["name"] for tool in tools or []}
                     try:
+                        request_budget.get().charge(tokens, self.max_output_tokens)
                         if streaming:
                             options = {}
                             # Preserve compatibility with providers exposing the older signature.
@@ -1593,8 +1822,7 @@ class Agent:
                             {"role": "assistant", "content": answer},
                         ]
                     ]
-                    while self.turns and len(serialize(self.turns)) > self.history_budget:
-                        self.turns.pop(0)
+                    self.trim_history()
                     return answer
                 if final:
                     raise ModelError(
@@ -1618,7 +1846,11 @@ class Agent:
                         arguments = json.loads(function["arguments"])
                         if not isinstance(arguments, dict):
                             raise ValueError("Argumentos devem ser um objeto JSON.")
-                        self.validate_arguments(name, arguments)
+                        if name in {tool["function"]["name"] for tool in ALL_DEFINITIONS}:
+                            self.validate_arguments(name, arguments)
+                            self.registry.validate(name, arguments)
+                        else:
+                            self.registry.validate(name, arguments)
                         if name == "propose_edit" and not self.allow_edits:
                             raise ValueError("Edição desabilitada nesta sessão.")
                         if name not in advertised:
@@ -1638,6 +1870,16 @@ class Agent:
                                 raise ValueError(
                                     "Tarefa finalizada: somente síntese final permitida."
                                 )
+                        self.registry.authorize(
+                            name,
+                            "execute" if self.legacy and name == "run_command" else self.mode.value,
+                            advertised,
+                            closed=bool(
+                                not self.legacy
+                                and self.tasks.current()
+                                and self.tasks.current()["state"] in {"completed", "planned"}
+                            ),
+                        )
                         guidance_before = len(pinned)
                         for path in [arguments["path"]] if "path" in arguments else []:
                             load_guidance(path)
@@ -1790,6 +2032,37 @@ class Agent:
                                             "reserved_output_tokens": self.max_output_tokens,
                                             "compact_tools": slim,
                                         }
+                                    elif name == "get_tools_catalog":
+                                        offset, limit = (
+                                            arguments.get("offset", 0),
+                                            arguments.get("limit", 8),
+                                        )
+                                        catalog = sorted(
+                                            available_tools(),
+                                            key=lambda item: (
+                                                not self.registry.tools[
+                                                    item["function"]["name"]
+                                                ].lazy
+                                            ),
+                                        )
+                                        result = {
+                                            "offset": offset,
+                                            "tools": [
+                                                {
+                                                    "name": item["function"]["name"],
+                                                    "description": item["function"]["description"][
+                                                        :150
+                                                    ],
+                                                    "read_only": self.registry.tools[
+                                                        item["function"]["name"]
+                                                    ].read_only,
+                                                }
+                                                for item in catalog[offset : offset + limit]
+                                            ],
+                                            "next_offset": offset + limit
+                                            if offset + limit < len(catalog)
+                                            else None,
+                                        }
                                     elif name == "compact_context":
                                         compact_requested = True
                                         result = {
@@ -1843,6 +2116,31 @@ class Agent:
                                         }
                                     if execution_key is not None:
                                         execution_cache[execution_key] = dict(result)
+                                if (
+                                    self.features["artifacts"]
+                                    and not self.tasks.ephemeral
+                                    and "artifact_id" not in result
+                                    and name
+                                    not in {"read_artifact", "search_artifact", "get_artifact_info"}
+                                    and len(serialize(result)) > 4000
+                                ):
+                                    try:
+                                        artifact = self.artifacts.save(
+                                            serialize(result),
+                                            source=name,
+                                            run_id=flow.data["run_id"] if flow else "",
+                                        )
+                                        result = {
+                                            **result,
+                                            "artifact_id": artifact["id"],
+                                            "artifact_complete": artifact["complete"],
+                                        }
+                                    except (ValueError, OSError) as storage_error:
+                                        detail(
+                                            AgentEvent(
+                                                "status", "Saída não arquivada", str(storage_error)
+                                            )
+                                        )
                                 encoded = serialize(result)
                                 limit = min(8000, remaining - denial_reserve)
                                 low, high = 0, min(len(encoded), limit)
@@ -1872,6 +2170,7 @@ class Agent:
                                                     "timed_out",
                                                     "duration_ms",
                                                     "reused_result",
+                                                    "artifact_id",
                                                 )
                                                 if key in result
                                             }
@@ -2226,6 +2525,15 @@ class Agent:
             result["truncated"] = True
             while result["results"] and len(serialize(result)) > budget:
                 result["results"].pop()
+        elif "tools" in result:
+            result = dict(result)
+            result["tools"] = list(result["tools"])
+            result["truncated"] = True
+            while result["tools"] and len(serialize(result)) > budget:
+                result["tools"].pop()
+                result["next_offset"] = result.get("offset", 0) + len(result["tools"])
+            if not result["tools"]:
+                return {"error": "Catálogo não cabe nesta página; solicite limit=1."}
         elif "files" in result:
             result = dict(result)
             result["files"] = list(result["files"])
@@ -2237,6 +2545,14 @@ class Agent:
             if not result["files"]:
                 return {"error": "Sem espaço para listar caminhos. Reduza o escopo da pergunta."}
         if len(serialize(result)) > budget:
+            if "artifact_id" in result:
+                receipt = {
+                    "artifact_id": result["artifact_id"],
+                    "truncated": True,
+                    "notice": "Recupere páginas com read_artifact; saída histórica.",
+                }
+                if len(serialize(receipt)) <= budget:
+                    return receipt
             return {"error": "Resultado excede o orçamento. Solicite um intervalo menor."}
         return result
 
@@ -2385,7 +2701,16 @@ class Agent:
                 return {"state": "partial", "changes": changes}
             self._detail(AgentEvent("status", "Alteração aplicada", proposal.path))
         self.edits.observed.clear()
-        return {"state": "applied", "changes": changes, "validation_required": True}
+        result = {"state": "applied", "changes": changes, "validation_required": True}
+        if self.features["lsp"]["enabled"]:
+            from codaro.lsp import diagnostics
+
+            result["diagnostics"] = [
+                diagnostics(self.repository, path, self.features["lsp"], self._cancelled)
+                for path in paths[:2]
+                if (self.repository.root / path).is_file()
+            ]
+        return result
 
     def sync_workspace(self, index):
         if self.mode == Mode.ASK or self.legacy:
@@ -2409,7 +2734,54 @@ class Agent:
 
             self.tasks.update(change)
 
+    def activate_session(self, identifier):
+        if self._lock.locked() or self.edits.pending:
+            raise ValueError("Aguarde a execução e revise propostas antes de trocar sessão.")
+        store = self.sessions.store(identifier)
+        try:
+            turns = store.load()
+        except FileNotFoundError:
+            turns = []
+        summary = self.sessions.summary(identifier)
+        self.sessions.activate(identifier)
+        old_redact = self.memory.redact
+        self.memory = ConversationMemory(
+            self.repository.root,
+            getattr(getattr(self.provider, "settings", None), "api_key", ""),
+            ephemeral=self.tasks.ephemeral,
+        )
+        self.memory.redact = old_redact
+        self.tasks = TaskStore(
+            self.repository.root, ephemeral=self.tasks.ephemeral, redact=old_redact
+        )
+        if identifier != "default":
+            self.memory.path = self.repository.root / (".codaro/memory-" + identifier + ".sqlite3")
+            self.tasks.path = self.repository.root / (".codaro/tasks-" + identifier + ".json")
+        self.edits.checkpoints.session_id = identifier
+        self.session_id = self.artifacts.session_id = identifier
+        self.artifacts.redact = old_redact
+        self.turns = turns
+        self.context.summary = summary
+        self.policy.reset()
+        self.edits.observed.clear()
+        self.edits.proposals.clear()
+        return store
+
     def execute(self, index: CodeIndex, name: str, args: dict) -> dict:
+        if tool := self.registry.tools.get(name):
+            if tool.handler is not None:
+                self.registry.validate(name, args)
+                return tool.handler(args)
+        if name in {tool["function"]["name"] for tool in ARTIFACT_TOOLS}:
+            self.registry.validate(name, args)
+            identifier = args["artifact_id"]
+            if name == "read_artifact":
+                return self.artifacts.read(
+                    identifier, args.get("offset", 0), args.get("limit", 2400)
+                )
+            if name == "search_artifact":
+                return self.artifacts.search(identifier, args["query"], args.get("limit", 5))
+            return self.artifacts.info(identifier)
         self.validate_arguments(name, args)
         self._read_snapshot = None
         if name in {"get_context_status", "compact_context", "request_tools"}:

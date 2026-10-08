@@ -6,11 +6,12 @@ import base64
 import difflib
 import hashlib
 import json
+import re
 import secrets
 
 from codaro.repository import MAX_FILE_BYTES, Repository
 from codaro.storage import private_json, private_lock
-from codaro.trace import atomic_write, timestamp
+from codaro.trace import atomic_write, current_flow, timestamp
 
 MAX_CHECKPOINT_BYTES = 12_000_000
 
@@ -23,6 +24,7 @@ class Checkpoints:
     def __init__(self, repository: Repository):
         self.repository = repository
         self.path = repository.root / ".codaro" / "checkpoints.json"
+        self.session_id = "default"
 
     def load(self):
         try:
@@ -51,6 +53,11 @@ class Checkpoints:
                 or item.get("state") not in {"ready", "applied", "failed", "undone"}
             ):
                 raise ValueError("Checkpoint inválido.")
+            from codaro.session_catalog import validate_id
+
+            validate_id(item.get("session_id", "default"))
+            if item.get("run_id") and not re.fullmatch(r"[a-f0-9-]{36}", item["run_id"]):
+                raise ValueError("Interação inválida no checkpoint.")
             ids.add(item["id"])
             if any(
                 type(item.get(key, True)) is not bool for key in ("before_exists", "after_exists")
@@ -76,6 +83,10 @@ class Checkpoints:
 
     def save(self, items):
         retained = items[-20:]
+        removed_runs = {item.get("run_id") for item in items[:-20] if item.get("run_id")}
+        retained = [item for item in retained if item.get("run_id") not in removed_runs]
+        if items and items[-1].get("run_id") in removed_runs:
+            raise ValueError("Interação excede a retenção de snapshots; divida em outra atividade.")
         while True:
             data = json.dumps(
                 {"version": 1, "root": str(self.repository.root), "items": retained},
@@ -86,7 +97,11 @@ class Checkpoints:
                 return
             if len(retained) <= 1:
                 raise ValueError("Checkpoint excede o limite.")
-            retained.pop(0)
+            first = retained.pop(0)
+            if first.get("run_id"):
+                retained = [item for item in retained if item.get("run_id") != first["run_id"]]
+                if not retained:
+                    raise ValueError("Snapshots da interação excedem o limite.")
 
     def prepare(self, proposal):
         with private_lock(self.path.with_suffix(".lock")):
@@ -101,6 +116,8 @@ class Checkpoints:
             "state": "ready",
             "reason": proposal.reason[:500],
             "task_id": proposal.task_id,
+            "session_id": self.session_id,
+            "run_id": current_flow.get().data["run_id"] if current_flow.get() else "",
             "before_exists": proposal.before_exists,
             "after_exists": proposal.after_exists,
             "file_mode": proposal.file_mode,

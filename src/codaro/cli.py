@@ -19,6 +19,7 @@ from rich.text import Text
 from typer.core import TyperGroup
 
 from codaro.agent import Agent, AgentEvent
+from codaro.extensions_cli import register as register_extensions
 from codaro.index import CodeIndex, safe_preview
 from codaro.policies import Mode
 from codaro.provider import ModelError, Settings, create_provider
@@ -109,6 +110,21 @@ def approve_changes(proposals, cancelled):
         return typer.confirm(
             f"Aplicar este conjunto de {len(proposals)} arquivo(s)?", default=False
         )
+    except (EOFError, typer.Abort):
+        return False
+
+
+def approve_external(source, name, arguments, cancelled):
+    if cancelled is not None and cancelled.is_set():
+        return False
+    errors.print(
+        safe_preview(
+            source + " / " + name + "\n" + json.dumps(arguments, ensure_ascii=False, indent=2)
+        ),
+        markup=False,
+    )
+    try:
+        return typer.confirm("Autorizar esta ação externa?", default=False)
     except (EOFError, typer.Abort):
         return False
 
@@ -293,6 +309,7 @@ def run_question(
             allow_edits=allow_edits,
             mode=mode or (Mode.EXECUTE if allow_edits else Mode.ASK),
             approve_edit=approve_changes,
+            approve_external=approve_external,
             max_steps=max_steps,
             max_seconds=max_seconds,
             max_corrections=max_corrections,
@@ -841,6 +858,8 @@ def model_use(
     except (ValueError, OSError, ModelError) as exc:
         fail(exc)
 
+
+register_extensions(app)
 
 if __name__ == "__main__":
     app()

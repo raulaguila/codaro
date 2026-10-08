@@ -7,6 +7,12 @@ import re
 from dataclasses import dataclass
 
 COMMANDS = {
+    "/integrations": "Cadastrar MCP ou plugin com teste de conexão",
+    "/undo-turn": "Revisar e desfazer todos os arquivos de uma interação",
+    "/redo": "Revisar e refazer a última interação desfeita",
+    "/sessions": "Listar sessões independentes",
+    "/session": "Trocar sessão pelo ID ou criar com new título",
+    "/features": "Configurar artifacts, semantic_compaction, exploration ou lsp: on|off",
     "/new": "Nova conversa/tarefa; revoga escopo e descarta propostas após confirmação",
     "/restore-clear": "Desfazer limpeza de mensagens",
     "/reasoning": "Expandir/recolher raciocínio durante geração",

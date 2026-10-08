@@ -21,6 +21,28 @@ MAX_ARCHIVE_RUNS = 20
 current_flow: ContextVar[PromptFlow | None] = ContextVar("codaro_prompt_flow", default=None)
 
 
+class AuxiliaryTrace:
+    """Capture another model request without moving the main tool-loop iteration."""
+
+    def __init__(self, parent, request, kind):
+        self.parent, self.kind = parent, kind
+        self.turn = {"request": snapshot(request), "http_attempts": []}
+        parent.data.setdefault("auxiliary_requests", []).append(self.turn)
+        self.turn["kind"] = kind
+        parent.append_event(kind + "_request", request)
+
+    def append_event(self, kind, value):
+        self.parent.append_event(self.kind + "_" + kind, value)
+
+    def capture(self, kind, value):
+        PromptFlow.capture(self, kind, value)
+
+    def response(self, message):
+        self.turn["response"] = snapshot(message)
+        self.parent.append_event(self.kind + "_response", message)
+        self.parent.checkpoint()
+
+
 def timestamp() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -35,9 +57,19 @@ def snapshot(value):
 
 class PromptFlow:
     def __init__(
-        self, root: Path, question: str, settings, *, allow_edits: bool, limits: dict, redact=None
+        self,
+        root: Path,
+        question: str,
+        settings,
+        *,
+        allow_edits: bool,
+        limits: dict,
+        redact=None,
+        trace_name="prompt.json",
     ):
-        self.path = root / ".codaro" / "prompt.json"
+        if trace_name not in {"prompt.json", "exploration.json"}:
+            raise ValueError("Destino de diagnóstico inválido.")
+        self.path = root / ".codaro" / trace_name
         self.redact = redact or (lambda value: value)
         self.secret = getattr(settings, "api_key", "")
         forms = {self.secret}
@@ -219,6 +251,7 @@ class PromptFlow:
                         "exit_code",
                         "timed_out",
                         "proposal_id",
+                        "artifact_id",
                         "error",
                     )
                     if key in result
@@ -310,6 +343,7 @@ class PromptFlow:
                     "local_retrievals",
                     "task_memory",
                     "compactions",
+                    "auxiliary_requests",
                 ):
                     if key in reduced:
                         reduced[key] = {"content_in_archive": True}
