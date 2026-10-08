@@ -1,6 +1,7 @@
 import copy
 import hashlib
 import json
+import re
 import sys
 import threading
 
@@ -402,9 +403,14 @@ def test_cli_registration_features_sessions_and_trust(tmp_path):
     assert result.exit_code == 0
     assert result.stdout.strip() == SessionCatalog(tmp_path).load()["active"]
     result = runner.invoke(
-        app, ["integrations", "add", "mcp", "local", "--command", '["x"]', "--repo", str(tmp_path)]
+        app,
+        ["integrations", "add", "mcp", "local", "--command", '["x"]', "--repo", str(tmp_path)],
+        color=True,
+        env={"FORCE_COLOR": "1"},
     )
-    assert result.exit_code != 0 and "--trust" in result.output
+    plain_output = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", result.output)
+    assert result.exit_code != 0 and "--trust" in plain_output
+    assert not FeatureStore(tmp_path).load()["mcp"]
 
 
 def test_agent_exploration_lazy_and_separate_trace(tmp_path):
