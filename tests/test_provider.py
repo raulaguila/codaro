@@ -93,7 +93,7 @@ def test_http_errors_do_not_echo_sensitive_bodies(status):
 
 def test_transient_status_is_retried(monkeypatch):
     attempts = []
-    monkeypatch.setattr("codaro.provider.time.sleep", lambda _: None)
+    monkeypatch.setattr("codaro.llm.openai.time.sleep", lambda _: None)
 
     def handle(request):
         attempts.append(request)
@@ -107,7 +107,7 @@ def test_transient_status_is_retried(monkeypatch):
 
 def test_retries_are_bounded(monkeypatch):
     attempts = []
-    monkeypatch.setattr("codaro.provider.time.sleep", lambda _: None)
+    monkeypatch.setattr("codaro.llm.openai.time.sleep", lambda _: None)
 
     def handle(request):
         attempts.append(request)
@@ -177,7 +177,7 @@ def test_tls_setting_reaches_http_client_for_both_response_modes(monkeypatch, in
         captured.append(kwargs["verify"])
         return original_client(**kwargs)
 
-    monkeypatch.setattr("codaro.provider.httpx.Client", client)
+    monkeypatch.setattr("codaro.llm.openai.httpx.Client", client)
     transport = httpx.MockTransport(
         lambda request: httpx.Response(200, json=result({"content": "OK"}))
     )

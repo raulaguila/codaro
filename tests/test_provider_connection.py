@@ -82,7 +82,7 @@ def test_successful_catalog_does_not_hide_inference_404(tmp_path):
 
 def test_provider_form_tests_connection_before_registration(tmp_path, monkeypatch):
     store = ProviderStore(tmp_path / "config", transport=httpx.MockTransport(ollama_handler))
-    monkeypatch.setattr("codaro.providers.ProviderStore", lambda: store)
+    monkeypatch.setattr("codaro.llm.profiles.ProviderStore", lambda: store)
     app = CodaroApp(Agent(Repository(tmp_path), UIModel()))
 
     async def scenario():

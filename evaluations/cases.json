@@ -4,7 +4,7 @@
     "repo": "..",
     "question": "Como o Codaro envia ferramentas na API OpenAI compatible e trata rejeição de contexto? Cite os arquivos e linhas reais.",
     "query": "build_payload ContextLimitError",
-    "expected_paths": ["src/codaro/provider.py"],
+    "expected_paths": ["src/codaro/llm/protocol.py", "src/codaro/llm/errors.py"],
     "answer_contains": ["tool_calls", "contexto"]
   },
   {

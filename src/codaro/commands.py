@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 from codaro.index import safe_preview
-from codaro.provider import RequestCancelled
+from codaro.llm import RequestCancelled
 from codaro.runtime import remaining_seconds, request_artifacts
 
 

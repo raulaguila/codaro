@@ -74,7 +74,7 @@ def test_macos_shortcuts_receive_command_and_keep_ctrl_fallback(tmp_path, monkey
     from textual._xterm_parser import XTermParser
     from textual.command import CommandPalette
 
-    monkeypatch.setattr("codaro.tui.sys", SimpleNamespace(platform="darwin"))
+    monkeypatch.setattr("codaro.ui.app.sys", SimpleNamespace(platform="darwin"))
     model = UIModel(blocked=True)
     agent = Agent(Repository(tmp_path), model)
 
@@ -116,7 +116,7 @@ def test_macos_shortcuts_receive_command_and_keep_ctrl_fallback(tmp_path, monkey
 
 def test_other_systems_keep_ctrl_and_alt_labels(tmp_path, monkeypatch):
     for platform in ("linux", "win32"):
-        monkeypatch.setattr("codaro.tui.sys", SimpleNamespace(platform=platform))
+        monkeypatch.setattr("codaro.ui.app.sys", SimpleNamespace(platform=platform))
         app = CodaroApp(Agent(Repository(tmp_path), UIModel()))
         assert app.get_key_display(app.BINDINGS[1]) == "Ctrl+L"
         assert app.option_display("Enter") == "Alt+Enter"

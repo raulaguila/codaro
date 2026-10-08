@@ -10,7 +10,7 @@ from pathlib import Path
 
 from codaro.agent import Agent, cites_observed_lines, serialize
 from codaro.index import CodeIndex
-from codaro.provider import ModelError
+from codaro.llm import ModelError
 from codaro.repository import Repository
 from codaro.storage import private_json
 from codaro.trace import timestamp

@@ -10,7 +10,7 @@ import time
 
 import httpx
 
-from codaro.provider import RequestCancelled
+from codaro.llm import RequestCancelled
 from codaro.runtime import remaining_seconds
 
 MAX_FRAME = 1_000_000

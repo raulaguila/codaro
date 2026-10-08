@@ -3,7 +3,7 @@
 import json
 from dataclasses import replace
 
-from codaro.provider import ModelError, RequestCancelled, validate_message
+from codaro.llm import ModelError, RequestCancelled, validate_message
 from codaro.runtime import request_budget
 from codaro.trace import AuxiliaryTrace, atomic_write, current_flow
 
@@ -68,7 +68,7 @@ class ContextController:
         settings = getattr(provider, "settings", None)
         if settings is None:
             return None
-        from codaro.provider import create_provider
+        from codaro.llm import create_provider
 
         output = min(768, max(128, input_limit // 4))
         summarizer = create_provider(

@@ -101,7 +101,7 @@ def test_stream_cancellation_keeps_raw_events_without_saving_answer(tmp_path):
 
 
 def test_http_retries_usage_and_key_redaction(tmp_path, monkeypatch):
-    monkeypatch.setattr("codaro.provider.time.sleep", lambda _: None)
+    monkeypatch.setattr("codaro.llm.openai.time.sleep", lambda _: None)
     requests = []
     key = "private-key-do-not-write"
 

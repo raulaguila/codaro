@@ -4,7 +4,7 @@ import copy
 import math
 
 from codaro.features import DEFAULTS
-from codaro.provider import ModelError, create_provider
+from codaro.llm import ModelError, create_provider
 from codaro.runtime import remaining_seconds, request_budget
 from codaro.tool_registry import Tool, definition
 from codaro.trace import current_flow

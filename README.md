@@ -493,6 +493,9 @@ Detalhamento dos 13 achados corrigidos e critérios de regressão: [correções 
 
 ## Desenvolvimento
 
+Veja a [estrutura do projeto e os limites dos módulos](docs/ARCHITECTURE.md)
+para localizar prompts, ferramentas, adaptadores de IA, comandos e componentes da UI.
+
 ```bash
 pytest -q
 ruff check .

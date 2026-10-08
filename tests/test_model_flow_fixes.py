@@ -530,7 +530,7 @@ def test_m10_recalibration_is_accessible_in_tui(tmp_path):
 
 
 def test_m11_option_negotiation_has_room_after_transient_retries(monkeypatch):
-    monkeypatch.setattr("codaro.provider.time.sleep", lambda _: None)
+    monkeypatch.setattr("codaro.llm.openai.time.sleep", lambda _: None)
     attempts = []
 
     def handler(request):

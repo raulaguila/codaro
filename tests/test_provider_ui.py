@@ -23,7 +23,7 @@ def test_chat_registration_and_model_selection_updates_live_budgets(tmp_path, mo
         )
 
     store = ProviderStore(tmp_path / "config", transport=httpx.MockTransport(handler))
-    monkeypatch.setattr("codaro.providers.ProviderStore", lambda: store)
+    monkeypatch.setattr("codaro.llm.profiles.ProviderStore", lambda: store)
     (tmp_path / "project").mkdir()
     app = CodaroApp(Agent(Repository(tmp_path / "project"), UIModel()))
 
@@ -91,7 +91,7 @@ def test_registration_error_keeps_key_masked_and_does_not_write(tmp_path, monkey
         tmp_path / "config",
         transport=httpx.MockTransport(lambda _: httpx.Response(401, json={"error": "ui-test-key"})),
     )
-    monkeypatch.setattr("codaro.providers.ProviderStore", lambda: store)
+    monkeypatch.setattr("codaro.llm.profiles.ProviderStore", lambda: store)
     app = CodaroApp(Agent(Repository(tmp_path), UIModel()))
 
     async def scenario():

@@ -1,0 +1,42 @@
+Screen { background: $background; }
+#brand { height: 1; margin: 1 2 0 2; color: $text; text-style: bold; }
+#session { height: auto; max-height: 2; margin: 0 2; color: $text-muted; }
+#session.insecure { color: $warning; }
+#conversation { width: 100%; height: 1fr; padding: 0 2; }
+#welcome { height: auto; max-width: 78; margin: 1; }
+#welcome-title { height: 1; color: $text; text-style: bold; }
+#welcome-description { height: auto; margin-bottom: 1; color: $text-muted; }
+#suggestions { height: 3; }
+#welcome Button { width: 1fr; min-width: 12; background: $panel; border: none; }
+#welcome Button:hover, #welcome Button:focus { border: round $accent; }
+#prompt { height: 3; max-height: 8; margin: 0 1; border: none;
+          border-top: solid $primary; padding: 0 1; }
+#prompt:focus { border-top: solid $accent; }
+#completion { display: none; height: auto; max-height: 7; margin: 0 2; color: $text-muted; }
+#prompt-hint { height: 1; margin: 0 2; color: $text-muted; }
+#context-meter { height: 1; margin: 0 2; color: $text-muted; }
+#new-messages { display: none; height: 1; min-height: 1; border: none; margin: 0 2; }
+#status { height: 1; margin: 0 2; color: $text; }
+.recovery-actions { height: 3; }
+.recovery-actions Button { width: 1fr; min-width: 8; padding: 0; }
+#configure-start { height: 1; min-height: 1; width: auto; border: none; padding: 0; }
+.question { height: auto; margin: 1 0; color: $text; }
+.assistant { margin: 0; padding: 0 1; background: $background; }
+.speaker { height: 1; margin: 1 1 0 1; color: $text; text-style: bold; }
+.tool-card { height: auto; margin: 0 1; border: none; border-left: thick $primary;
+             padding: 0; }
+.tool-card.error { border-left: thick $error; }
+.tool-card.success { border-left: thick $success; }
+.tool-card CollapsibleTitle { color: $text-muted; }
+.tool-card > Contents { padding: 0 1; }
+.generation-previews { height: auto; }
+.generation-preview { height: auto; border: none; padding: 0; }
+.generation-preview > Contents { padding: 0 1; }
+.generation-text { height: auto; color: $text; }
+.generation-preview CollapsibleTitle { color: $text-muted; }
+.reasoning-preview { margin: 0 1 1 1; }
+.reasoning-preview .generation-text { color: $text-muted; text-style: italic;
+                                     max-height: 8; overflow-y: auto; }
+.response-preview { margin: 1 0; }
+
+.notice { height: auto; margin: 1; color: $warning; }

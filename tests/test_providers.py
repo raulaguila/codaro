@@ -32,7 +32,7 @@ def catalog_response(request):
 def test_registration_selection_and_env_precedence(tmp_path, monkeypatch):
     store = store_for(tmp_path, catalog_response)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    monkeypatch.setattr("codaro.providers.ProviderStore", lambda: store)
+    monkeypatch.setattr("codaro.llm.profiles.ProviderStore", lambda: store)
     for variable in (
         "CODARO_BASE_URL",
         "CODARO_MODEL",
@@ -179,7 +179,7 @@ def test_credential_storage_rejects_links_and_public_permissions(tmp_path):
 
 def test_byok_cli_registers_without_echoing_key_and_lists_models(tmp_path, monkeypatch):
     store = store_for(tmp_path, catalog_response)
-    monkeypatch.setattr("codaro.providers.ProviderStore", lambda: store)
+    monkeypatch.setattr("codaro.llm.profiles.ProviderStore", lambda: store)
     runner = CliRunner()
     result = runner.invoke(app, ["providers", "add", "groq"], input="test-secret\nsmall\n")
     assert result.exit_code == 0, result.output
@@ -195,7 +195,7 @@ def test_byok_cli_registers_without_echoing_key_and_lists_models(tmp_path, monke
 
 def test_compatible_tls_insecure_is_explicit_and_preserved(tmp_path, monkeypatch):
     store = store_for(tmp_path, catalog_response)
-    monkeypatch.setattr("codaro.providers.ProviderStore", lambda: store)
+    monkeypatch.setattr("codaro.llm.profiles.ProviderStore", lambda: store)
     monkeypatch.setenv("TEST_BYOK_KEY", "test-secret")
     result = CliRunner().invoke(
         app,

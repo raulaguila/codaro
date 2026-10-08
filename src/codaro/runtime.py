@@ -28,7 +28,7 @@ class RunBudget:
         self.reserved_requests = self.reserved_tokens = 0
 
     def charge(self, input_tokens, output_reservation):
-        from codaro.provider import ModelError
+        from codaro.llm import ModelError
 
         cost = max(0, input_tokens) + max(0, output_reservation)
         if (

@@ -7,7 +7,7 @@ import os
 import stat
 from pathlib import Path
 
-from codaro.provider import validate_message
+from codaro.llm import validate_message
 from codaro.trace import atomic_write, timestamp
 
 MAX_SESSION_BYTES = 512_000
