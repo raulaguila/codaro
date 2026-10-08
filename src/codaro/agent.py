@@ -364,8 +364,33 @@ def is_project_overview(question: str) -> bool:
     project = re.search(r"\b(projeto|repositorio|project|repository|repo|codebase)\b", text)
     overview = re.search(r"\b(estrutura|arquitetura|structure|architecture)\b", text)
     entrypoints = re.search(r"\b(pontos? de entrada|entry[ -]?points?)\b", text)
-    explanation = re.search(r"\b(explique|explique-me|explore|explain|describe|descreva)\b", text)
+    explanation = re.search(
+        r"\b(explique|explique-me|explore|explain|describe|descreva)\b"
+        r"|(?:o que|what).*(?:falar|dizer|tell|about)|fale sobre",
+        text,
+    )
     return bool(entrypoints or project and (overview or explanation))
+
+
+def is_information_request(question: str) -> bool:
+    """Only explicit consultations bypass a pending implementation task."""
+    text = question.strip().casefold()
+    if re.search(
+        r"\b(implemente|implementar|crie|criar|corrija|corrigir|altere|alterar|"
+        r"adicione|adicionar|remova|remover|execute|executar|continue|continuar|"
+        r"valide|validar|refatore|ajuste|atualize|faça|faca|mude|substitua|"
+        r"aplique|edite|editar|teste|testar|implement|create|fix|change|"
+        r"add|remove|run|execute|continue|validate|refactor|update|delete|test)\b",
+        text,
+    ):
+        return False
+    return bool(
+        re.match(
+            r"(?:explique|descreva|fale sobre|o que|qual|quais|quem|como|onde|"
+            r"explain|describe|what|which|who|how|where)\b",
+            text,
+        )
+    )
 
 
 def cites_observed_lines(answer: str, evidence: list[tuple[str, int, int]]) -> bool:
@@ -595,6 +620,7 @@ class Agent:
         self._failures_run = 0
         self._detail = lambda event: None
         self._cancelled = None
+        self.last_run_intent = "task"
         self.edits = EditManager(repository)
         self.turns: list[list[dict]] = []
         self._lock = threading.Lock()
@@ -852,6 +878,15 @@ class Agent:
             self.artifacts if self.features["artifacts"] and not self.tasks.ephemeral else None
         )
         self.context.attempts = self.context.failures = 0
+        configured_mode, configured_edits = self.mode, self.allow_edits
+        consultation = (
+            not self.legacy and self.mode == Mode.EXECUTE and is_information_request(question)
+        )
+        self.last_run_intent = "consultation" if consultation or self.mode == Mode.ASK else "task"
+        if consultation:
+            self.mode, self.allow_edits = Mode.ASK, False
+            flow.data["configured_mode"] = configured_mode.value
+            flow.data["intent"] = "consultation"
         if not self.legacy:
             flow.data["mode"] = self.mode.value
 
@@ -996,7 +1031,12 @@ class Agent:
                     session_store.save(self.turns, getattr(settings, "model", ""))
                 except (OSError, ValueError) as exc:
                     record_detail(AgentEvent("status", "Sessão não salva", str(exc)))
-            flow.finish("success", answer=answer)
+            flow.finish(
+                "blocked"
+                if self.mode != Mode.ASK and self.tasks.current()["state"] == "blocked"
+                else "success",
+                answer=answer,
+            )
             return answer
         except BaseException as exc:
             if self.mode != Mode.ASK:
@@ -1035,6 +1075,7 @@ class Agent:
                 self.edits.reject(proposal.id)
             raise
         finally:
+            self.mode, self.allow_edits = configured_mode, configured_edits
             self._cancelled = None
             current_flow.reset(token)
             request_deadline.reset(deadline_token)
@@ -1178,6 +1219,8 @@ class Agent:
             read_snapshots: dict[str, bytes] = {}
             recoveries = 0
             validation_repairs = 0
+            last_validation_answer = None
+            last_validation_progress = None
             output_recoveries = 0
             output_instruction = ""
             repeated = 0
@@ -1623,13 +1666,23 @@ class Agent:
                                 "podemos continuar com uma parte menor da tarefa."
                             ) from exc
                         output_recoveries += 1
-                        detail(AgentEvent("model_end", "Saída incompleta", state="retry"))
+                        detail(
+                            AgentEvent(
+                                "model_end",
+                                "Limite de resposta atingido",
+                                "Gerando uma versão mais curta",
+                                state="retry",
+                            )
+                        )
                         if flow is not None and flow.turn is not None:
                             flow.turn["error"] = {"type": type(exc).__name__, "message": str(exc)}
                             flow.checkpoint()
                         output_instruction = (
                             "A saída anterior foi truncada e não foi aceita. "
-                            "Responda brevemente ou divida a operação em chamadas menores. "
+                            "Responda em até 400 palavras, priorizando a conclusão. "
+                            "Não enumere todos os arquivos; agrupe módulos e explique o essencial. "
+                            "Reutilize resultados já presentes e divida operações "
+                            "em chamadas menores. "
                             "Nunca execute JSON incompleto nem repita ações já aplicadas."
                         )
                         continue
@@ -1691,7 +1744,14 @@ class Agent:
                                     "status", "Limite aprendido nesta sessão", str(storage_error)
                                 )
                             )
-                        detail(AgentEvent("model_end", "Contexto rejeitado", state="retry"))
+                        detail(
+                            AgentEvent(
+                                "model_end",
+                                "Contexto ajustado",
+                                "Reutilizando resultados",
+                                state="retry",
+                            )
+                        )
                         detail(
                             AgentEvent(
                                 "status",
@@ -1750,7 +1810,7 @@ class Agent:
                 detail(
                     AgentEvent(
                         "model_end",
-                        "Modelo respondeu",
+                        "Corrigindo protocolo de ferramentas" if text_call else "Modelo respondeu",
                         state="tools" if calls else "retry" if text_call else "answer",
                     )
                 )
@@ -1804,7 +1864,55 @@ class Agent:
                         and not final
                         and validation_repairs < self.max_corrections
                     ):
+                        progress = serialize(
+                            {
+                                "revision": current_task["revision"],
+                                "validations": current_task["validations"],
+                                "plan": current_task["plan"],
+                            }
+                        )
+                        if (
+                            answer == last_validation_answer
+                            and progress == last_validation_progress
+                        ):
+                            self.tasks.state(
+                                "blocked", "O modelo repetiu a resposta sem avançar na validação."
+                            )
+                            detail(
+                                AgentEvent(
+                                    "status",
+                                    "Validação sem progresso",
+                                    "Tentativas repetidas interrompidas; alterações preservadas.",
+                                )
+                            )
+                            if flow is not None and flow.turn is not None:
+                                flow.turn["outcome"] = "blocked_no_progress"
+                            # Return the answer with the pending-validation notice in ask().
+                        else:
+                            last_validation_answer = answer
+                            last_validation_progress = progress
+                    if (
+                        not self.legacy
+                        and self.mode == Mode.EXECUTE
+                        and not self.tasks.validation_ready()
+                        and not final
+                        and validation_repairs < self.max_corrections
+                        and self.tasks.current()["state"] != "blocked"
+                    ):
                         validation_repairs += 1
+                        # Feed back the rejected answer, not only the same generic instruction.
+                        turn.append(message)
+                        detail(
+                            AgentEvent(
+                                "model_end",
+                                "Verificação pendente",
+                                "Solicitando validação das alterações",
+                                state="retry",
+                            )
+                        )
+                        if flow is not None and flow.turn is not None:
+                            flow.turn["outcome"] = "validation_repair"
+                            flow.checkpoint()
                         instructions.append(
                             "Alterações ainda não foram validadas na revisão atual. "
                             "Execute verificações pertinentes, corrija falhas e "

@@ -408,7 +408,7 @@ class GenerationPreview(Collapsible):
         if stable:
             self.content.update(RichMarkdown(self.text + suffix))
 
-    def finish(self, state: str):
+    def finish(self, state: str, reason: str = ""):
         self.state = state
         if self.reasoning:
             self.title = (
@@ -420,7 +420,7 @@ class GenerationPreview(Collapsible):
             return
         self.title = {
             "tools": "Etapa intermediária · chamada de ferramentas",
-            "retry": "Prévia rejeitada · nova tentativa",
+            "retry": reason or "Etapa em revisão · nova tentativa",
             "answer": "Prévia não validada · aguardando conclusão",
             "accepted": "Prévia da resposta · geração concluída",
             "cancelled": "Prévia interrompida · sem resposta concluída",
@@ -1696,7 +1696,15 @@ class CodaroApp(App):
             self.reported_tokens = event.reported_tokens
             self.query_one("#status", Static).update(safe_preview(event.detail))
         elif event.kind == "model_end":
-            self.finish_preview(event.state)
+            self.finish_preview(
+                event.state,
+                " · ".join(filter(None, (event.title, event.detail)))
+                if event.state == "retry"
+                else "",
+            )
+            if event.state == "retry" and self.answer_preview is not None:
+                self.answer_preview.finish("retry", event.title)
+                self.answer_preview = None
         elif event.kind == "tool_start":
             self.query_one("#status", Static).update(
                 safe_preview(f"{event.title}… · {event.detail}".rstrip(" ·"))
@@ -1769,10 +1777,10 @@ class CodaroApp(App):
         if follow:
             self.call_after_refresh(conversation.scroll_end, animate=False)
 
-    def finish_preview(self, state: str):
+    def finish_preview(self, state: str, reason: str = ""):
         self.flush_preview()
         if self.generation_preview is not None:
-            self.generation_preview.finish(state)
+            self.generation_preview.finish(state, reason)
             if state == "answer":
                 self.answer_preview = self.generation_preview
         if self.reasoning_preview is not None:
@@ -1811,7 +1819,8 @@ class CodaroApp(App):
         if self.activity_group is not None:
             self.activity_group.finish(successful)
         if successful:
-            self.show_plan()
+            if self.agent.last_run_intent != "consultation":
+                self.show_plan()
             self.response_text = safe_preview(answer)
             if self.answer_preview is not None:
                 self.reply = self.answer_preview.accept(self.response_text)
@@ -1848,6 +1857,7 @@ class CodaroApp(App):
                 self.proposal_cards[proposal.id] = card
                 self.mount_message(card)
         self.busy = False
+        self.update_session_header()
         prompt = self.query_one(Prompt)
         prompt.disabled = False
         prompt.focus()
@@ -1855,7 +1865,7 @@ class CodaroApp(App):
             "Aguardando revisão de edições" if self.agent.edits.pending else "Pronto"
         )
 
-        if not self.agent.legacy:
+        if not self.agent.legacy and self.agent.last_run_intent != "consultation":
             try:
                 task = self.agent.tasks.current()
                 if task:

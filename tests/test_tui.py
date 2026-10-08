@@ -424,7 +424,7 @@ def test_rejected_stream_is_labeled_and_prior_answer_stays_visible(tmp_path):
                 assert await asyncio.to_thread(model.started.wait, 10)
                 await pilot.pause()
                 previews = list(app.query(GenerationPreview))
-                assert any("rejeitada" in preview.title for preview in previews)
+                assert any("Corrigindo protocolo" in preview.title for preview in previews)
                 assert len(app.query("Markdown")) == 1
                 assert app.query_one("Markdown") is original_reply
                 assert original_reply.is_attached

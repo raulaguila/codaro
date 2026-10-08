@@ -101,7 +101,6 @@ class Ollama(OpenAICompatible):
                 )
             raise ModelError("O Ollama interrompeu a geração; confira o fluxo local de debug.")
         if data.get("done"):
-            check_finish_reason(data.get("done_reason"))
             capture_wire("finish_reason", data.get("done_reason"))
             capture_wire(
                 "usage",
@@ -110,6 +109,8 @@ class Ollama(OpenAICompatible):
                     "completion_tokens": data.get("eval_count"),
                 },
             )
+            # Preserve the terminal reason and usage even when validation raises.
+            check_finish_reason(data.get("done_reason"))
 
     def _read_json(self, response, cancelled, on_reasoning=None):
         raw = bytearray()

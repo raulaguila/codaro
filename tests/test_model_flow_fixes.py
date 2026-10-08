@@ -397,7 +397,7 @@ def test_m07_closed_task_rejects_later_mutations(tmp_path):
     agent = Agent(
         Repository(tmp_path), model, mode="execute", approve_edit=lambda *_: pytest.fail()
     )
-    agent.ask("Explique o projeto.")
+    agent.ask("Conclua a tarefa atual.")
     assert not (tmp_path / "x.py").exists()
     assert agent.tasks.current()["state"] == "completed"
     assert "finalizada" in flow(tmp_path)["turns"][1]["tool_results"][0]["result"]["error"]
