@@ -482,6 +482,7 @@ class ProviderStore:
             context_window=window,
             max_output_tokens=output,
             provider_id=name,
+            include_stream_usage=profile["kind"] == "openai",
             api_style=profile["kind"] if profile["kind"] in {"anthropic", "ollama"} else "openai",
             model_max_output_tokens=model["max_output_tokens"],
             context_source="configuração do usuário"

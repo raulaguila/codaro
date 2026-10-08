@@ -190,7 +190,7 @@ def test_stream_bounds_tool_arguments():
                                 {
                                     "index": 0,
                                     "id": "c",
-                                    "function": {"name": "list_files", "arguments": "x" * 8001},
+                                    "function": {"name": "list_files", "arguments": "x" * 64001},
                                 }
                             ]
                         }

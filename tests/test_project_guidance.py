@@ -17,7 +17,8 @@ def test_explicit_references_and_agents_are_bounded_traced_and_read_before_model
     system = model.requests[0][0][0]["content"]
     assert "Use pytest para validar" in system
     assert "def main(): return 1" in system
-    assert len(system) < 12_000
+    assert "x" * 10000 in system
+    assert len(system) < 24_000
     flow = json.loads((tmp_path / ".codaro/prompt.json").read_text())
     assert len(flow["local_retrievals"]) == 2
     assert len([event for event in events if event.kind == "tool_end"]) == 2

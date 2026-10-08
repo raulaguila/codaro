@@ -26,6 +26,7 @@ def test_context_limit_parser_does_not_confuse_requested_tokens(message, expecte
 def test_small_window_loads_tools_on_demand_and_reports_budget(tmp_path):
     model = FakeModel(
         [
+            call("request_tools", {"names": ["get_context_status"]}, "status-load"),
             call("get_context_status", {}),
             call("request_tools", {"names": ["read_symbol"]}, "load"),
             {"content": "Pronto."},
@@ -38,7 +39,7 @@ def test_small_window_loads_tools_on_demand_and_reports_budget(tmp_path):
     final = {tool["function"]["name"] for tool in model.requests[-1][1]}
     assert "request_tools" in initial
     assert "read_symbol" not in initial and "read_symbol" in final
-    status = next(item for item in model.requests[1][0] if item.get("name") == "get_context_status")
+    status = next(item for item in model.requests[2][0] if item.get("name") == "get_context_status")
     assert json.loads(status["content"])["compact_tools"]
     for messages, _ in model.requests:
         assert_protocol(messages)

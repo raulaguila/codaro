@@ -12,6 +12,7 @@ from pathlib import Path
 
 from codaro.index import safe_preview
 from codaro.provider import RequestCancelled
+from codaro.runtime import remaining_seconds
 
 
 def validate_command(argv: list[str], timeout: int):
@@ -37,6 +38,9 @@ def run_command(root: Path, argv: list[str], timeout=60, cancelled=None) -> dict
     cancelled = cancelled or threading.Event()
     if cancelled.is_set():
         raise RequestCancelled("Comando cancelado.")
+    remaining = remaining_seconds()
+    if remaining is not None:
+        timeout = min(timeout, remaining)
     started = time.monotonic()
     # A pipe drained by a reader thread avoids unbounded disk writes and pipe deadlocks.
     captured = bytearray()

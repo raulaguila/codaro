@@ -12,7 +12,7 @@ from pathlib import Path
 from codaro.chunks import terms
 from codaro.sessions import SessionStore
 from codaro.storage import private_lock, private_read
-from codaro.trace import atomic_write, timestamp
+from codaro.trace import MAX_EVENT_BYTES, atomic_write, timestamp
 
 MAX_MEMORY_BYTES = 8_000_000
 MAX_TURNS = 500
@@ -353,8 +353,34 @@ class ConversationMemory:
             row = db.execute("SELECT * FROM turns WHERE id=?", (turn_id,)).fetchone()
             if row is None:
                 raise ValueError("Turno não encontrado neste projeto.")
+            archive_results = []
+            archive_available = False
+            try:
+                identifier = str(uuid.UUID(turn_id))
+                if identifier != turn_id:
+                    raise ValueError("Identificador não canônico.")
+                raw = private_read(
+                    self.root / ".codaro" / f"run-{identifier}.jsonl",
+                    MAX_EVENT_BYTES,
+                    require_private=True,
+                )
+                archive_available = True
+                for line in raw.splitlines():
+                    record = json.loads(line)
+                    if record.get("kind") == "tool_result":
+                        archive_results.append(record["data"])
+            except (ValueError, OSError, KeyError, TypeError, RecursionError):
+                pass
             content = json.dumps(
-                {"user": row["question"], "assistant": row["answer"], "review": row["review"]},
+                {
+                    "user": row["question"],
+                    "assistant": row["answer"],
+                    "review": row["review"],
+                    "actions": json.loads(row["actions"]),
+                    "source": "historical_not_current_evidence",
+                    "archive_available": archive_available,
+                    "historical_tool_results": archive_results,
+                },
                 ensure_ascii=False,
             )
             page = content[offset : offset + limit]
@@ -371,6 +397,10 @@ class ConversationMemory:
                     "source": "conversation_not_code_evidence",
                 }
             )
+
+    def reset_calibration(self):
+        with self.database(write=True) as db:
+            db.execute("DELETE FROM meta WHERE key LIKE 'calibration:%'")
 
     def calibration(self, key: str, value=None):
         with self.database(write=value is not None) as db:

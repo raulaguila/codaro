@@ -101,7 +101,7 @@ class SessionStore:
             if isinstance(item, list):
                 return [clean(entry) for entry in item]
             if isinstance(item, dict):
-                return {key: clean(entry) for key, entry in item.items()}
+                return {clean(key): clean(entry) for key, entry in item.items()}
             return item
 
         return clean(value)

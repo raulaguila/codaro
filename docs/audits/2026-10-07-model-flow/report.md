@@ -6,6 +6,8 @@ A integração tem controles úteis de protocolo, autorização, streaming e com
 
 Esta entrega é uma auditoria: não altera o comportamento da aplicação. Os 487 testes existentes passaram em 68,79 segundos. O roteiro adicional produziu 16 observações em repositórios temporários, com respostas HTTP sintéticas e sem provedores pagos ou credenciais reais. Os achados abaixo têm evidência executável ou inspeção direta identificada; as observações não são novos testes de aprovação da aplicação.
 
+Correções posteriores e critérios de regressão: [implementação de 8 de outubro](../../MODEL_FLOW_FIXES.md). Este relatório mantém os achados e evidências da base original.
+
 ## Escopo e funcionamento atual
 
 Foram revisados `provider`, `providers`, `ollama`, `anthropic`, `agent`, `context`, `memory`, `tasks`, `trace`, a integração com a TUI e a avaliação do agente. A revisão cobre cadastro/seleção, descoberta de limites, construção do payload nativo, estimativas, memória, recuperação, ferramentas, permissões, critérios de conclusão, persistência e cancelamento.

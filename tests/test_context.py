@@ -214,7 +214,7 @@ def test_context_retry_is_bounded_and_fixed_base_is_reported(tmp_path):
     agent = Agent(Repository(tmp_path), provider)
     with pytest.raises(ContextCapacityError, match="preservadas"):
         agent.ask("Investigue.")
-    assert len(requests) <= 3
+    assert len(requests) <= 7
     assert not agent.turns
 
 

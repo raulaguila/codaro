@@ -59,6 +59,7 @@ class TaskStore:
                 or len(task["plan"]) > 24
                 or not isinstance(task.get("events"), list)
                 or len(task["events"]) > 200
+                or type(task.get("requires_changes", False)) is not bool
                 or type(task.get("revision")) is not int
                 or task["revision"] < 0
                 or type(task.get("plan_revision")) is not int
@@ -79,6 +80,9 @@ class TaskStore:
                 r"[0-9a-f]{64}", str(task["workspace_digest"])
             ):
                 raise ValueError("Digest da tarefa inválido.")
+            for key in ("initial_digest", "verified_no_change_digest"):
+                if task.get(key) is not None and not re.fullmatch(r"[0-9a-f]{64}", str(task[key])):
+                    raise ValueError("Digest inicial/verificado inválido.")
             from codaro.commands import validate_command
 
             for result in task["validations"]:
@@ -155,6 +159,15 @@ class TaskStore:
                 "plan": [],
                 "plan_revision": 0,
                 "criteria": [],
+                "requires_changes": bool(
+                    re.search(
+                        r"\b(altere|alterar|implemente|implementar|crie|criar|corrija|corrigir|"
+                        r"substitua|refatore|ajuste|ajustar|mude|adicione|adicionar|atualize|"
+                        r"implement|create|fix|change|refactor|update|add)\b",
+                        objective.casefold(),
+                    )
+                )
+                and not bool(re.match(r"(?:como|explique|how|explain)\b", objective.casefold())),
                 "revision": 0,
                 "validations": [],
                 "events": [],
@@ -265,6 +278,19 @@ class TaskStore:
 
     def validation_ready(self):
         task = self.current()
+        if (
+            task
+            and task.get("requires_changes")
+            and not (
+                task.get("workspace_digest") is not None
+                and task.get("verified_no_change_digest") == task.get("workspace_digest")
+            )
+            and (
+                task.get("initial_digest") is None
+                or task.get("workspace_digest") == task.get("initial_digest")
+            )
+        ):
+            return False
         if not task or (
             not task["revision"] and not task["validations"] and not task.get("validation_commands")
         ):

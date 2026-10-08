@@ -593,6 +593,7 @@ class CodaroApp(App):
             ),
             "Revogar escopo": ("/permissions action", "Voltar à aprovação por ação"),
             "Contexto": ("/status", "Orçamento, origem e contagem"),
+            "Recalibrar contexto": ("/recalibrate", "Reaprender limites do servidor"),
             "Compactar contexto": ("/compact", "Reduzir histórico enviado ao modelo"),
             "Histórico": ("/history", "Consultar a memória da conversa"),
             "Tarefas": ("/task list", "Ver tarefas deste projeto"),
@@ -904,6 +905,7 @@ class CodaroApp(App):
             name
             in {
                 "/resume",
+                "/recalibrate",
                 "/compact",
                 "/model",
                 "/models",
@@ -1090,6 +1092,9 @@ class CodaroApp(App):
                     )
                     return
             text = f"Modelo: {self.agent.provider.settings.model}\nTroque com /model nome"
+        elif name == "/recalibrate":
+            self.agent.reset_calibration()
+            text = "Calibração removida. A próxima chamada verificará os limites novamente."
         elif name == "/compact":
             before = len(str(self.agent.turns))
             self.agent.turns = [[turn[0], turn[-1]] for turn in self.agent.turns[-4:]]
@@ -1174,6 +1179,8 @@ class CodaroApp(App):
             self.agent.set_provider(create_provider(settings))
             self.provider_available = True
             self.session.secret = settings.api_key
+            self.session.redact = self.agent.memory.redact
+            self.session_turns = self.session.redact(self.session_turns)
             self.context_limit = self.agent.adaptive_input_limit
             self.context_chars = self.context_tokens = 0
             self.reported_tokens = None

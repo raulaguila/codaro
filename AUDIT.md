@@ -252,3 +252,11 @@ Validação local: **471 testes aprovados na suíte completa**, mais um teste ad
 A revisão do commit `f0392a5` encontrou 13 achados abertos: seis de prioridade alta e sete de prioridade média. A suíte existente passou com 487 testes; 16 observações adicionais foram reproduzidas com repositórios isolados e APIs sintéticas. Nenhuma correção de comportamento foi aplicada nesta auditoria.
 
 O [relatório completo](docs/audits/2026-10-07-model-flow/report.md) contém o mapa do fluxo, evidências, critérios de aceitação e entregas propostas. As prioridades são redigir segredos ao trocar provedores, conservar restrições do usuário e AGENTS.md, impedir conclusão sem trabalho e corrigir prazo/recuperação durante streaming. Os [resultados](docs/audits/2026-10-07-model-flow/observations.json) e o [roteiro de reprodução](docs/audits/2026-10-07-model-flow/reproduce.py) acompanham o relatório.
+
+## Correções da auditoria do modelo — 8 de outubro de 2026
+
+Os 13 achados M01–M13 receberam correções e regressões executáveis. Foram protegidas chaves anteriores após troca de provedor, restrições do usuário e AGENTS.md; adicionadas verificações de implementação/validação e ferramentas anunciadas; compartilhado o prazo com transportes; normalizados erros de memória do Ollama; ajustados limites de argumentos; preservadas tentativas falhas; persistida a janela viável com expiração e `/recalibrate`; solicitado usage no streaming; recuperada saída truncada; e limitado o diagnóstico incremental com retenção explícita.
+
+Detalhamento e limites em [docs/MODEL_FLOW_FIXES.md](docs/MODEL_FLOW_FIXES.md). A auditoria original e suas observações permanecem como evidência do comportamento anterior. A validação inclui arquivos temporários alterados/validados por comandos reais e Textual em modo de teste; APIs de inferência são simuladas, sem Ollama real ou chamadas pagas. A qualidade semântica de qualquer tarefa/modelo não é garantida pelos controles operacionais.
+
+Validação local: **510 testes aprovados na suíte completa**, mais uma regressão adicional de negociação de usage após duas falhas transitórias (**511 cenários verificados**). A revisão final de provedores, diagnóstico e novas regressões passou em conjunto. Ruff, formatação e verificação de diff aprovados em Python 3.12.

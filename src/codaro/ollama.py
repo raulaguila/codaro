@@ -12,6 +12,7 @@ from codaro.provider import (
     MAX_STREAM_BYTES,
     ContextLimitError,
     ModelError,
+    OllamaMemoryError,
     OpenAICompatible,
     capture_wire,
     check_cancelled,
@@ -72,7 +73,7 @@ class Ollama(OpenAICompatible):
                         "name": function["name"],
                         "arguments": arguments
                         if isinstance(arguments, str)
-                        else json.dumps(arguments),
+                        else json.dumps(arguments, ensure_ascii=False),
                     },
                 }
             )
@@ -84,6 +85,16 @@ class Ollama(OpenAICompatible):
     def _completion(data):
         if "error" in data:
             body = json.dumps(data)
+            if any(
+                phrase in body.lower()
+                for phrase in (
+                    "out of memory",
+                    "requires more system memory",
+                    "unable to allocate",
+                    "failed to allocate",
+                )
+            ):
+                raise OllamaMemoryError("A janela solicitada excede a memória do Ollama.")
             if is_context_error(body):
                 raise ContextLimitError(
                     "Contexto rejeitado pelo Ollama.", context_window=reported_context_window(body)

@@ -6,12 +6,14 @@ import json
 import logging
 import re
 import shlex
+import sqlite3
 import threading
 import time
 import unicodedata
 from collections.abc import Callable
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass, replace
+from pathlib import Path
 
 from codaro.commands import run_command, validate_command
 from codaro.context import COMPACT_PREFIX, TokenCounter, compact_batch
@@ -27,11 +29,13 @@ from codaro.provider import (
     ModelError,
     OllamaMemoryError,
     OpenAICompatible,
+    OutputLimitError,
     RequestCancelled,
     build_payload,
     validate_message,
 )
 from codaro.repository import IGNORE_RULE_FILES, Repository
+from codaro.runtime import request_deadline, request_redactor
 from codaro.storage import private_lock
 from codaro.tasks import TaskStore
 from codaro.trace import PromptFlow, current_flow
@@ -282,7 +286,8 @@ TASK_TOOLS = [
     ),
     schema(
         "finish_task",
-        "Registra conclusão/plano/bloqueio; alterações exigem validação real.",
+        "Registra conclusão/plano/bloqueio; alterações exigem validação real. "
+        "verified_no_change permite concluir sem alteração somente após ler e validar o código.",
         {
             "status": {
                 "type": "string",
@@ -290,6 +295,7 @@ TASK_TOOLS = [
                 "maxLength": 20,
             },
             "summary": {"type": "string", "maxLength": 2000},
+            "verified_no_change": {"type": "boolean"},
         },
         ["status", "summary"],
     ),
@@ -299,7 +305,8 @@ CHANGES_TOOL = schema(
     "apply_changes",
     "Revisa e aplica um conjunto de até oito arquivos. "
     "Edit exige trecho lido; delete/rename exigem arquivo inteiro lido. "
-    "Resultados podem ser parciais.",
+    "Resultados podem ser parciais. Argumentos JSON: máximo 64.000 bytes UTF-8; "
+    "divida arquivos/conjuntos maiores em chamadas menores.",
     {
         "reason": {"type": "string", "maxLength": 500},
         "operations": {
@@ -558,6 +565,7 @@ class Agent:
         self.history_budget = history_budget
         self.context_budget = context_budget
         settings = getattr(provider, "settings", None)
+        self._original_settings = settings
         self.context_window = getattr(settings, "context_window", 16_384)
         self.max_output_tokens = getattr(settings, "max_output_tokens", 1400)
         self.input_limit = self.context_window - self.max_output_tokens - 512
@@ -585,6 +593,19 @@ class Agent:
         self.tasks = TaskStore(
             repository.root, ephemeral=not persist_memory, redact=self.memory.redact
         )
+
+    def reset_calibration(self):
+        if self._lock.locked() or self.edits.pending:
+            raise ValueError("Conclua/cancele a ação atual antes de recalibrar.")
+        self.memory.reset_calibration()
+        if self._original_settings is not None:
+            self.provider.settings = self._original_settings
+            self.context_window = self._original_settings.context_window
+            self.max_output_tokens = self._original_settings.max_output_tokens
+        self.input_limit = self.context_window - self.max_output_tokens - 512
+        self.adaptive_input_limit = self.input_limit
+        self.counter.scale, self.counter.samples = 1.0, []
+        self._calibration_key = ""
 
     def set_mode(self, mode):
         if self._lock.locked() or self.edits.pending:
@@ -614,6 +635,7 @@ class Agent:
             raise ValueError("Conclua/cancele a ação atual antes de trocar de provedor/modelo.")
         self.provider = provider
         settings = provider.settings
+        self._original_settings = settings
         self.context_window, self.max_output_tokens = (
             settings.context_window,
             settings.max_output_tokens,
@@ -631,6 +653,7 @@ class Agent:
         )
         self.memory.redact = lambda value: current(previous(value))
         self.tasks.redact = self.memory.redact
+        self.turns = self.memory.redact(self.turns)
         self.policy.reset()
 
     def repository_info(self) -> dict:
@@ -719,6 +742,7 @@ class Agent:
             question,
             getattr(self.provider, "settings", None),
             allow_edits=self.allow_edits,
+            redact=self.memory.redact,
             limits={
                 "max_steps": self.max_steps,
                 "tool_budget": self.tool_budget,
@@ -731,11 +755,15 @@ class Agent:
             },
         )
         token = current_flow.set(flow)
+        deadline_token = request_deadline.set(lambda: self._deadline)
+        redactor_token = request_redactor.set(self.memory.redact)
         if not self.legacy:
             flow.data["mode"] = self.mode.value
 
         def record_detail(item: AgentEvent):
+            flow.append_event("activity", asdict(item))
             flow.data["events"].append(asdict(item))
+            flow.data["events"] = flow.data["events"][-200:]
             if on_detail is not None:
                 on_detail(item)
 
@@ -774,6 +802,30 @@ class Agent:
             if key != self._calibration_key:
                 self.counter.scale, self.counter.samples = 1.0, []
                 calibration = self.memory.calibration(key)
+                learned_window = (
+                    calibration.get("effective_window") if isinstance(calibration, dict) else None
+                )
+                learned_at = (
+                    calibration.get("learned_at", 0) if isinstance(calibration, dict) else 0
+                )
+                if (
+                    type(learned_window) is int
+                    and 4096 <= learned_window < self.context_window
+                    and type(learned_at) in (int, float)
+                    and 0 <= time.time() - learned_at < 86400
+                    and getattr(settings, "api_style", "") == "ollama"
+                ):
+                    self.context_window = learned_window
+                    self.max_output_tokens = min(
+                        self.max_output_tokens, max(128, learned_window // 4)
+                    )
+                    self.provider.settings = replace(
+                        settings,
+                        context_window=learned_window,
+                        max_output_tokens=self.max_output_tokens,
+                        context_source="Janela aprendida do Ollama (24h)",
+                    )
+                    self.input_limit = learned_window - self.max_output_tokens - 512
                 self.counter.restore(calibration)
                 self.adaptive_input_limit = self.input_limit
                 if isinstance(calibration, dict):
@@ -821,27 +873,10 @@ class Agent:
                 self.turns[-1][-1]["content"] = answer
                 while self.turns and len(serialize(self.turns)) > self.history_budget:
                     self.turns.pop(0)
+            answer = self.memory.redact(answer)
+            self.turns = self.memory.redact(self.turns)
             try:
-                actions = [
-                    {
-                        "tool": result["message"].get("name"),
-                        **{
-                            key: result["result"][key]
-                            for key in (
-                                "path",
-                                "start_line",
-                                "end_line",
-                                "exit_code",
-                                "timed_out",
-                                "proposal_id",
-                                "error",
-                            )
-                            if key in result["result"]
-                        },
-                    }
-                    for turn in flow.data["turns"]
-                    for result in turn["tool_results"]
-                ]
+                actions = flow.actions
                 identifier = self.memory.append(
                     flow.data["run_id"], question, answer, getattr(settings, "model", ""), actions
                 )
@@ -862,6 +897,23 @@ class Agent:
                     flow.data["task"] = self.tasks.current()
                 except (ValueError, OSError):
                     pass
+            try:
+                state = (
+                    "cancelled"
+                    if isinstance(exc, (RequestCancelled, KeyboardInterrupt))
+                    else "error"
+                )
+                excerpts = "\n".join(action.get("excerpt", "") for action in flow.actions)
+                self.memory.append(
+                    flow.data["run_id"],
+                    question,
+                    f"[{state}] {str(exc)}\nResultados históricos, não prova atual:\n"
+                    + excerpts[:5000],
+                    getattr(getattr(self.provider, "settings", None), "model", ""),
+                    [{"run_status": state, "archive": flow.archive_path.name}, *flow.actions],
+                )
+            except (ValueError, OSError, sqlite3.Error):
+                pass
             flow.finish(
                 "cancelled" if isinstance(exc, (RequestCancelled, KeyboardInterrupt)) else "error",
                 error=exc,
@@ -872,6 +924,8 @@ class Agent:
         finally:
             self._cancelled = None
             current_flow.reset(token)
+            request_deadline.reset(deadline_token)
+            request_redactor.reset(redactor_token)
             self._lock.release()
             guard.__exit__(None, None, None)
             if flow.write_error:
@@ -928,6 +982,42 @@ class Agent:
                 "omitted_items": 0,
                 "recover": "Use search_conversation para recuperar itens omitidos.",
             }
+            required_items = [item for item in task_context["items"] if item["source"] == "user"]
+            task_context["items"] = [
+                item for item in task_context["items"] if item["source"] != "user"
+            ]
+            pinned = []
+            loaded_guidance = set()
+
+            def load_guidance(path):
+                if not isinstance(path, str):
+                    return
+                target = Path(path)
+                target = target if target.is_absolute() else self.repository.root / target
+                if not self.repository.allowed(target):
+                    return
+                relative = self.repository._relative(target)
+                directory = self.repository.root
+                for part in relative.parts[:-1]:
+                    directory /= part
+                    rule = directory / "AGENTS.md"
+                    if rule not in loaded_guidance and rule.exists():
+                        text = self.repository.read_bytes(rule).decode("utf-8-sig")
+                        pinned.append(
+                            f"{rule.relative_to(self.repository.root)}: orientações para "
+                            f"{directory.relative_to(self.repository.root)}, subordinadas "
+                            "ao usuário e às aprovações:\n" + text
+                        )
+                        loaded_guidance.add(rule)
+
+            if required_items:
+                pinned.append("Decisões/restrições do usuário: " + serialize(required_items))
+            guidance = self.repository.root / "AGENTS.md"
+            if guidance.exists():
+                text = self.repository.read_bytes(guidance).decode("utf-8-sig")
+                pinned.append(
+                    "AGENTS.md: orientações subordinadas ao usuário e às aprovações:\n" + text
+                )
             while len(serialize(task_context)) > 2200 and task_context["items"]:
                 task_context["items"].pop()
                 task_context["omitted_items"] += 1
@@ -972,6 +1062,8 @@ class Agent:
             read_snapshots: dict[str, bytes] = {}
             recoveries = 0
             validation_repairs = 0
+            output_recoveries = 0
+            output_instruction = ""
             repeated = 0
             last_result = None
             stalled = False
@@ -1069,6 +1161,10 @@ class Agent:
                             "role": "system",
                             "content": prompt()
                             + "\n"
+                            + "\n".join(pinned)
+                            + "\n"
+                            + output_instruction
+                            + "\n"
                             + "\n".join(instructions)
                             + ("\n" + FINAL_INSTRUCTION if final else ""),
                         },
@@ -1089,6 +1185,7 @@ class Agent:
 
             def wire(payload):
                 convert = getattr(self.provider, "wire_payload", None)
+                payload = self.memory.redact(payload)
                 return convert(payload) if callable(convert) else payload
 
             def refresh_evidence():
@@ -1186,16 +1283,7 @@ class Agent:
                                 # Current request and approval enforcement remain intact.
                                 # Memory/source/repair hints can be retrieved again by tools.
                                 instructions.clear()
-                                constraints = [
-                                    item
-                                    for item in task_context["items"]
-                                    if item["source"] == "user"
-                                ]
-                                if constraints:
-                                    instructions.append(
-                                        "Decisões/restrições do usuário: " + serialize(constraints)
-                                    )
-                                bootstrap_count = len(instructions)
+                                bootstrap_count = 0
                                 turn[:] = [
                                     item
                                     for item in turn
@@ -1205,6 +1293,16 @@ class Agent:
                                     or (item.get("content") or "").startswith(COMPACT_PREFIX)
                                 ]
                                 record = {"kind": "minimal_tool_context"}
+                            elif self.max_output_tokens > 256:
+                                saved_output = self.max_output_tokens
+                                self.max_output_tokens = 256
+                                if getattr(self.provider, "settings", None) is not None:
+                                    self.provider.settings = replace(
+                                        self.provider.settings, max_output_tokens=256
+                                    )
+                                self.input_limit += saved_output - 256
+                                self.adaptive_input_limit += saved_output - 256
+                                record = {"kind": "reduced_output_reservation"}
                             else:
                                 break
                         refresh_evidence()
@@ -1223,7 +1321,7 @@ class Agent:
                             "status",
                             "Compactando contexto",
                             f"{record['input_tokens_before']} → {record['input_tokens_after']} "
-                            "tokens estimados; fluxo completo preservado no debug.",
+                            "tokens estimados; diagnóstico disponível no registro local.",
                         )
                     )
 
@@ -1272,6 +1370,7 @@ class Agent:
                                 "counter_method": self.counter.method,
                             },
                         )
+                    advertised = {tool["function"]["name"] for tool in tools or []}
                     try:
                         if streaming:
                             options = {}
@@ -1288,6 +1387,23 @@ class Agent:
                         else:
                             message = self.provider.complete(payload["messages"], tools)
                         break
+                    except OutputLimitError as exc:
+                        if output_recoveries >= 2:
+                            raise ContextCapacityError(
+                                "O modelo não finalizou esta etapa. O progresso foi salvo; "
+                                "podemos continuar com uma parte menor da tarefa."
+                            ) from exc
+                        output_recoveries += 1
+                        detail(AgentEvent("model_end", "Saída incompleta", state="retry"))
+                        if flow is not None and flow.turn is not None:
+                            flow.turn["error"] = {"type": type(exc).__name__, "message": str(exc)}
+                            flow.checkpoint()
+                        output_instruction = (
+                            "A saída anterior foi truncada e não foi aceita. "
+                            "Responda brevemente ou divida a operação em chamadas menores. "
+                            "Nunca execute JSON incompleto nem repita ações já aplicadas."
+                        )
+                        continue
                     except (ContextLimitError, OllamaMemoryError) as exc:
                         if flow is not None and flow.turn is not None:
                             flow.turn["error"] = {"type": type(exc).__name__, "message": str(exc)}
@@ -1336,6 +1452,8 @@ class Agent:
                                     "scale": self.counter.scale,
                                     "samples": self.counter.samples,
                                     "input_limit": self.adaptive_input_limit,
+                                    "effective_window": self.context_window,
+                                    "learned_at": time.time(),
                                 },
                             )
                         except (ValueError, OSError) as storage_error:
@@ -1380,6 +1498,8 @@ class Agent:
                                     "scale": self.counter.scale,
                                     "samples": self.counter.samples,
                                     "input_limit": self.adaptive_input_limit,
+                                    "effective_window": self.context_window,
+                                    "learned_at": time.time(),
                                 },
                             )
                         except (ValueError, OSError) as exc:
@@ -1428,6 +1548,26 @@ class Agent:
                 if not calls:
                     answer = message["content"]
                     self.sync_workspace(index)
+                    current_task = self.tasks.current() if not self.legacy else None
+                    if (
+                        self.mode == Mode.EXECUTE
+                        and current_task
+                        and current_task.get("requires_changes")
+                        and not (
+                            current_task.get("workspace_digest") is not None
+                            and current_task.get("verified_no_change_digest")
+                            == current_task.get("workspace_digest")
+                        )
+                        and (
+                            current_task.get("initial_digest")
+                            == current_task.get("workspace_digest")
+                        )
+                    ):
+                        answer = (
+                            "A implementação não foi concluída: nenhuma alteração foi registrada. "
+                            "Podemos continuar investigando a tarefa."
+                        )
+                        self.tasks.state("blocked", answer)
                     if (
                         not self.legacy
                         and self.mode == Mode.EXECUTE
@@ -1460,7 +1600,7 @@ class Agent:
                     raise ModelError(
                         "O modelo solicitou ferramentas após o limite de investigação."
                     )
-                if len(serialize(message)) > 16_000:
+                if len(serialize(message).encode("utf-8")) > min(128_000, self.context_budget):
                     raise ModelError("Lote de ferramentas excede o limite de contexto permitido.")
                 turn.append(message)
                 tool_error = False
@@ -1481,6 +1621,39 @@ class Agent:
                         self.validate_arguments(name, arguments)
                         if name == "propose_edit" and not self.allow_edits:
                             raise ValueError("Edição desabilitada nesta sessão.")
+                        if name not in advertised:
+                            raise ValueError(
+                                "Ferramenta não anunciada nesta chamada. "
+                                "Solicite novamente via request_tools e aguarde o próximo passo."
+                            )
+                        if name in {
+                            "propose_edit",
+                            "apply_changes",
+                            "run_command",
+                            "update_plan",
+                            "finish_task",
+                        }:
+                            current_task = self.tasks.current() if not self.legacy else None
+                            if current_task and current_task["state"] in {"completed", "planned"}:
+                                raise ValueError(
+                                    "Tarefa finalizada: somente síntese final permitida."
+                                )
+                        guidance_before = len(pinned)
+                        for path in [arguments["path"]] if "path" in arguments else []:
+                            load_guidance(path)
+                        if name == "apply_changes":
+                            for operation in arguments["operations"]:
+                                for field in ("path", "destination"):
+                                    if field in operation:
+                                        load_guidance(operation[field])
+                        if len(pinned) != guidance_before and name in {
+                            "apply_changes",
+                            "propose_edit",
+                        }:
+                            raise ValueError(
+                                "Orientações locais carregadas. Reavalie a operação com "
+                                "AGENTS.md no próximo passo antes de alterar arquivos."
+                            )
                         target = tool_target(name, arguments)
                         detail(AgentEvent("tool_start", title, target, state="running"))
                         # Compact before executing: discarded reads must not authorize
@@ -1495,6 +1668,11 @@ class Agent:
                             for pending in calls[call_index:]
                         ]
                         make_room(stubs, ratio=0.85 if self.legacy else 1.0)
+                        if not fits(request(stubs)):
+                            raise ValueError(
+                                "Instruções obrigatórias e resultado não cabem nesta etapa; "
+                                "nenhuma alteração executada. Selecione um modelo maior."
+                            )
                         remaining = self.tool_budget - used
                         if remaining < denial_reserve:
                             result = {"error": "Orçamento esgotado."}
@@ -1607,6 +1785,8 @@ class Agent:
                                         result = {
                                             "estimated_input_tokens": tokens,
                                             "input_limit": self.adaptive_input_limit,
+                                            "effective_window": self.context_window,
+                                            "learned_at": time.time(),
                                             "reserved_output_tokens": self.max_output_tokens,
                                             "compact_tools": slim,
                                         }
@@ -2220,6 +2400,7 @@ class Agent:
         if old != digest:
 
             def change(item):
+                item.setdefault("initial_digest", digest)
                 item["workspace_digest"] = digest
                 if old is not None:
                     item["revision"] += 1
@@ -2252,6 +2433,20 @@ class Agent:
             if self.mode == Mode.EXECUTE and status == "planned":
                 raise ValueError("No modo Executar, conclua ou informe um bloqueio.")
             task = self.tasks.current()
+            if status == "completed" and args.get("verified_no_change"):
+                current_checks = [
+                    item for item in task["validations"] if item["revision"] == task["revision"]
+                ]
+                if (
+                    not self.edits.observed
+                    or not current_checks
+                    or any(item["exit_code"] != 0 or item["timed_out"] for item in current_checks)
+                ):
+                    raise ValueError("Sem alteração exige leitura atual e validação aprovada.")
+                self.tasks.update(
+                    lambda item: item.update(verified_no_change_digest=task.get("workspace_digest"))
+                )
+                task = self.tasks.current()
             if status == "completed" and (
                 not self.tasks.validation_ready()
                 or any(step["state"] != "done" for step in task["plan"])

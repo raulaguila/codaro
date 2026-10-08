@@ -25,6 +25,7 @@ COMMANDS = {
     "/providers": "Cadastrar um provedor e sua API key (BYOK)",
     "/clear": "Limpar mensagens/contexto; mantém tarefa, escopo e propostas; permite desfazer",
     "/resume": "Retomar a última conversa salva neste projeto",
+    "/recalibrate": "Reaprender os limites de contexto do servidor",
     "/compact": "Reduzir o contexto aos quatro turnos mais recentes",
     "/history": "Buscar conversa com /history termos",
     "/memory": "Ver memória ou registrar decision/constraint/pending texto",

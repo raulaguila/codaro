@@ -449,6 +449,7 @@ def test_small_window_execution_compacts_without_reapplying_changes(tmp_path):
     content = "\n".join(f"v{i} = '{'x' * 80}'" for i in range(200)) + "\n"
     (tmp_path / "large.py").write_text(content)
     responses = [
+        call("request_tools", {"names": ["read_lines", "propose_edit"]}, "load-edit"),
         call("read_lines", {"path": "large.py", "start": 1, "end": 1}),
         call(
             "propose_edit",
@@ -460,6 +461,7 @@ def test_small_window_execution_compacts_without_reapplying_changes(tmp_path):
             },
         ),
     ]
+    responses.append(call("request_tools", {"names": ["read_lines"]}, "load-read"))
     for number in range(4):
         responses.append(
             call(
@@ -468,6 +470,7 @@ def test_small_window_execution_compacts_without_reapplying_changes(tmp_path):
             )
         )
     responses += [
+        call("request_tools", {"names": ["run_command"]}, "load-command"),
         call(
             "run_command",
             {

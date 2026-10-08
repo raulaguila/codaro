@@ -10,9 +10,11 @@ import httpx
 from codaro.provider import (
     MAX_MESSAGE_CHARS,
     MAX_RESPONSE_BYTES,
+    MAX_TOOL_ARGUMENT_BYTES,
     ContextLimitError,
     ModelError,
     OpenAICompatible,
+    OutputLimitError,
     build_payload,
     capture_wire,
     check_cancelled,
@@ -21,6 +23,7 @@ from codaro.provider import (
     sse_events,
     validate_message,
 )
+from codaro.runtime import redact_request, remaining_seconds
 
 
 class Anthropic(OpenAICompatible):
@@ -85,6 +88,8 @@ class Anthropic(OpenAICompatible):
             raise ModelError("Resposta Anthropic inválida.")
         reason = data.get("stop_reason")
         capture_wire("finish_reason", reason)
+        if reason == "max_tokens":
+            raise OutputLimitError("A Anthropic atingiu o limite de saída.")
         if reason not in {"end_turn", "tool_use", "stop_sequence"}:
             raise ModelError("A Anthropic não concluiu a resposta; confira o limite de saída.")
         content, calls = [], []
@@ -124,10 +129,14 @@ class Anthropic(OpenAICompatible):
                 max_tokens=self.settings.max_output_tokens,
             )
         )
+        payload = redact_request(payload)
         headers = {"x-api-key": self.settings.api_key, "anthropic-version": "2023-06-01"}
         try:
             with httpx.Client(
-                timeout=httpx.Timeout(self.settings.timeout, connect=10),
+                timeout=httpx.Timeout(
+                    min(self.settings.timeout, remaining_seconds() or self.settings.timeout),
+                    connect=min(10, remaining_seconds() or 10),
+                ),
                 verify=not self.settings.tls_insecure,
                 transport=self.transport,
             ) as client:
@@ -138,6 +147,7 @@ class Anthropic(OpenAICompatible):
                     flow = current_flow.get()
                     if flow is not None and flow.turn is not None:
                         flow.turn["http_attempts"].append({"attempt": attempt + 1})
+                    capture_wire("http_request", payload)
                     with client.stream(
                         "POST",
                         self.settings.base_url.rstrip("/") + "/messages",
@@ -255,7 +265,7 @@ class Anthropic(OpenAICompatible):
                     if not isinstance(fragment, str) or block.get("type") != "tool_use":
                         raise ModelError("Fragmento de ferramenta Anthropic inválido.")
                     block["partial_json"] += fragment
-                    if len(block["partial_json"]) > 8000:
+                    if len(block["partial_json"].encode("utf-8")) > MAX_TOOL_ARGUMENT_BYTES:
                         raise ModelError("Argumentos de ferramenta excedem o limite permitido.")
                 elif delta.get("type") == "thinking_delta" and on_reasoning:
                     fragment = delta.get("thinking")

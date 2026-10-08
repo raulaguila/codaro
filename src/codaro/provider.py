@@ -13,10 +13,12 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from codaro.runtime import redact_request, remaining_seconds
 from codaro.trace import current_flow
 
 MAX_RESPONSE_BYTES = 256_000
 MAX_MESSAGE_CHARS = 16_000
+MAX_TOOL_ARGUMENT_BYTES = 64_000
 MAX_STREAM_BYTES = 2_000_000
 
 
@@ -35,15 +37,15 @@ def build_payload(
 def capture_wire(kind: str, value):
     flow = current_flow.get()
     if flow is not None and flow.turn is not None and flow.turn["http_attempts"]:
-        attempt = flow.turn["http_attempts"][-1]
-        if kind in {"sse", "ndjson"}:
-            attempt.setdefault("sse_events" if kind == "sse" else "ndjson_events", []).append(value)
-        else:
-            attempt[kind] = value
+        flow.capture(kind, value)
 
 
 class ModelError(RuntimeError):
     """Provider failure with a user-facing message that excludes remote error bodies."""
+
+
+class OutputLimitError(ModelError):
+    """Incomplete output must be regenerated, never executed as tool arguments."""
 
 
 class OllamaMemoryError(ModelError):
@@ -142,6 +144,7 @@ class Settings:
     context_source: str = "configuração padrão/ambiente"
     api_style: str = "openai"
     model_max_output_tokens: int | None = None
+    include_stream_usage: bool = False
 
     def __post_init__(self):
         if self.api_style not in {"openai", "anthropic", "ollama"}:
@@ -158,6 +161,8 @@ class Settings:
             raise ValueError("Janela de contexto/limite de saída inválidos; reserve 512 tokens.")
         if self.token_encoding not in (None, "cl100k_base", "o200k_base"):
             raise ValueError("CODARO_TOKEN_ENCODING deve ser cl100k_base ou o200k_base.")
+        if type(self.include_stream_usage) is not bool:
+            raise ValueError("Stream usage deve ser booleano.")
         if type(self.tls_insecure) is not bool:
             raise ValueError("TLS insecure deve ser booleano.")
         try:
@@ -264,6 +269,7 @@ class Settings:
             provider_id=configured.provider_id if configured else "",
             api_style=configured.api_style if configured else "openai",
             model_max_output_tokens=configured.model_max_output_tokens if configured else None,
+            include_stream_usage=configured.include_stream_usage if configured else False,
             context_source=(
                 "configuração do usuário"
                 if context_window is not None or os.getenv("CODARO_CONTEXT_WINDOW")
@@ -309,7 +315,7 @@ def validate_message(message: object) -> dict:
             or not name
             or len(name) > 80
             or not isinstance(arguments, str)
-            or len(arguments) > 8000
+            or len(arguments.encode("utf-8")) > MAX_TOOL_ARGUMENT_BYTES
         ):
             raise ModelError("Nome ou argumentos da ferramenta inválidos.")
         ids.add(identifier)
@@ -328,8 +334,18 @@ class OpenAICompatible:
     def chat_url(self):
         return f"{self.settings.base_url.rstrip('/')}/chat/completions"
 
-    @staticmethod
-    def wire_payload(payload):
+    def wire_payload(self, payload):
+        payload = dict(payload)
+        if (
+            payload.get("stream")
+            and self.settings.api_style == "openai"
+            and (
+                self.settings.include_stream_usage
+                or urlsplit(self.settings.base_url).hostname == "api.openai.com"
+            )
+            and getattr(self, "_stream_usage_supported", True)
+        ):
+            payload["stream_options"] = {"include_usage": True}
         return payload
 
     def __init__(self, settings: Settings, transport: httpx.BaseTransport | None = None):
@@ -434,21 +450,26 @@ class OpenAICompatible:
             streaming=on_delta is not None,
             max_tokens=self.settings.max_output_tokens,
         )
-        payload = self.wire_payload(payload)
+        payload = redact_request(self.wire_payload(payload))
         headers = {"Content-Type": "application/json"}
         if self.settings.api_key:
             headers["Authorization"] = f"Bearer {self.settings.api_key}"
         try:
             with httpx.Client(
-                timeout=httpx.Timeout(self.settings.timeout, connect=10),
+                timeout=httpx.Timeout(
+                    min(self.settings.timeout, remaining_seconds() or self.settings.timeout),
+                    connect=min(10, remaining_seconds() or 10),
+                ),
                 transport=self.transport,
                 verify=not self.settings.tls_insecure,
             ) as client:
-                for attempt in range(3):
+                negotiated_usage = False
+                for attempt in range(4):
                     check_cancelled(cancelled)
                     flow = current_flow.get()
                     if flow is not None and flow.turn is not None:
                         flow.turn["http_attempts"].append({"attempt": attempt + 1})
+                    capture_wire("http_request", payload)
                     with client.stream(
                         "POST",
                         self.chat_url,
@@ -466,6 +487,26 @@ class OpenAICompatible:
                                 if len(raw_error) >= 64_000:
                                     break
                             capture_wire("error_body", raw_error.decode("utf-8", errors="replace"))
+                            if (
+                                response.status_code in {400, 422}
+                                and "stream_options" in payload
+                                and (
+                                    "stream_options" in raw_error.decode("utf-8", errors="replace")
+                                    and any(
+                                        word in raw_error.decode("utf-8", errors="replace").lower()
+                                        for word in (
+                                            "unsupported",
+                                            "unknown",
+                                            "unrecognized",
+                                            "not permitted",
+                                        )
+                                    )
+                                )
+                            ):
+                                payload.pop("stream_options")
+                                self._stream_usage_supported = False
+                                negotiated_usage = True
+                                continue
                             if self.settings.api_style == "ollama" and any(
                                 phrase in raw_error.decode("utf-8", errors="replace").lower()
                                 for phrase in (
@@ -491,7 +532,9 @@ class OpenAICompatible:
                                         raw_error.decode("utf-8", errors="replace")
                                     ),
                                 )
-                        if response.status_code in {429, 502, 503, 504} and attempt < 2:
+                        if response.status_code in {429, 502, 503, 504} and attempt < 2 + int(
+                            negotiated_usage
+                        ):
                             if cancelled is None:
                                 time.sleep(0.25 * 2**attempt)
                             elif cancelled.wait(0.25 * 2**attempt):
@@ -544,6 +587,7 @@ class OpenAICompatible:
             capture_wire(
                 "response_body", raw[:MAX_RESPONSE_BYTES].decode("utf-8", errors="replace")
             )
+        check_cancelled(cancelled)
         data = json.loads(raw)
         choices = data["choices"]
         if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
@@ -664,7 +708,10 @@ class OpenAICompatible:
                         if not isinstance(arguments, str):
                             raise ValueError("invalid arguments delta")
                         call["function"]["arguments"] += arguments
-                        if len(call["function"]["arguments"]) > 8000:
+                        if (
+                            len(call["function"]["arguments"].encode("utf-8"))
+                            > MAX_TOOL_ARGUMENT_BYTES
+                        ):
                             raise ModelError("Argumentos de ferramenta excedem o limite permitido.")
             reason = choice.get("finish_reason")
             if reason is not None:
@@ -689,6 +736,9 @@ class OpenAICompatible:
 
 
 def check_cancelled(cancelled: threading.Event | None):
+    remaining = remaining_seconds()
+    if remaining is not None and remaining <= 0:
+        raise ModelError("Prazo da tarefa atingido; progresso salvo para retomada.")
     if cancelled is not None and cancelled.is_set():
         raise RequestCancelled("Investigação cancelada.")
 
@@ -707,7 +757,7 @@ def create_provider(settings, *, transport=None):
 
 def check_finish_reason(reason: str | None):
     if reason == "length":
-        raise ModelError("O modelo atingiu o limite de saída. Faça uma pergunta menor.")
+        raise OutputLimitError("O modelo atingiu o limite de saída.")
     if reason == "content_filter":
         raise ModelError("O provedor interrompeu a geração da resposta.")
     if reason == "function_call":
