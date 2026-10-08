@@ -1,0 +1,109 @@
+[
+  {
+    "case": "user_constraints",
+    "stored": 8,
+    "sent": 5
+  },
+  {
+    "case": "project_guidance",
+    "locally_read": true,
+    "sent": false,
+    "compactions": [
+      "initial_context",
+      "compact_prompt_and_tools"
+    ]
+  },
+  {
+    "case": "pending_proposal_next_turn",
+    "blocked": true,
+    "before": 1,
+    "after": 1,
+    "file": "x = 1\n"
+  },
+  {
+    "case": "pending_proposal_failure",
+    "states": [
+      "rejected"
+    ],
+    "pending": 0
+  },
+  {
+    "case": "old_key_after_provider_change",
+    "present_in_new_trace": true,
+    "present_in_new_request": true
+  },
+  {
+    "case": "completion_without_work",
+    "task_state": "completed",
+    "revision": 0,
+    "validations": [],
+    "file_unchanged": true,
+    "answer": "Alterado e validado."
+  },
+  {
+    "case": "unadvertised_tool",
+    "advertised": false,
+    "executed_successfully": true
+  },
+  {
+    "case": "openai_stream_usage",
+    "requests_usage": false
+  },
+  {
+    "case": "anthropic_framing",
+    "native_messages": 2,
+    "counted_message_framing": 32,
+    "expected_message_framing": 32
+  },
+  {
+    "case": "failed_conversation_recovery",
+    "search": {
+      "results": []
+    },
+    "last_trace_contains_failed_question": true,
+    "last_trace_contains_failed_excerpt": false
+  },
+  {
+    "case": "stream_deadline",
+    "configured_seconds": 1,
+    "elapsed_seconds": 1.515,
+    "deltas_after_deadline": 3
+  },
+  {
+    "case": "schema_transport_limits",
+    "valid_for_tool": true,
+    "argument_chars": 9089,
+    "rejected_by_transport": true
+  },
+  {
+    "case": "memory_window_after_restart",
+    "requested_windows": [
+      131072,
+      65536,
+      32768,
+      16384,
+      131072,
+      65536,
+      32768,
+      16384
+    ]
+  },
+  {
+    "case": "memory_error_in_stream",
+    "error_type": "ModelError",
+    "attempts": 1,
+    "requested_windows": [
+      131072
+    ]
+  },
+  {
+    "case": "output_limit_recovery",
+    "attempts": 1,
+    "error_type": "ModelError"
+  },
+  {
+    "case": "trace_budget",
+    "file_bytes": 3202068,
+    "write_error": null
+  }
+]
