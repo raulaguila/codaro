@@ -1,0 +1,30 @@
+                                                                                                    
+  ◈ Codaro                                                                                          
+  /tmp/codaro-ux-tdpkiopd/cancel · test-model · Perguntar · Aprovação por ação · HTTP               
+                                                                                                    
+  › Olá, como usar o assistente?                                                                    
+                                                                                                    
+   ▶ Raciocínio · 1 etapa                                                                           
+                                                                                                    
+   ▶ Prévia interrompida · sem resposta concluída                                                   
+                                                                                                    
+   Local/ambiente / test-model                                                                      
+   Investigação cancelada.                                                                          
+                                                                                                    
+  ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔  
+              Repetir                        Configurar                     Outro modelo            
+  ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁  
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+  Contexto ≈ 4,263/11,776 · configuração padrão/ambiente · /status                                  
+  Pronto                                                                                            
+ ────────────────────────────────────────────────────────────────────────────────────────────────── 
+  Próximo rascunho                                                                                  
+                                                                                                    
+  Enter envia · Alt+Enter nova linha · / comandos · @ arquivo · ↑ histórico                         
+ Ctrl+X Cancelar  Ctrl+Q Sair  Ctrl+L Mensagens  Ctrl+P Comandos                                    

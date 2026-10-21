@@ -13,6 +13,7 @@ from contextlib import nullcontext
 from dataclasses import asdict, replace
 from pathlib import Path
 
+from codaro.agent import lifecycle
 from codaro.agent.arguments import validate_arguments
 from codaro.agent.events import AgentEvent, InvestigationCancelled
 from codaro.agent.execution import execute_tool
@@ -28,6 +29,7 @@ from codaro.agent.prompts import MODE_INSTRUCTIONS, SYSTEM
 from codaro.agent.reading import initial_context, overview_context
 from codaro.agent.requests import build_request
 from codaro.agent.results import ResultBudgetError, fit_result
+from codaro.agent.reviews import review_changes
 from codaro.agent.schemas import (
     ALL_DEFINITIONS,
     CHANGES_TOOL,
@@ -237,74 +239,13 @@ class Agent:
                     pass
 
     def reset_calibration(self):
-        if self._lock.locked() or self.edits.pending:
-            raise ValueError("Conclua/cancele a ação atual antes de recalibrar.")
-        self.memory.reset_calibration()
-        if self._original_settings is not None:
-            self.provider.settings = self._original_settings
-            self.context_window = self._original_settings.context_window
-            self.max_output_tokens = self._original_settings.output_reserve
-        self.input_limit = self.context_window - self.max_output_tokens - 512
-        self.adaptive_input_limit = self.input_limit
-        if self._configured_context_budget is None:
-            self.context_budget = max(64_000, min(512_000, self.context_window * 3))
-        self.counter.scale, self.counter.samples = 1.0, []
-        self._calibration_key = ""
+        return lifecycle.reset_calibration(self)
 
     def set_mode(self, mode):
-        if self._lock.locked() or self.edits.pending:
-            raise ValueError("Conclua/cancele a ação atual antes de trocar de modo.")
-        self.mode = Mode(mode)
-        self.allow_edits = self.mode == Mode.EXECUTE
-        self._pending_text_continuation = False
-        self.policy.reset()
-        self.max_steps = (
-            self._configured_steps
-            if self._configured_steps is not None
-            else 8
-            if self.mode == Mode.ASK
-            else 20
-            if self.mode == Mode.PLAN
-            else 32
-        )
-        self.tool_budget = (
-            self._configured_tool_budget
-            if self._configured_tool_budget is not None
-            else 24_000
-            if self.mode == Mode.ASK
-            else 96_000
-        )
+        return lifecycle.set_mode(self, mode)
 
     def set_provider(self, provider):
-        if self._lock.locked() or self.edits.pending:
-            raise ValueError("Conclua/cancele a ação atual antes de trocar de provedor/modelo.")
-        self.provider = provider
-        settings = provider.settings
-        self._original_settings = settings
-        self.context_window, self.max_output_tokens = (
-            settings.context_window,
-            settings.output_reserve,
-        )
-        if self._configured_context_budget is None:
-            self.context_budget = max(64_000, min(512_000, self.context_window * 3))
-        self.input_limit = self.context_window - self.max_output_tokens - 512
-        self.adaptive_input_limit = self.input_limit
-        self.local_read_budget = min(6000, max(1200, self.input_limit // 3))
-        self.counter = TokenCounter(settings.token_encoding)
-        self.context.counter = self.counter
-        self.artifacts.redact = self.memory.redact
-        self._calibration_key = ""
-        from codaro.sessions import SessionStore
-
-        previous, current = (
-            self.memory.redact,
-            SessionStore(self.repository.root, settings.api_key).redact,
-        )
-        self.memory.redact = lambda value: current(previous(value))
-        self.tasks.redact = self.memory.redact
-        self.turns = self.memory.redact(self.turns)
-        self.artifacts.redact = self.memory.redact
-        self.policy.reset()
+        return lifecycle.set_provider(self, provider)
 
     def repository_info(self) -> dict:
         return {
@@ -2063,101 +2004,7 @@ class Agent:
         return validate_arguments(name, args)
 
     def review_changes(self, proposals):
-        if self.mode != Mode.EXECUTE:
-            raise ValueError("Alterações disponíveis somente no modo Executar.")
-        task = self.tasks.current() or self.tasks.start("Aplicar alteração solicitada")
-        for proposal in proposals:
-            proposal.task_id = task["id"]
-        paths = [proposal.path for proposal in proposals]
-        self.tasks.state("awaiting_approval")
-        self._detail(AgentEvent("status", "Aguardando aprovação", " · ".join(paths)))
-        started = time.monotonic()
-        try:
-            approved = self.policy.permits_paths(task["id"], paths) or (
-                self.approve_edit is not None and self.approve_edit(proposals, self._cancelled)
-            )
-        finally:
-            self._deadline += time.monotonic() - started
-        if self._cancelled is not None and self._cancelled.is_set():
-            raise InvestigationCancelled("Execução cancelada durante a revisão.")
-        self.tasks.event(
-            "approval",
-            {
-                "kind_action": "changes",
-                "paths": paths,
-                "approved": bool(approved),
-                "policy": self.policy.kind,
-            },
-        )
-        changes = []
-        if not approved:
-            for proposal in proposals:
-                self.edits.reject(proposal.id)
-            self.tasks.state("blocked", "Alteração rejeitada pelo usuário.")
-            return {
-                "state": "rejected",
-                "changes": [{"path": path, "state": "rejected"} for path in paths],
-            }
-        self.tasks.state("executing")
-        for position, proposal in enumerate(proposals):
-            if self._cancelled is not None and self._cancelled.is_set():
-                for pending in proposals[position:]:
-                    self.edits.reject(pending.id)
-                raise InvestigationCancelled(
-                    "Execução cancelada; alterações aplicadas foram mantidas."
-                )
-            # Persist intent before touching source; a crash leaves an inspectable task/checkpoint.
-            self.tasks.event(
-                "change_started",
-                {
-                    "proposal": proposal.id,
-                    "path": proposal.path,
-                    "before": hashlib.sha256(proposal.before).hexdigest(),
-                    "after": hashlib.sha256(proposal.after).hexdigest(),
-                },
-            )
-            try:
-                self.edits.apply(proposal.id)
-            except (ValueError, OSError) as exc:
-                changes.append({"path": proposal.path, "state": proposal.state, "error": str(exc)})
-                for pending in proposals[position + 1 :]:
-                    self.edits.reject(pending.id)
-                    changes.append({"path": pending.path, "state": "not_applied"})
-                self.tasks.state(
-                    "blocked", "Conjunto parcialmente aplicado ou bloqueado por conflito."
-                )
-                return {"state": "partial" if position else "conflict", "changes": changes}
-            entry = {
-                "path": proposal.path,
-                "state": "applied",
-                "checkpoint_id": proposal.checkpoint_id,
-            }
-            if proposal.checkpoint_warning:
-                entry["warning"] = proposal.checkpoint_warning
-            changes.append(entry)
-            try:
-                self.tasks.changed(proposal.path, proposal.checkpoint_id)
-                self.memory.record_change(
-                    proposal, "Alteração aplicada durante a execução da tarefa."
-                )
-            except (ValueError, OSError) as exc:
-                entry["warning"] = "Arquivo aplicado; registro de continuidade falhou: " + str(exc)
-                for pending in proposals[position + 1 :]:
-                    self.edits.reject(pending.id)
-                    changes.append({"path": pending.path, "state": "not_applied"})
-                return {"state": "partial", "changes": changes}
-            self._detail(AgentEvent("status", "Alteração aplicada", proposal.path))
-        self.edits.observed.clear()
-        result = {"state": "applied", "changes": changes, "validation_required": True}
-        if self.features["lsp"]["enabled"]:
-            from codaro.lsp import diagnostics
-
-            result["diagnostics"] = [
-                diagnostics(self.repository, path, self.features["lsp"], self._cancelled)
-                for path in paths[:2]
-                if (self.repository.root / path).is_file()
-            ]
-        return result
+        return review_changes(self, proposals)
 
     def sync_workspace(self, index):
         if self.mode == Mode.ASK or self.legacy:
@@ -2182,38 +2029,7 @@ class Agent:
             self.tasks.update(change)
 
     def activate_session(self, identifier):
-        if self._lock.locked() or self.edits.pending:
-            raise ValueError("Aguarde a execução e revise propostas antes de trocar sessão.")
-        self._pending_text_continuation = False
-        store = self.sessions.store(identifier)
-        try:
-            turns = store.load()
-        except FileNotFoundError:
-            turns = []
-        summary = self.sessions.summary(identifier)
-        self.sessions.activate(identifier)
-        old_redact = self.memory.redact
-        self.memory = ConversationMemory(
-            self.repository.root,
-            getattr(getattr(self.provider, "settings", None), "api_key", ""),
-            ephemeral=self.tasks.ephemeral,
-        )
-        self.memory.redact = old_redact
-        self.tasks = TaskStore(
-            self.repository.root, ephemeral=self.tasks.ephemeral, redact=old_redact
-        )
-        if identifier != "default":
-            self.memory.path = self.repository.root / (".codaro/memory-" + identifier + ".sqlite3")
-            self.tasks.path = self.repository.root / (".codaro/tasks-" + identifier + ".json")
-        self.edits.checkpoints.session_id = identifier
-        self.session_id = self.artifacts.session_id = identifier
-        self.artifacts.redact = old_redact
-        self.turns = turns
-        self.context.summary = summary
-        self.policy.reset()
-        self.edits.observed.clear()
-        self.edits.proposals.clear()
-        return store
+        return lifecycle.activate_session(self, identifier)
 
     def execute(self, index, name, args):
         return execute_tool(self, index, name, args)

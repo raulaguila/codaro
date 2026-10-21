@@ -1,0 +1,24 @@
+                                                                                
+  ◈ Codaro                                                                      
+  /tmp/codaro-ux-tdpkiopd/layout-80 · test-model                                
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+                                                                                
+  🔎 Buscar comandos…                                                           
+                                                                                
+                                                                                
+  Ajuda                                                                         
+  /help · Comandos e atalhos                                                    
+  Ampliar painel                                                                
+  Ampliar elemento atual                                                      ▅▅
+  Atalhos                                                                       
+  Mostrar teclas disponíveis                                                    
+  Cadastrar MCP ou plugin                                                       
+  /integrations · Confiar, testar e cadastrar uma integração                    
+  Cadastrar provedor                                                            
+  /providers · Cadastrar API key e listar modelos do provedor (BYOK).           
+  Capturar tela                                                                 
+  Salvar captura SVG                                                            
+  Compactar contexto                                                            
+  /compact · Reduzir histórico enviado ao modelo                                
+▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+ Ctrl+X Cancelar  Ctrl+Q Sair  Ctrl+L Mensagens  Ctrl+P Comandos                

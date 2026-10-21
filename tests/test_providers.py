@@ -53,6 +53,8 @@ def test_registration_selection_and_env_precedence(tmp_path, monkeypatch):
     monkeypatch.delenv("CODARO_MAX_OUTPUT_TOKENS")
     assert Settings.from_env(context_window=4096).context_window == 4096
     monkeypatch.setenv("CODARO_MODEL", "legacy-model")
+    assert Settings.from_env().model == "small"
+    monkeypatch.setenv("CODARO_PROVIDER", "env")
     assert Settings.from_env().model == "legacy-model"
     monkeypatch.setenv("CODARO_PROVIDER", "groq")
     assert Settings.from_env().model == "small"

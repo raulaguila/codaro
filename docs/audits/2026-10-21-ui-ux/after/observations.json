@@ -1,0 +1,1891 @@
+[
+  {
+    "scenario": "welcome",
+    "size": [
+      60,
+      20
+    ],
+    "prompt": {
+      "region": [
+        1,
+        15,
+        58,
+        3
+      ],
+      "visible": [
+        1,
+        15,
+        58,
+        3
+      ],
+      "fully_visible": true
+    },
+    "chat": {
+      "region": [
+        0,
+        4,
+        60,
+        9
+      ],
+      "visible": [
+        0,
+        4,
+        60,
+        9
+      ],
+      "fully_visible": true
+    },
+    "buttons": {
+      "configure-start": {
+        "region": [
+          3,
+          6,
+          54,
+          1
+        ],
+        "visible": [
+          3,
+          6,
+          54,
+          1
+        ],
+        "fully_visible": true
+      },
+      "suggest-explore": {
+        "region": [
+          3,
+          10,
+          18,
+          1
+        ],
+        "visible": [
+          3,
+          10,
+          18,
+          1
+        ],
+        "fully_visible": true
+      },
+      "suggest-search": {
+        "region": [
+          21,
+          10,
+          18,
+          1
+        ],
+        "visible": [
+          21,
+          10,
+          18,
+          1
+        ],
+        "fully_visible": true
+      },
+      "suggest-edit": {
+        "region": [
+          39,
+          10,
+          18,
+          1
+        ],
+        "visible": [
+          39,
+          10,
+          18,
+          1
+        ],
+        "fully_visible": true
+      },
+      "new-messages": {
+        "intentionally_hidden": true,
+        "fully_visible": false
+      }
+    }
+  },
+  {
+    "scenario": "completion",
+    "size": [
+      60,
+      20
+    ],
+    "chat_height": 4,
+    "menu": {
+      "region": [
+        2,
+        10,
+        56,
+        5
+      ],
+      "visible": [
+        2,
+        10,
+        56,
+        5
+      ],
+      "fully_visible": true
+    }
+  },
+  {
+    "scenario": "provider",
+    "size": [
+      60,
+      20
+    ],
+    "focused": "provider-fields",
+    "controls": {
+      "provider-save": {
+        "region": [
+          3,
+          12,
+          53,
+          3
+        ],
+        "visible": [
+          3,
+          12,
+          53,
+          3
+        ],
+        "fully_visible": true
+      },
+      "provider-test": {
+        "region": [
+          3,
+          15,
+          26,
+          3
+        ],
+        "visible": [
+          3,
+          15,
+          26,
+          3
+        ],
+        "fully_visible": true
+      },
+      "provider-back": {
+        "region": [
+          29,
+          15,
+          27,
+          3
+        ],
+        "visible": [
+          29,
+          15,
+          27,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "models",
+    "size": [
+      60,
+      20
+    ],
+    "focused": "model-fields",
+    "controls": {
+      "model-use": {
+        "region": [
+          3,
+          15,
+          17,
+          3
+        ],
+        "visible": [
+          3,
+          15,
+          17,
+          3
+        ],
+        "fully_visible": true
+      },
+      "model-refresh": {
+        "region": [
+          20,
+          15,
+          18,
+          3
+        ],
+        "visible": [
+          20,
+          15,
+          18,
+          3
+        ],
+        "fully_visible": true
+      },
+      "model-back": {
+        "region": [
+          38,
+          15,
+          18,
+          3
+        ],
+        "visible": [
+          38,
+          15,
+          18,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "manager",
+    "size": [
+      60,
+      20
+    ],
+    "focused": "profile-list",
+    "controls": {
+      "profile-edit-local": {
+        "region": [
+          5,
+          7,
+          25,
+          3
+        ],
+        "visible": [
+          5,
+          7,
+          25,
+          3
+        ],
+        "fully_visible": true
+      },
+      "profile-remove-local": {
+        "region": [
+          30,
+          7,
+          25,
+          3
+        ],
+        "visible": [
+          30,
+          7,
+          25,
+          3
+        ],
+        "fully_visible": true
+      },
+      "profile-add": {
+        "region": [
+          5,
+          13,
+          25,
+          3
+        ],
+        "visible": [
+          5,
+          13,
+          25,
+          3
+        ],
+        "fully_visible": true
+      },
+      "manager-back": {
+        "region": [
+          30,
+          13,
+          25,
+          3
+        ],
+        "visible": [
+          30,
+          13,
+          25,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "new",
+    "size": [
+      60,
+      20
+    ],
+    "focused": "cancel-conversation",
+    "controls": {
+      "begin-conversation": {
+        "region": [
+          5,
+          12,
+          25,
+          3
+        ],
+        "visible": [
+          5,
+          12,
+          25,
+          3
+        ],
+        "fully_visible": true
+      },
+      "cancel-conversation": {
+        "region": [
+          30,
+          12,
+          25,
+          3
+        ],
+        "visible": [
+          30,
+          12,
+          25,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "command",
+    "size": [
+      60,
+      20
+    ],
+    "focused": "reject-command",
+    "controls": {
+      "approve-command": {
+        "region": [
+          3,
+          15,
+          26,
+          3
+        ],
+        "visible": [
+          3,
+          15,
+          26,
+          3
+        ],
+        "fully_visible": true
+      },
+      "reject-command": {
+        "region": [
+          29,
+          15,
+          27,
+          3
+        ],
+        "visible": [
+          29,
+          15,
+          27,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "scope",
+    "size": [
+      60,
+      20
+    ],
+    "focused": "cancel-scope",
+    "controls": {
+      "grant-scope": {
+        "region": [
+          3,
+          15,
+          26,
+          3
+        ],
+        "visible": [
+          3,
+          15,
+          26,
+          3
+        ],
+        "fully_visible": true
+      },
+      "cancel-scope": {
+        "region": [
+          29,
+          15,
+          27,
+          3
+        ],
+        "visible": [
+          29,
+          15,
+          27,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "palette",
+    "size": [
+      60,
+      20
+    ],
+    "opened": "CommandPalette"
+  },
+  {
+    "scenario": "welcome",
+    "size": [
+      80,
+      24
+    ],
+    "prompt": {
+      "region": [
+        1,
+        19,
+        78,
+        3
+      ],
+      "visible": [
+        1,
+        19,
+        78,
+        3
+      ],
+      "fully_visible": true
+    },
+    "chat": {
+      "region": [
+        0,
+        4,
+        80,
+        13
+      ],
+      "visible": [
+        0,
+        4,
+        80,
+        13
+      ],
+      "fully_visible": true
+    },
+    "buttons": {
+      "configure-start": {
+        "region": [
+          3,
+          6,
+          74,
+          1
+        ],
+        "visible": [
+          3,
+          6,
+          74,
+          1
+        ],
+        "fully_visible": true
+      },
+      "suggest-explore": {
+        "region": [
+          3,
+          10,
+          24,
+          1
+        ],
+        "visible": [
+          3,
+          10,
+          24,
+          1
+        ],
+        "fully_visible": true
+      },
+      "suggest-search": {
+        "region": [
+          27,
+          10,
+          25,
+          1
+        ],
+        "visible": [
+          27,
+          10,
+          25,
+          1
+        ],
+        "fully_visible": true
+      },
+      "suggest-edit": {
+        "region": [
+          52,
+          10,
+          25,
+          1
+        ],
+        "visible": [
+          52,
+          10,
+          25,
+          1
+        ],
+        "fully_visible": true
+      },
+      "new-messages": {
+        "intentionally_hidden": true,
+        "fully_visible": false
+      }
+    }
+  },
+  {
+    "scenario": "completion",
+    "size": [
+      80,
+      24
+    ],
+    "chat_height": 7,
+    "menu": {
+      "region": [
+        2,
+        13,
+        76,
+        6
+      ],
+      "visible": [
+        2,
+        13,
+        76,
+        6
+      ],
+      "fully_visible": true
+    }
+  },
+  {
+    "scenario": "provider",
+    "size": [
+      80,
+      24
+    ],
+    "focused": "provider-fields",
+    "controls": {
+      "provider-save": {
+        "region": [
+          4,
+          15,
+          72,
+          3
+        ],
+        "visible": [
+          4,
+          15,
+          72,
+          3
+        ],
+        "fully_visible": true
+      },
+      "provider-test": {
+        "region": [
+          4,
+          18,
+          36,
+          3
+        ],
+        "visible": [
+          4,
+          18,
+          36,
+          3
+        ],
+        "fully_visible": true
+      },
+      "provider-back": {
+        "region": [
+          40,
+          18,
+          36,
+          3
+        ],
+        "visible": [
+          40,
+          18,
+          36,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "models",
+    "size": [
+      80,
+      24
+    ],
+    "focused": "model-fields",
+    "controls": {
+      "model-use": {
+        "region": [
+          4,
+          18,
+          24,
+          3
+        ],
+        "visible": [
+          4,
+          18,
+          24,
+          3
+        ],
+        "fully_visible": true
+      },
+      "model-refresh": {
+        "region": [
+          28,
+          18,
+          24,
+          3
+        ],
+        "visible": [
+          28,
+          18,
+          24,
+          3
+        ],
+        "fully_visible": true
+      },
+      "model-back": {
+        "region": [
+          52,
+          18,
+          24,
+          3
+        ],
+        "visible": [
+          52,
+          18,
+          24,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "manager",
+    "size": [
+      80,
+      24
+    ],
+    "focused": "profile-list",
+    "controls": {
+      "profile-edit-local": {
+        "region": [
+          6,
+          8,
+          34,
+          3
+        ],
+        "visible": [
+          6,
+          8,
+          34,
+          3
+        ],
+        "fully_visible": true
+      },
+      "profile-remove-local": {
+        "region": [
+          40,
+          8,
+          34,
+          3
+        ],
+        "visible": [
+          40,
+          8,
+          34,
+          3
+        ],
+        "fully_visible": true
+      },
+      "profile-add": {
+        "region": [
+          6,
+          17,
+          34,
+          3
+        ],
+        "visible": [
+          6,
+          17,
+          34,
+          3
+        ],
+        "fully_visible": true
+      },
+      "manager-back": {
+        "region": [
+          40,
+          17,
+          34,
+          3
+        ],
+        "visible": [
+          40,
+          17,
+          34,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "new",
+    "size": [
+      80,
+      24
+    ],
+    "focused": "cancel-conversation",
+    "controls": {
+      "begin-conversation": {
+        "region": [
+          6,
+          14,
+          34,
+          3
+        ],
+        "visible": [
+          6,
+          14,
+          34,
+          3
+        ],
+        "fully_visible": true
+      },
+      "cancel-conversation": {
+        "region": [
+          40,
+          14,
+          34,
+          3
+        ],
+        "visible": [
+          40,
+          14,
+          34,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "command",
+    "size": [
+      80,
+      24
+    ],
+    "focused": "reject-command",
+    "controls": {
+      "approve-command": {
+        "region": [
+          4,
+          17,
+          36,
+          3
+        ],
+        "visible": [
+          4,
+          17,
+          36,
+          3
+        ],
+        "fully_visible": true
+      },
+      "reject-command": {
+        "region": [
+          40,
+          17,
+          36,
+          3
+        ],
+        "visible": [
+          40,
+          17,
+          36,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "scope",
+    "size": [
+      80,
+      24
+    ],
+    "focused": "cancel-scope",
+    "controls": {
+      "grant-scope": {
+        "region": [
+          4,
+          18,
+          36,
+          3
+        ],
+        "visible": [
+          4,
+          18,
+          36,
+          3
+        ],
+        "fully_visible": true
+      },
+      "cancel-scope": {
+        "region": [
+          40,
+          18,
+          36,
+          3
+        ],
+        "visible": [
+          40,
+          18,
+          36,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "palette",
+    "size": [
+      80,
+      24
+    ],
+    "opened": "CommandPalette"
+  },
+  {
+    "scenario": "welcome",
+    "size": [
+      120,
+      35
+    ],
+    "prompt": {
+      "region": [
+        1,
+        30,
+        118,
+        3
+      ],
+      "visible": [
+        1,
+        30,
+        118,
+        3
+      ],
+      "fully_visible": true
+    },
+    "chat": {
+      "region": [
+        0,
+        3,
+        120,
+        25
+      ],
+      "visible": [
+        0,
+        3,
+        120,
+        25
+      ],
+      "fully_visible": true
+    },
+    "buttons": {
+      "configure-start": {
+        "region": [
+          3,
+          5,
+          78,
+          1
+        ],
+        "visible": [
+          3,
+          5,
+          78,
+          1
+        ],
+        "fully_visible": true
+      },
+      "suggest-explore": {
+        "region": [
+          3,
+          9,
+          26,
+          1
+        ],
+        "visible": [
+          3,
+          9,
+          26,
+          1
+        ],
+        "fully_visible": true
+      },
+      "suggest-search": {
+        "region": [
+          29,
+          9,
+          26,
+          1
+        ],
+        "visible": [
+          29,
+          9,
+          26,
+          1
+        ],
+        "fully_visible": true
+      },
+      "suggest-edit": {
+        "region": [
+          55,
+          9,
+          26,
+          1
+        ],
+        "visible": [
+          55,
+          9,
+          26,
+          1
+        ],
+        "fully_visible": true
+      },
+      "new-messages": {
+        "intentionally_hidden": true,
+        "fully_visible": false
+      }
+    }
+  },
+  {
+    "scenario": "completion",
+    "size": [
+      120,
+      35
+    ],
+    "chat_height": 19,
+    "menu": {
+      "region": [
+        2,
+        24,
+        116,
+        6
+      ],
+      "visible": [
+        2,
+        24,
+        116,
+        6
+      ],
+      "fully_visible": true
+    }
+  },
+  {
+    "scenario": "provider",
+    "size": [
+      120,
+      35
+    ],
+    "focused": "provider-fields",
+    "controls": {
+      "provider-save": {
+        "region": [
+          17,
+          26,
+          86,
+          3
+        ],
+        "visible": [
+          17,
+          26,
+          86,
+          3
+        ],
+        "fully_visible": true
+      },
+      "provider-test": {
+        "region": [
+          17,
+          29,
+          43,
+          3
+        ],
+        "visible": [
+          17,
+          29,
+          43,
+          3
+        ],
+        "fully_visible": true
+      },
+      "provider-back": {
+        "region": [
+          60,
+          29,
+          43,
+          3
+        ],
+        "visible": [
+          60,
+          29,
+          43,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "models",
+    "size": [
+      120,
+      35
+    ],
+    "focused": "model-fields",
+    "controls": {
+      "model-use": {
+        "region": [
+          9,
+          23,
+          33,
+          3
+        ],
+        "visible": [
+          9,
+          23,
+          33,
+          3
+        ],
+        "fully_visible": true
+      },
+      "model-refresh": {
+        "region": [
+          42,
+          23,
+          34,
+          3
+        ],
+        "visible": [
+          42,
+          23,
+          34,
+          3
+        ],
+        "fully_visible": true
+      },
+      "model-back": {
+        "region": [
+          76,
+          23,
+          34,
+          3
+        ],
+        "visible": [
+          76,
+          23,
+          34,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "manager",
+    "size": [
+      120,
+      35
+    ],
+    "focused": "profile-list",
+    "controls": {
+      "profile-edit-local": {
+        "region": [
+          17,
+          9,
+          43,
+          3
+        ],
+        "visible": [
+          17,
+          9,
+          43,
+          3
+        ],
+        "fully_visible": true
+      },
+      "profile-remove-local": {
+        "region": [
+          60,
+          9,
+          43,
+          3
+        ],
+        "visible": [
+          60,
+          9,
+          43,
+          3
+        ],
+        "fully_visible": true
+      },
+      "profile-add": {
+        "region": [
+          17,
+          27,
+          43,
+          3
+        ],
+        "visible": [
+          17,
+          27,
+          43,
+          3
+        ],
+        "fully_visible": true
+      },
+      "manager-back": {
+        "region": [
+          60,
+          27,
+          43,
+          3
+        ],
+        "visible": [
+          60,
+          27,
+          43,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "new",
+    "size": [
+      120,
+      35
+    ],
+    "focused": "cancel-conversation",
+    "controls": {
+      "begin-conversation": {
+        "region": [
+          22,
+          19,
+          38,
+          3
+        ],
+        "visible": [
+          22,
+          19,
+          38,
+          3
+        ],
+        "fully_visible": true
+      },
+      "cancel-conversation": {
+        "region": [
+          60,
+          19,
+          38,
+          3
+        ],
+        "visible": [
+          60,
+          19,
+          38,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "command",
+    "size": [
+      120,
+      35
+    ],
+    "focused": "reject-command",
+    "controls": {
+      "approve-command": {
+        "region": [
+          12,
+          22,
+          48,
+          3
+        ],
+        "visible": [
+          12,
+          22,
+          48,
+          3
+        ],
+        "fully_visible": true
+      },
+      "reject-command": {
+        "region": [
+          60,
+          22,
+          48,
+          3
+        ],
+        "visible": [
+          60,
+          22,
+          48,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "scope",
+    "size": [
+      120,
+      35
+    ],
+    "focused": "cancel-scope",
+    "controls": {
+      "grant-scope": {
+        "region": [
+          5,
+          29,
+          55,
+          3
+        ],
+        "visible": [
+          5,
+          29,
+          55,
+          3
+        ],
+        "fully_visible": true
+      },
+      "cancel-scope": {
+        "region": [
+          60,
+          29,
+          55,
+          3
+        ],
+        "visible": [
+          60,
+          29,
+          55,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "palette",
+    "size": [
+      120,
+      35
+    ],
+    "opened": "CommandPalette"
+  },
+  {
+    "scenario": "welcome",
+    "size": [
+      160,
+      50
+    ],
+    "prompt": {
+      "region": [
+        1,
+        45,
+        158,
+        3
+      ],
+      "visible": [
+        1,
+        45,
+        158,
+        3
+      ],
+      "fully_visible": true
+    },
+    "chat": {
+      "region": [
+        0,
+        3,
+        160,
+        40
+      ],
+      "visible": [
+        0,
+        3,
+        160,
+        40
+      ],
+      "fully_visible": true
+    },
+    "buttons": {
+      "configure-start": {
+        "region": [
+          3,
+          5,
+          78,
+          1
+        ],
+        "visible": [
+          3,
+          5,
+          78,
+          1
+        ],
+        "fully_visible": true
+      },
+      "suggest-explore": {
+        "region": [
+          3,
+          9,
+          26,
+          1
+        ],
+        "visible": [
+          3,
+          9,
+          26,
+          1
+        ],
+        "fully_visible": true
+      },
+      "suggest-search": {
+        "region": [
+          29,
+          9,
+          26,
+          1
+        ],
+        "visible": [
+          29,
+          9,
+          26,
+          1
+        ],
+        "fully_visible": true
+      },
+      "suggest-edit": {
+        "region": [
+          55,
+          9,
+          26,
+          1
+        ],
+        "visible": [
+          55,
+          9,
+          26,
+          1
+        ],
+        "fully_visible": true
+      },
+      "new-messages": {
+        "intentionally_hidden": true,
+        "fully_visible": false
+      }
+    }
+  },
+  {
+    "scenario": "completion",
+    "size": [
+      160,
+      50
+    ],
+    "chat_height": 34,
+    "menu": {
+      "region": [
+        2,
+        39,
+        156,
+        6
+      ],
+      "visible": [
+        2,
+        39,
+        156,
+        6
+      ],
+      "fully_visible": true
+    }
+  },
+  {
+    "scenario": "provider",
+    "size": [
+      160,
+      50
+    ],
+    "focused": "provider-fields",
+    "controls": {
+      "provider-save": {
+        "region": [
+          37,
+          36,
+          86,
+          3
+        ],
+        "visible": [
+          37,
+          36,
+          86,
+          3
+        ],
+        "fully_visible": true
+      },
+      "provider-test": {
+        "region": [
+          37,
+          39,
+          43,
+          3
+        ],
+        "visible": [
+          37,
+          39,
+          43,
+          3
+        ],
+        "fully_visible": true
+      },
+      "provider-back": {
+        "region": [
+          80,
+          39,
+          43,
+          3
+        ],
+        "visible": [
+          80,
+          39,
+          43,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "models",
+    "size": [
+      160,
+      50
+    ],
+    "focused": "model-fields",
+    "controls": {
+      "model-use": {
+        "region": [
+          29,
+          31,
+          33,
+          3
+        ],
+        "visible": [
+          29,
+          31,
+          33,
+          3
+        ],
+        "fully_visible": true
+      },
+      "model-refresh": {
+        "region": [
+          62,
+          31,
+          34,
+          3
+        ],
+        "visible": [
+          62,
+          31,
+          34,
+          3
+        ],
+        "fully_visible": true
+      },
+      "model-back": {
+        "region": [
+          96,
+          31,
+          34,
+          3
+        ],
+        "visible": [
+          96,
+          31,
+          34,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "manager",
+    "size": [
+      160,
+      50
+    ],
+    "focused": "profile-list",
+    "controls": {
+      "profile-edit-local": {
+        "region": [
+          37,
+          10,
+          43,
+          3
+        ],
+        "visible": [
+          37,
+          10,
+          43,
+          3
+        ],
+        "fully_visible": true
+      },
+      "profile-remove-local": {
+        "region": [
+          80,
+          10,
+          43,
+          3
+        ],
+        "visible": [
+          80,
+          10,
+          43,
+          3
+        ],
+        "fully_visible": true
+      },
+      "profile-add": {
+        "region": [
+          37,
+          41,
+          43,
+          3
+        ],
+        "visible": [
+          37,
+          41,
+          43,
+          3
+        ],
+        "fully_visible": true
+      },
+      "manager-back": {
+        "region": [
+          80,
+          41,
+          43,
+          3
+        ],
+        "visible": [
+          80,
+          41,
+          43,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "new",
+    "size": [
+      160,
+      50
+    ],
+    "focused": "cancel-conversation",
+    "controls": {
+      "begin-conversation": {
+        "region": [
+          42,
+          27,
+          38,
+          3
+        ],
+        "visible": [
+          42,
+          27,
+          38,
+          3
+        ],
+        "fully_visible": true
+      },
+      "cancel-conversation": {
+        "region": [
+          80,
+          27,
+          38,
+          3
+        ],
+        "visible": [
+          80,
+          27,
+          38,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "command",
+    "size": [
+      160,
+      50
+    ],
+    "focused": "reject-command",
+    "controls": {
+      "approve-command": {
+        "region": [
+          32,
+          30,
+          48,
+          3
+        ],
+        "visible": [
+          32,
+          30,
+          48,
+          3
+        ],
+        "fully_visible": true
+      },
+      "reject-command": {
+        "region": [
+          80,
+          30,
+          48,
+          3
+        ],
+        "visible": [
+          80,
+          30,
+          48,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "scope",
+    "size": [
+      160,
+      50
+    ],
+    "focused": "cancel-scope",
+    "controls": {
+      "grant-scope": {
+        "region": [
+          6,
+          43,
+          74,
+          3
+        ],
+        "visible": [
+          6,
+          43,
+          74,
+          3
+        ],
+        "fully_visible": true
+      },
+      "cancel-scope": {
+        "region": [
+          80,
+          43,
+          74,
+          3
+        ],
+        "visible": [
+          80,
+          43,
+          74,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "palette",
+    "size": [
+      160,
+      50
+    ],
+    "opened": "CommandPalette"
+  },
+  {
+    "scenario": "reasoning-collapsed",
+    "collapsed": true,
+    "step_two_leaked": false,
+    "parents": [
+      "Contents",
+      "Contents"
+    ]
+  },
+  {
+    "scenario": "reasoning-final",
+    "rendered_titles": 0,
+    "final_parent": "conversation"
+  },
+  {
+    "scenario": "stream-draft",
+    "cancel": false,
+    "preserved": true
+  },
+  {
+    "scenario": "stream-end",
+    "cancel": false,
+    "turns": 1,
+    "draft": "Próximo rascunho",
+    "focused": "prompt",
+    "recovery_actions": 0
+  },
+  {
+    "scenario": "stream-draft",
+    "cancel": true,
+    "preserved": true
+  },
+  {
+    "scenario": "stream-end",
+    "cancel": true,
+    "turns": 0,
+    "draft": "Próximo rascunho",
+    "focused": "prompt",
+    "recovery_actions": 1
+  },
+  {
+    "scenario": "completion-escape",
+    "menu_initially_open": true,
+    "menu_still_open": false,
+    "status": "Pronto"
+  },
+  {
+    "scenario": "provider-error",
+    "actions": {
+      "retry-question": {
+        "region": [
+          2,
+          12,
+          38,
+          3
+        ],
+        "visible": [
+          2,
+          12,
+          38,
+          3
+        ],
+        "fully_visible": true
+      },
+      "recover-provider": {
+        "region": [
+          40,
+          12,
+          38,
+          3
+        ],
+        "visible": [
+          40,
+          12,
+          38,
+          3
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "scenario": "retry-finished",
+    "turns": 1,
+    "draft": "Rascunho que deve ser preservado",
+    "old_actions": []
+  },
+  {
+    "scenario": "slow-catalog",
+    "refresh": false,
+    "escape_closed": false,
+    "back_disabled": false,
+    "busy": false
+  },
+  {
+    "scenario": "slow-catalog",
+    "refresh": true,
+    "escape_closed": false,
+    "back_disabled": false,
+    "busy": false
+  },
+  {
+    "scenario": "multiline",
+    "chat": {
+      "region": [
+        0,
+        4,
+        60,
+        8
+      ],
+      "visible": [
+        0,
+        4,
+        60,
+        8
+      ],
+      "fully_visible": true
+    },
+    "prompt": {
+      "region": [
+        1,
+        14,
+        58,
+        4
+      ],
+      "visible": [
+        1,
+        14,
+        58,
+        4
+      ],
+      "fully_visible": true
+    }
+  },
+  {
+    "scenario": "completion-small",
+    "chat_height": 4,
+    "menu": {
+      "region": [
+        2,
+        10,
+        56,
+        5
+      ],
+      "visible": [
+        2,
+        10,
+        56,
+        5
+      ],
+      "fully_visible": true
+    }
+  }
+]

@@ -6,6 +6,7 @@ import re
 import uuid
 from contextlib import nullcontext
 
+from codaro.intent import requests_changes
 from codaro.storage import private_json, private_lock
 from codaro.trace import atomic_write, timestamp
 
@@ -159,15 +160,7 @@ class TaskStore:
                 "plan": [],
                 "plan_revision": 0,
                 "criteria": [],
-                "requires_changes": bool(
-                    re.search(
-                        r"\b(altere|alterar|implemente|implementar|crie|criar|corrija|corrigir|"
-                        r"substitua|refatore|ajuste|ajustar|mude|adicione|adicionar|atualize|"
-                        r"implement|create|fix|change|refactor|update|add)\b",
-                        objective.casefold(),
-                    )
-                )
-                and not bool(re.match(r"(?:como|explique|how|explain)\b", objective.casefold())),
+                "requires_changes": requests_changes(objective),
                 "revision": 0,
                 "validations": [],
                 "events": [],

@@ -1,0 +1,24 @@
+                                                                                
+  ◈ Codaro                                                                      
+  /tmp/codaro-ux-tdpkiopd/keyboard · test-model                                 
+  Perguntar · Aprovação por ação · HTTP                                         
+                                                                                
+   Local/ambiente / test-model                                              ▃▃  
+   Não foi possível concluir: API indisponível.                                 
+                                                                                
+  ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔    
+          Repetir                Configurar              Outro modelo           
+  ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁    
+                                                                                
+  › Uma pergunta                                                                
+                                                                                
+   Codaro                                                                       
+   Resposta de teste.                                                           
+                                                                                
+  Contexto ≈ 4,248/11,776 · configuração padrão/ambiente · /status              
+  Pronto                                                                        
+ ────────────────────────────────────────────────────────────────────────────── 
+  Pergunte ou peça uma mudança…                                                 
+                                                                                
+  Enter envia · Alt+Enter linha · / ajuda · @ arquivo                           
+ Ctrl+X Cancelar  Ctrl+Q Sair  Ctrl+L Mensagens  Ctrl+P Comandos                

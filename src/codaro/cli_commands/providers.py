@@ -160,5 +160,5 @@ def model_use(
 
 
 def register(app):
-    app.add_typer(providers_app, name="providers")
-    app.add_typer(models_app, name="models")
+    app.add_typer(providers_app, name="providers", rich_help_panel="Configuração")
+    app.add_typer(models_app, name="models", rich_help_panel="Configuração")

@@ -24,6 +24,7 @@ from codaro.diagnostics import (
     observe_stream,
     source_fingerprint,
 )
+from codaro.redaction import redact_credentials
 from codaro.trace_metrics import count_usage, initial_totals, settings_snapshot
 
 MAX_TRACE_BYTES = 2_000_000
@@ -86,7 +87,7 @@ class PromptFlow:
         if trace_name not in {"prompt.json", "exploration.json"}:
             raise ValueError("Destino de diagnóstico inválido.")
         self.path = root / ".codaro" / trace_name
-        self.redact = redact or (lambda value: value)
+        self.redact = redact or redact_credentials
         self.secret = getattr(settings, "api_key", "")
         forms = {self.secret}
         for _ in range(2):

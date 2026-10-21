@@ -13,10 +13,13 @@ from codaro.ui.widgets import ActivityGroup, GenerationPreview, ReasoningGroup
 
 def activity(app, event: AgentEvent):
     if event.kind == "model_start":
-        app.query_one("#context-meter", Static).update(
-            f"Contexto ≈ {event.context_tokens or 0:,}/"
-            f"{event.context_limit or app.agent.adaptive_input_limit:,} · "
-            f"{app.agent.provider.settings.context_source} · /status"
+        tokens = event.context_tokens or 0
+        limit = event.context_limit or app.agent.adaptive_input_limit
+        capacity = f"{limit / 1000:.1f}k" if limit >= 1000 else str(limit)
+        meter = app.query_one("#context-meter", Static)
+        meter.update(f"Contexto ≈ {round(tokens * 100 / max(1, limit))}% · {capacity} · /status")
+        meter.tooltip = (
+            f"Enviado: ≈ {tokens:,}/{limit:,} tokens · {app.agent.provider.settings.context_source}"
         )
     elif event.kind == "compaction" or event.title in {
         "Contexto liberado",
@@ -37,14 +40,11 @@ def activity(app, event: AgentEvent):
         app.context_tokens = event.context_tokens or 0
         app.reported_tokens = None
         app.context_limit = event.context_limit or app.agent.adaptive_input_limit
-        app.query_one("#status", Static).update(
-            f"Consultando modelo… · contexto ≈ {app.context_tokens:,} / "
-            f"{app.context_limit:,} tokens"
-        )
+        app.set_generation_status("Investigando…")
 
     elif event.reported_tokens is not None:
         app.reported_tokens = event.reported_tokens
-        app.query_one("#status", Static).update(safe_preview(event.detail))
+        app.set_generation_status("Respondendo…")
     elif event.kind == "model_end":
         app.finish_preview(
             event.state,
@@ -54,29 +54,23 @@ def activity(app, event: AgentEvent):
             app.answer_preview.finish("retry", event.title)
             app.answer_preview = None
     elif event.kind == "tool_start":
-        app.query_one("#status", Static).update(
-            safe_preview(f"{event.title}… · {event.detail}".rstrip(" ·"))
-        )
+        app.set_generation_status(safe_preview(f"{event.title}… · {event.detail}".rstrip(" ·")))
     elif event.kind == "tool_end":
         duration = f"{event.elapsed_ms:.0f} ms" if event.elapsed_ms is not None else ""
         if app.activity_group is None:
             app.activity_group = ActivityGroup()
             app.mount_message(app.activity_group)
         app.activity_group.add(event)
-        app.query_one("#status", Static).update(f"{event.title} · {duration}")
+        app.set_generation_status(f"{event.title} · {duration}")
     else:
-        app.query_one("#status", Static).update(
-            safe_preview(f"{event.title} · {event.detail}".rstrip(" ·"))
-        )
+        app.set_generation_status("Investigando…")
 
 
 def append_delta(app, delta: str):
     # A content delta may precede native tool_calls in the same message.
     # Only finish() can commit an answer to the conversation.
     app.draft_text = (app.draft_text + safe_preview(delta))[:MAX_MESSAGE_CHARS]
-    app.query_one("#status", Static).update(
-        f"Gerando resposta… · {app.shortcut_display('x')} para cancelar"
-    )
+    app.set_generation_status("Respondendo…")
     # Render the first fragment immediately; subsequent fragments are coalesced by the timer.
     if app.generation_preview is None:
         app.flush_preview()
@@ -94,7 +88,7 @@ def append_reasoning(app, delta: str):
         else:
             app.reasoning_group.add_preview(app.reasoning_preview)
     app.reasoning_preview.update_text((app.reasoning_preview.text + safe_preview(delta))[:4001])
-    app.query_one("#status", Static).update("Modelo raciocinando…")
+    app.set_generation_status("Investigando…")
 
 
 def flush_preview(app):

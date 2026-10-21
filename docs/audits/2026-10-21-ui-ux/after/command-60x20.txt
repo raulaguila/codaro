@@ -1,0 +1,20 @@
+                                                            
+ ╭───────────────────────────────────────────────────────╮  
+ │ Autorizar comando                                     │  
+ │                                                       │  
+ │ Diretório: /tmp/codaro-ux-uawx3ikb/layout-60          │  
+ │ Timeout: 60s                                          │  
+ │                                                       │  
+ │ python -m pytest                                      │  
+ │                                                       │  
+ │ O comando pode alterar arquivos. A aprovação vale só  │  
+ │ para esta execução.                                   │  
+ │                                                       │  
+ │                                                       │  
+ │                                                       │  
+ │                                                       │  
+ │ ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔ │  
+ │          Executar                  Rejeitar           │  
+ │ ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁ │  
+ ╰───────────────────────────────────────────────────────╯  
+                                                            

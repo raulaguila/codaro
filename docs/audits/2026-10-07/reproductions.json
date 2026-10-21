@@ -1,0 +1,36 @@
+{
+  "index_hardlink": {
+    "outside_rows_before": [
+      "outside.py"
+    ],
+    "outside_rows_after": [],
+    "outside_mode_after": "0o600"
+  },
+  "validation_mutates_sources": {
+    "revision_before": 0,
+    "revision_after": 1,
+    "validation_revision": 1,
+    "exit_code": 0,
+    "validation_ready": true,
+    "completion": "completed"
+  },
+  "command_isolation": {
+    "wrote_outside_project": true,
+    "inherited_custom_key_env": true
+  },
+  "warm_search": {
+    "project_files": 200,
+    "file_reads_during_warm_search": 200
+  },
+  "redaction_after_provider_switch": {
+    "previous_key_protected_before_switch": true,
+    "previous_key_in_saved_session_after_switch": true,
+    "previous_key_in_new_flow": true
+  },
+  "anthropic_calibration": {
+    "normalized_base": 1581,
+    "native_base": 1485,
+    "observed_ratio_using_normalized": 0.9392789373814042,
+    "correct_ratio_for_native_estimate": 1.0
+  }
+}

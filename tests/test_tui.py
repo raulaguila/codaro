@@ -209,7 +209,8 @@ def test_chat_keeps_streaming_preview_separate_from_final_markdown(tmp_path):
             preview = app.generation_preview
             assert preview is not None
             assert "Parcial" in preview.text
-            assert "não validado" in preview.title
+            assert preview.title == "Respondendo…"
+            assert "provisório" in preview.tooltip
             assert not preview.collapsed
             assert app.activity_group.collapsed
             # Live generation is visible without expanding the activity summary.
@@ -424,7 +425,7 @@ def test_rejected_stream_is_labeled_and_prior_answer_stays_visible(tmp_path):
                 assert await asyncio.to_thread(model.started.wait, 10)
                 await pilot.pause()
                 previews = list(app.query(GenerationPreview))
-                assert any("Corrigindo protocolo" in preview.title for preview in previews)
+                assert any("Corrigindo protocolo" in str(preview.tooltip) for preview in previews)
                 assert len(app.query("Markdown")) == 1
                 assert app.query_one("Markdown") is original_reply
                 assert original_reply.is_attached

@@ -8,6 +8,9 @@ dist/
 *.egg-info/
 .env
 .env.*
+.coverage
+.coverage.*
+htmlcov/
 
 
 # Cache gerado pela versão anterior do projeto

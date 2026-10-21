@@ -1,0 +1,30 @@
+                                                                                                    
+  ◈ Codaro                                                                                          
+  /tmp/codaro-ux-uawx3ikb/reasoning · test-model · Perguntar · Aprovação por ação · HTTP            
+   ▶ Raciocínio · 3 etapas                                                                          
+                                                                                                    
+   Codaro                                                                                           
+   Resposta final separada.                                                                         
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+  Contexto: aguardando primeira chamada · /status                                                   
+  Pronto                                                                                            
+ ────────────────────────────────────────────────────────────────────────────────────────────────── 
+  Pergunte ou peça uma mudança…                                                                     
+                                                                                                    
+  Enter envia · Alt+Enter nova linha · / comandos · @ arquivo · ↑ histórico                         
+ Ctrl+X Cancelar  Ctrl+Q Sair  Ctrl+L Mensagens  Ctrl+P Comandos                                    

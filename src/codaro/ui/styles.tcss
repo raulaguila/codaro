@@ -13,6 +13,7 @@ Screen { background: $background; }
           border-top: solid $primary; padding: 0 1; }
 #prompt:focus { border-top: solid $accent; }
 #completion { display: none; height: auto; max-height: 7; margin: 0 2; color: $text-muted; }
+#completion { text-overflow: ellipsis; text-wrap: nowrap; }
 #prompt-hint { height: 1; margin: 0 2; color: $text-muted; }
 #context-meter { height: 1; margin: 0 2; color: $text-muted; }
 #new-messages { display: none; height: 1; min-height: 1; border: none; margin: 0 2; }
@@ -42,3 +43,9 @@ Screen { background: $background; }
 .response-preview { margin: 1 0; }
 
 .notice { height: auto; margin: 1; color: $warning; }
+.notice.neutral { color: $text-muted; }
+.recovery-card { height: auto; padding: 0; border: none; }
+.recovery-card > CollapsibleTitle { color: $warning; }
+.recovery-card.neutral > CollapsibleTitle,
+.recovery-card.resolved > CollapsibleTitle { color: $text-muted; }
+.recovery-card > Contents { padding: 0; }

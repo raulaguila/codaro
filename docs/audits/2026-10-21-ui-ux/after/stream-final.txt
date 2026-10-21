@@ -1,0 +1,30 @@
+                                                                                                    
+  ◈ Codaro                                                                                          
+  /tmp/codaro-ux-uawx3ikb/stream · test-model · Perguntar · Aprovação por ação · HTTP               
+                                                                                                    
+  › Olá, como usar o assistente?                                                                    
+                                                                                                    
+   ▶ Raciocínio · 1 etapa                                                                           
+                                                                                                    
+   Codaro                                                                                           
+                                                                                                    
+                                                                                                    
+   Resposta                                                                                         
+                                                                                                    
+   Primeira parte recebida em streaming.                                                            
+                                                                                                    
+   Última parte recebida.                                                                           
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+  Contexto ≈ 36% · 11.8k · /status                                                                  
+  Pronto                                                                                            
+ ────────────────────────────────────────────────────────────────────────────────────────────────── 
+  Próximo rascunho                                                                                  
+                                                                                                    
+  Enter envia · Alt+Enter nova linha · / comandos · @ arquivo · ↑ histórico                         
+ Ctrl+X Cancelar  Ctrl+Q Sair  Ctrl+L Mensagens  Ctrl+P Comandos                                    

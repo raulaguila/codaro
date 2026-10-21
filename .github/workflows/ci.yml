@@ -20,6 +20,35 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest -q
+        if: matrix.python-version != '3.12'
+      - name: Tests and coverage
+        if: matrix.python-version == '3.12'
+        run: pytest -q --cov --cov-report=term --cov-report=xml:.codaro/quality/coverage.xml --cov-report=html:.codaro/quality/coverage
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.python-version == '3.12'
+        with:
+          name: coverage
+          path: .codaro/quality/
+          retention-days: 14
+  retrieval-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: ./.github/actions/setup-ripgrep
+      - run: python -m pip install -r requirements-dev.lock
+      - run: python -m pip install -e '.[dev]'
+      - name: Evaluate committed retrieval cases (no model calls)
+        run: codaro evaluate evaluations/cases.json --output .codaro/quality/retrieval.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: retrieval-quality
+          path: .codaro/quality/retrieval.json
+          retention-days: 14
   installed-package:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10

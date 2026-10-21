@@ -1,0 +1,20 @@
+                                                            
+  ◈ Codaro                                                  
+  /tmp/codaro-ux-uawx3ikb/layout-60 · test-model            
+  Executar · Aprovação por ação · HTTP                      
+                                                            
+   Vamos trabalhar no seu projeto                           
+                    Configurar provedor                     
+   Pergunte sobre o código ou peça uma mudança.             
+   Edições exigem aprovação.                                
+                                                            
+        Explorar       Buscar código     Propor mudança     
+                                                            
+                                                            
+  Contexto: aguardando primeira chamada · /status           
+  Pronto                                                    
+ ────────────────────────────────────────────────────────── 
+  Pergunte ou peça uma mudança…                             
+                                                            
+  Enter envia · Alt+Enter linha · / ajuda · @ arquivo       
+ ^X Cancelar  ^Q Sair  ^L Mensagens  ^P Comandos            

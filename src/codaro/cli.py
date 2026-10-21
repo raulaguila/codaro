@@ -15,40 +15,28 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
-from typer.core import TyperGroup
 
 from codaro.agent import Agent, AgentEvent
 from codaro.cli_commands.common import ContextWindow, Root, TLSInsecure, console, errors, fail
+from codaro.cli_commands.configuration import register as register_configuration
 from codaro.cli_commands.extensions import register as register_extensions
 from codaro.cli_commands.providers import register as register_provider_commands
+from codaro.cli_commands.startup import CodaroGroup, help_all
+from codaro.configuration import resolve_configuration, startup_overrides
 from codaro.index import CodeIndex, safe_preview
 from codaro.llm import ModelError, Settings, create_provider
 from codaro.policies import Mode
 from codaro.repository import Repository
 from codaro.tasks import TaskStore
 
-
-class CodaroGroup(TyperGroup):
-    def resolve_command(self, ctx, args: list[str]):
-        if args:
-            target = args[0]
-            explicit_path = (
-                target in {".", ".."} or "/" in target or "\\" in target or target.startswith("~")
-            )
-            if target not in self.commands and (
-                explicit_path or Path(target).expanduser().is_dir()
-            ):
-                return super().resolve_command(ctx, ["chat", "--repo", target, *args[1:]])
-        return super().resolve_command(ctx, args)
-
-
 app = typer.Typer(
     cls=CodaroGroup,
     help="Explore repositórios com busca local e um assistente de IA.",
     epilog=(
-        "Atalho: codaro . abre o chat no diretório atual. Use codaro CAMINHO para outro projeto."
+        "codaro abre o projeto atual. codaro CAMINHO abre outro projeto. "
+        "Use Ctrl+P para configurar; --help-all lista todos os comandos."
     ),
-    no_args_is_help=True,
+    no_args_is_help=False,
 )
 
 
@@ -56,13 +44,33 @@ app = typer.Typer(
 def main(
     ctx: typer.Context,
     resume: Annotated[
-        bool, typer.Option("--resume", help="Retoma a conversa do diretório atual.")
+        bool | None, typer.Option("--resume/--no-resume", help="Retoma a última conversa.")
+    ] = None,
+    mode: Annotated[Mode | None, typer.Option(help="Modo inicial: ask, plan ou execute.")] = None,
+    provider: Annotated[
+        str | None, typer.Option(help="Perfil salvo; env usa variáveis de ambiente.")
+    ] = None,
+    all_help: Annotated[
+        bool,
+        typer.Option(
+            "--help-all",
+            callback=help_all,
+            is_eager=True,
+            help="Mostra também ferramentas e administração.",
+        ),
     ] = False,
 ):
-    if resume:
-        if ctx.invoked_subcommand:
-            raise typer.BadParameter("Use --resume após o diretório ou o comando chat.")
-        ctx.invoke(chat, repo=Path("."), read_only=False, tls_insecure=None, resume=True)
+    overrides = {
+        key: value
+        for key, value in {"mode": mode, "resume": resume, "provider": provider}.items()
+        if value is not None
+    }
+    if ctx.invoked_subcommand not in {None, "chat"} and (mode is not None or resume is not None):
+        raise typer.BadParameter("--mode e --resume se aplicam à abertura do chat.")
+    token = startup_overrides.set(overrides)
+    ctx.call_on_close(lambda: startup_overrides.reset(token))
+    if ctx.invoked_subcommand is None:
+        ctx.invoke(chat)
 
 
 def approve_command(argv, timeout, cancelled, *, root):
@@ -268,22 +276,31 @@ def run_question(
     scopes: list[str] | None = None,
     commands: list[str] | None = None,
     max_steps: int | None = None,
-    max_seconds: int = 1800,
-    max_corrections: int = 3,
+    max_seconds: int | None = None,
+    max_corrections: int | None = None,
 ):
     try:
+        config = resolve_configuration(
+            tls_insecure=tls_insecure,
+            context_window=context_window,
+            max_steps=max_steps,
+            max_seconds=max_seconds,
+            max_corrections=max_corrections,
+        )
+        if config.needs_setup and config.setup_profile:
+            raise ValueError(
+                "Selecione um modelo para o perfil. Abra codaro ou use codaro models use."
+            )
         agent = Agent(
             Repository(repo),
-            create_provider(
-                Settings.from_env(tls_insecure=tls_insecure, context_window=context_window)
-            ),
+            create_provider(config.model),
             allow_edits=allow_edits,
             mode=mode or (Mode.EXECUTE if allow_edits else Mode.ASK),
             approve_edit=approve_changes,
             approve_external=approve_external,
-            max_steps=max_steps,
-            max_seconds=max_seconds,
-            max_corrections=max_corrections,
+            max_steps=config.preferences.max_steps,
+            max_seconds=config.preferences.max_seconds,
+            max_corrections=config.preferences.max_corrections,
             approve_command=(
                 lambda argv, timeout, cancelled: approve_command(
                     argv, timeout, cancelled, root=repo.expanduser().resolve()
@@ -360,33 +377,53 @@ def chat(
     read_only: Annotated[
         bool, typer.Option("--read-only", help="Somente leitura: desabilita edições e comandos.")
     ] = False,
-    mode: Annotated[Mode, typer.Option("--mode", help="ask, plan ou execute.")] = Mode.EXECUTE,
-    max_steps: Annotated[int | None, typer.Option(min=1, max=200)] = None,
-    max_seconds: Annotated[int, typer.Option(min=1, max=7200)] = 1800,
-    max_corrections: Annotated[int, typer.Option(min=1, max=10)] = 3,
+    mode: Annotated[Mode | None, typer.Option("--mode", help="ask, plan ou execute.")] = None,
+    max_steps: Annotated[
+        int | None, typer.Option(min=1, max=200, rich_help_panel="Avançado")
+    ] = None,
+    max_seconds: Annotated[
+        int | None, typer.Option(min=1, max=7200, rich_help_panel="Avançado")
+    ] = None,
+    max_corrections: Annotated[
+        int | None, typer.Option(min=1, max=10, rich_help_panel="Avançado")
+    ] = None,
     tls_insecure: TLSInsecure = None,
     context_window: ContextWindow = None,
     resume: Annotated[
-        bool, typer.Option("--resume", help="Retoma a última conversa deste projeto.")
-    ] = False,
+        bool | None,
+        typer.Option("--resume/--no-resume", help="Retoma a última conversa deste projeto."),
+    ] = None,
+    provider: Annotated[
+        str | None, typer.Option(help="Perfil salvo; env usa variáveis de ambiente.")
+    ] = None,
 ):
     """Abre o agente interativo no projeto, com conversa, ferramentas e revisão."""
     from codaro.ui.app import CodaroApp
 
     try:
+        config = resolve_configuration(
+            mode=mode,
+            resume=resume,
+            provider=provider,
+            max_steps=max_steps,
+            max_seconds=max_seconds,
+            max_corrections=max_corrections,
+            tls_insecure=tls_insecure,
+            context_window=context_window,
+        )
         CodaroApp(
             Agent(
                 Repository(repo),
-                create_provider(
-                    Settings.from_env(tls_insecure=tls_insecure, context_window=context_window)
-                ),
+                create_provider(config.model),
                 allow_edits=not read_only,
-                mode=Mode.ASK if read_only else mode,
-                max_steps=max_steps,
-                max_seconds=max_seconds,
-                max_corrections=max_corrections,
+                mode=Mode.ASK if read_only else config.preferences.mode,
+                max_steps=config.preferences.max_steps,
+                max_seconds=config.preferences.max_seconds,
+                max_corrections=config.preferences.max_corrections,
             ),
-            resume=resume,
+            resume=config.preferences.resume,
+            setup_required=config.needs_setup,
+            setup_profile=config.setup_profile,
         ).run()
     except (ValueError, OSError, sqlite3.Error) as exc:
         fail(exc)
@@ -405,8 +442,9 @@ def doctor(
 ):
     """Mostra configuração e disponibilidade do ripgrep sem expor a chave."""
     try:
-        settings = Settings.from_env(tls_insecure=tls_insecure, context_window=context_window)
-    except ValueError as exc:
+        config = resolve_configuration(tls_insecure=tls_insecure, context_window=context_window)
+        settings = config.model
+    except (ValueError, OSError) as exc:
         fail(exc)
     sqlite_ready = True
     snapshot_ready = False
@@ -421,13 +459,14 @@ def doctor(
     except sqlite3.Error:
         sqlite_ready = False
     rg_ready = bool(shutil.which("rg"))
+    model_label = settings.model if not config.needs_setup else "não selecionado · abra codaro"
     console.print(
         Panel(
             Text(
                 f"ripgrep: {'disponível' if rg_ready else 'ausente'}\n"
                 f"SQLite FTS5: {'disponível' if sqlite_ready else 'ausente'}\n"
                 f"SQLite snapshots: {'disponível' if snapshot_ready else 'ausente'}\n"
-                f"modelo: {settings.model}\n"
+                f"modelo: {model_label}\n"
                 f"provedor: {settings.provider_id or 'ambiente/local'} · API {settings.api_style}\n"
                 f"timeout: {settings.timeout:g}s\n"
                 f"janela configurada: {settings.context_window} tokens\n"
@@ -437,7 +476,14 @@ def doctor(
                 f"contagem: {settings.token_encoding or 'estimativa UTF-8 / 2'}\n"
                 f"TLS: {'sem verificação' if settings.tls_insecure else 'verificação ativa'}\n"
                 f"credencial: {'configurada' if settings.api_key else 'não configurada'}\n"
-                "Configuração: CODARO_BASE_URL, CODARO_MODEL, CODARO_API_KEY"
+                "origem da configuração: " + config.sources["provider"] + "\n"
+                "origem do timeout: " + config.sources["timeout"] + "\n"
+                "Configuração: Ctrl+P → Preferências; codaro config show\n"
+                + (
+                    "Variáveis de conexão ignoradas: " + ", ".join(config.ignored_environment)
+                    if config.ignored_environment
+                    else ""
+                )
             ),
             title="Diagnóstico",
         )
@@ -616,9 +662,15 @@ def execute_task(
         list[str] | None,
         typer.Option(help='Comando exato como array JSON, por exemplo ["pytest","-q"]. Repetível.'),
     ] = None,
-    max_steps: Annotated[int | None, typer.Option(min=1, max=200)] = None,
-    max_seconds: Annotated[int, typer.Option(min=1, max=7200)] = 1800,
-    max_corrections: Annotated[int, typer.Option(min=1, max=10)] = 3,
+    max_steps: Annotated[
+        int | None, typer.Option(min=1, max=200, rich_help_panel="Avançado")
+    ] = None,
+    max_seconds: Annotated[
+        int | None, typer.Option(min=1, max=7200, rich_help_panel="Avançado")
+    ] = None,
+    max_corrections: Annotated[
+        int | None, typer.Option(min=1, max=10, rich_help_panel="Avançado")
+    ] = None,
 ):
     """Implementa uma atividade e valida o resultado, com autorização humana."""
     run_question(
@@ -684,6 +736,17 @@ def task(
 
 register_provider_commands(app)
 register_extensions(app)
+register_configuration(app)
+
+for command in app.registered_commands:
+    name = command.name or command.callback.__name__.replace("_", "-")
+    command.rich_help_panel = (
+        "Uso diário"
+        if name in {"chat", "ask", "plan", "execute"}
+        else "Configuração"
+        if name == "doctor"
+        else "Ferramentas e administração"
+    )
 
 if __name__ == "__main__":
     app()

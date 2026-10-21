@@ -20,6 +20,7 @@ TLSInsecure = Annotated[
     typer.Option(
         "--tls-insecure/--tls-verify",
         help="Desativa/ativa a verificação de certificados TLS do modelo.",
+        rich_help_panel="Avançado",
     ),
 ]
 
@@ -30,6 +31,7 @@ ContextWindow = Annotated[
         min=4096,
         max=2_000_000,
         help="Janela real do servidor em tokens; reserva saída e margem de segurança.",
+        rich_help_panel="Avançado",
     ),
 ]
 

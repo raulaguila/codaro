@@ -1,0 +1,35 @@
+                                                                                                                        
+  ◈ Codaro                                                                                                              
+  /tmp/codaro-ux-tdpkiopd/layout-120 · test-model · Executar · Aprovação por ação · HTTP                                
+                                                                                                                        
+   Vamos trabalhar no seu projeto                                                                                       
+   Escolha um ponto de partida ou escreva sua pergunta.                                                                 
+   As respostas usam os arquivos locais; edições exigem sua aprovação.                                                  
+                                                                                                                        
+            Explorar               Buscar código             Propor mudança                                             
+                                                                                                                        
+                                                                                                                        
+                                Configurar provedor                                                                     
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+  Contexto: aguardando primeira chamada · /status                                                                       
+  Pronto                                                                                                                
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+  Pergunte ou peça uma mudança…                                                                                         
+                                                                                                                        
+  Enter envia · Alt+Enter nova linha · / comandos · @ arquivo · ↑ histórico                                             
+ Ctrl+X Cancelar  Ctrl+Q Sair  Ctrl+L Mensagens  Ctrl+P Comandos                                                        

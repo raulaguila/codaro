@@ -10,7 +10,7 @@ leitura, MCP, plugins explícitos, diagnósticos LSP opcionais e benchmarks de
 implementação. Veja configuração, exemplos e limites em
 [Plataforma do agente](docs/AGENT_PLATFORM.md).
 
-No chat, Ctrl+P inclui **Sessões**, **Cadastrar MCP ou plugin**, **Desfazer
+No chat, Ctrl+P inclui **Preferências**, **Sessões**, **Cadastrar MCP ou plugin**, **Desfazer
 interação**, **Refazer interação** e **Funcionalidades e integrações**.
 
 ## Instalação
@@ -38,6 +38,32 @@ pip install -r requirements-dev.lock
 pip install -e '.[dev]'
 ```
 
+## Comece aqui
+
+```bash
+codaro                     # abre no diretório atual
+codaro ./meu-projeto        # abre outro projeto
+codaro --resume             # retoma a conversa
+codaro --mode plan          # começa em planejamento
+```
+
+No primeiro acesso, o Codaro abre o cadastro do provedor, testa o acesso ao catálogo
+e permite selecionar um modelo. Depois disso, basta executar `codaro`: o perfil e
+o modelo escolhidos ficam salvos. Para Ollama, inicie o serviço e baixe antes um
+modelo com suporte a ferramentas. O teste de inferência com ferramentas continua
+opcional e informa quando pode haver custo.
+
+Use **Ctrl+P → Preferências** (ou `/settings`) para salvar o modo inicial, a
+retomada da conversa e os limites avançados. Essas preferências valem para novas
+inicializações; não mudam as permissões da tarefa aberta. Provedor, modelo e TLS
+continuam no cadastro de provedores.
+
+`codaro --help` mostra o uso diário e a configuração. `codaro --help-all` lista
+também busca local, memória, integrações, avaliações e administração. Todos os
+comandos anteriores continuam disponíveis, incluindo `codaro .`, `chat --repo`,
+`edit`, `search` e `index`. A ajuda de `chat` agrupa os ajustes técnicos em
+**Avançado**. Veja [Inicialização e configuração](docs/STARTUP.md).
+
 ## Experimente sem configurar IA
 
 ```bash
@@ -56,19 +82,16 @@ Instale e inicie [Ollama](https://ollama.com), e baixe um modelo que suporte cha
 
 ```bash
 ollama pull qwen2.5:7b
-export CODARO_BASE_URL=http://localhost:11434/v1
-export CODARO_MODEL=qwen2.5:7b
-
-codaro ask 'Como validamos o acesso antes de editar um projeto?' --repo examples/demo
-codaro chat --repo examples/demo
+codaro ./examples/demo
+# No cadastro, escolha Ollama e depois qwen2.5:7b.
 
 # Dentro de qualquer projeto, abra o chat no diretório atual
-codaro .
+codaro
 # Ou informe outro diretório
 codaro ./examples/demo
 ```
 
-`codaro .` equivale a `codaro chat --repo .`: o diretório de trabalho do terminal se torna a raiz do projeto. O atalho também aceita caminhos relativos/absolutos e opções do chat, por exemplo `codaro . --read-only`.
+`codaro` e `codaro .` abrem o projeto atual e equivalem a `codaro chat --repo .`. O diretório do terminal define a raiz do projeto. O atalho aceita caminhos relativos/absolutos e opções do chat, por exemplo `codaro . --read-only`. Flags de abertura como `--mode` e `--resume` também podem vir antes do diretório.
 
 O agente recebe a raiz absoluta do projeto em cada consulta e pode confirmá-la com `get_repository_info`. No chat, `/pwd` mostra essa raiz diretamente, sem chamar o modelo; no terminal, use `codaro pwd --repo /caminho/do/projeto`. A pasta de instalação do Codaro não define a pasta explorada.
 
@@ -146,20 +169,20 @@ Ctrl+P reúne Perguntar, Planejar, Executar, nova conversa/tarefa, retomada, alt
 - **Limpar mensagens** (`Ctrl+L` ou `/clear`) limpa mensagens e contexto enviados, mantendo a tarefa, o escopo autorizado e propostas pendentes visíveis. `/restore-clear` desfaz a última limpeza nesta sessão.
 - **Nova conversa e tarefa** (`/new`) abre uma revisão do efeito: revoga o escopo anterior, descarta propostas pendentes e começa outra atividade. Arquivos já alterados são mantidos. É possível informar o novo objetivo.
 - **Gerenciar provedores** (`/provider-manage`) permite editar URL/TLS, renomear, substituir a API key, testar e remover perfis. Na edição, uma chave vazia mantém a credencial salva; ela permanece mascarada. Remover o perfil ativo exige selecionar outro modelo antes de enviar uma pergunta.
-- Os formulários têm rótulos permanentes e ações fixas. **Testar conexão** permite cancelar e ignora resultados tardios. O teste não salva o perfil. Uma operação HTTP síncrona já iniciada pode continuar até retornar/atingir timeout; o cancelamento evita novas etapas e libera a interface.
+- Os formulários têm rótulos permanentes e ações fixas. URL, TLS e o teste de ferramentas ficam em **Conexão e teste de ferramentas**, expandido automaticamente para provedores personalizados/Ollama. **Testar conexão**, cadastro, edição, atualização do catálogo e seleção do modelo permitem cancelar a consulta com Esc ou pelo botão. O teste não salva o perfil; consultas canceladas não alteram a configuração. O transporte HTTP interrompe a espera e fecha a conexão; resultados tardios não são aplicados. A gravação local é uma etapa atômica após a consulta.
 - O seletor oculta modelos que a API informa não suportarem ferramentas/chat e distingue suporte confirmado de suporte desconhecido. Para capacidade desconhecida, use o teste do modelo no cadastro/edição do provedor.
 - O escopo da tarefa usa campos de caminhos e comandos exatos, um por linha, com prévia e JSON avançado opcional. Aspas agrupam argumentos; essa entrada não executa um shell. `/permissions action` revoga o escopo.
-- A chegada de mensagens respeita a posição de leitura e oferece **Novas mensagens ↓**. O orçamento estimado e sua origem continuam visíveis após a geração; `/status` detalha contagem e calibração.
-- É possível escrever o próximo rascunho enquanto o agente trabalha. O envio simultâneo fica bloqueado e preserva o texto. Erros oferecem repetir a pergunta, configurar o provedor e escolher outro modelo.
+- A chegada de mensagens respeita a posição de leitura e oferece **Novas mensagens ↓**. O indicador compacto mostra a porcentagem estimada de uso do orçamento de entrada e sua capacidade; a contagem e a origem do limite ficam no tooltip e em `/status`. Durante a geração, o status mostra a etapa e o tempo decorrido.
+- É possível escrever o próximo rascunho enquanto o agente trabalha. O envio simultâneo fica bloqueado e preserva o texto. **Repetir** reenvia a pergunta anterior sem substituir o rascunho nem o cursor. Erros oferecem ações conforme a causa: credencial, disponibilidade ou limite. Cancelamentos têm apresentação neutra e opção de repetir. Após uma repetição bem-sucedida, os detalhes da falha ficam recolhidos como **Tentativa resolvida**, sem botões inativos.
 - `/reasoning` alterna o raciocínio expandido/recolhido nesta sessão. A prévia renderiza Markdown estável, conserva cercas incompletas como texto e só promove a resposta depois da aceitação. Respostas sem ferramentas não criam um resumo vazio de atividades.
 - Os temas usam cores semânticas para manter texto/fundo consistentes. Em terminais estreitos, o cabeçalho prioriza modo e aprovação em duas linhas e os atalhos usam `^` para Ctrl; no macOS, `⌘` indica Command. `/help` mostra os atalhos completos e a alternativa Ctrl.
 
-Detalhamento da correção dos 17 achados: [UI e UX](docs/UI_UX.md).
+Detalhamento das correções: [UI e UX](docs/UI_UX.md) e [auditoria por interação](docs/audits/2026-10-21-ui-ux/README.md).
 
 ## Interface e streaming
 
 - `codaro chat` exibe a resposta final após o agente concluir e validar o turno, em Markdown, com títulos, listas, tabelas e destaque de sintaxe em blocos de código. Durante a geração, a barra de status e as ferramentas mostram o progresso.
-- A abertura tem sugestões que preenchem um rascunho sem chamar o modelo. Enter envia; Alt+Enter insere uma nova linha (Shift+Enter também funciona quando reconhecido pelo terminal). A entrada cresce até oito linhas de altura e preserva rascunhos acima de 8.000 caracteres para que você possa reduzi-los antes do envio.
+- A abertura prioriza **Configurar provedor** e tem sugestões que preenchem um rascunho sem chamar o modelo. Enter envia; Alt+Enter insere uma nova linha (Shift+Enter também funciona quando reconhecido pelo terminal). A entrada cresce até oito linhas, adaptando-se à altura do terminal, e preserva rascunhos acima de 8.000 caracteres para que você possa reduzi-los antes do envio. O autocompletar limita sua altura para manter a conversa visível, abrevia descrições longas e mantém a dica de Tab/setas. Esc fecha as sugestões sem apagar o texto.
 - Cada pergunta tem um resumo expansível das ações, leituras, buscas e duração. Dentro dele ficam consulta ou arquivo/símbolo, resultados ou linhas e indicação de leitura parcial ou reutilização de conteúdo. Erros abrem os detalhes automaticamente.
 - As atividades aparecem uma única vez na conversa. A barra de status informa o arquivo ou consulta durante a execução.
 - A barra superior mostra pasta abreviada, modelo, modo de edição e conexão. A barra de status informa o estado atual. `/pwd` mostra o caminho completo.
@@ -214,11 +237,11 @@ codaro .
 
 **Metadados vêm da API, quando disponíveis.** Gemini usa `/v1beta/models`, incluindo `inputTokenLimit`/`outputTokenLimit`, e conversa pelo endpoint OpenAI-compatible. Anthropic usa `/v1/models`, incluindo `max_input_tokens`/`max_tokens` quando informados, e `/v1/messages` nativo para ferramentas, resultados e streaming. Groq e servidores compatíveis usam `/models` e seus campos de limites. Ollama lista `/api/tags` e consulta `/api/show` ao selecionar: `parameters.num_ctx` tem prioridade; sem ele, lê `*.context_length` em `model_info`. A conversa nativa envia explicitamente `options.num_ctx` com esse valor, alinhando o orçamento do cliente à janela solicitada ao servidor. A seleção consulta os metadados novamente. O catálogo mostra ID, nome, limites, origem e suporte a ferramentas quando informado.
 
-Algumas APIs, incluindo a listagem padrão da OpenAI, não informam contexto. Nesses casos, o catálogo mostra **não informado pela API** e o cliente usa **fallback de 16.384 tokens**; para Ollama sem `num_ctx` nem `model_info.context_length` informado, usa **4.096 tokens** como fallback conservador. A origem aparece em `/status`, no diagnóstico e na seleção. Isso não é o limite oficial nem uma garantia sobre a janela ativa do servidor. É possível definir um limite conhecido com `codaro models use ID --provider PERFIL --context-window 8192`; essa configuração é preservada ao atualizar o catálogo. Limites de entrada de Gemini/Anthropic são tratados conservadoramente como orçamento total, reservando saída e margem; o cliente mantém seu teto de 2.000.000 tokens e reserva padrão de até 1.400 tokens, limitada pelo máximo de saída informado. APIs indisponíveis não apagam a configuração anterior. A abertura do chat tenta atualizar os detalhes do modelo Ollama selecionado, inclusive perfis antigos com fallback. Se a API estiver indisponível, conserva a configuração anterior; os demais provedores usam o catálogo salvo.
+Algumas APIs, incluindo a listagem padrão da OpenAI, não informam contexto. Nesses casos, o catálogo mostra **não informado pela API** e o cliente usa **fallback de 16.384 tokens**; para Ollama sem `num_ctx` nem `model_info.context_length` informado, usa **4.096 tokens** como fallback conservador. A origem aparece em `/status`, no diagnóstico e na seleção. Isso não é o limite oficial nem uma garantia sobre a janela ativa do servidor. É possível definir um limite conhecido com `codaro models use ID --provider PERFIL --context-window 8192`; essa configuração é preservada ao atualizar o catálogo. Limites de entrada de Gemini/Anthropic são tratados conservadoramente como orçamento total, reservando saída e margem; o cliente mantém seu teto de 2.000.000 tokens e reserva calculada para saída, limitada pelo máximo informado pelo modelo. APIs indisponíveis não apagam a configuração anterior. A abertura usa o catálogo salvo para não depender da rede. Atualizar API e selecionar um modelo consultam novamente os metadados; a rejeição de contexto pelo servidor continua ajustando o orçamento automaticamente.
 
 Os perfis e chaves ficam em `$XDG_CONFIG_HOME/codaro/provider-credentials.json` (padrão `~/.config/codaro/provider-credentials.json`), fora dos projetos. A gravação é atômica e, em POSIX, usa diretório privado e arquivo `0600`; links, arquivos compartilhados e permissões públicas são rejeitados. O arquivo contém as chaves em texto local, sem criptografia/keychain nesta versão. Seu nome é excluído pela política de arquivos do agente, inclusive ao analisar a pasta que contém a configuração. As chaves do formulário não são mensagens do chat, não entram no histórico e não aparecem no cadastro/listagem/diagnóstico. Em Windows, a proteção depende das permissões do diretório do usuário.
 
-A configuração antiga continua disponível: `CODARO_BASE_URL`, `CODARO_MODEL` ou `CODARO_API_KEY` definidos selecionam o modo de ambiente. `CODARO_PROVIDER=PERFIL` seleciona explicitamente um perfil cadastrado. As opções `--context-window`, `--tls-insecure/--tls-verify`, `CODARO_CONTEXT_WINDOW`, `CODARO_MAX_OUTPUT_TOKENS` e `CODARO_TIMEOUT` podem ajustar os limites/configuração do perfil. `codaro doctor --check-tools` verifica o ciclo real de ferramenta e resposta no provedor ativo, incluindo Anthropic.
+O perfil salvo tem prioridade sobre variáveis antigas de conexão (`CODARO_BASE_URL`, `CODARO_MODEL` e `CODARO_API_KEY`). Sem perfil ativo, URL/modelo do ambiente continuam funcionando por compatibilidade. Para forçar esse modo em automações, use `CODARO_PROVIDER=env` ou `codaro --provider env`. `CODARO_PROVIDER=PERFIL` ou `--provider PERFIL` seleciona um perfil cadastrado sem mudar permanentemente o perfil ativo. Uma chave isolada no ambiente não desativa o cadastro guiado. As opções `--context-window`, `--tls-insecure/--tls-verify`, `CODARO_CONTEXT_WINDOW`, `CODARO_MAX_OUTPUT_TOKENS` e `CODARO_TIMEOUT` podem ajustar os limites/configuração do perfil. `codaro doctor --check-tools` verifica o ciclo real de ferramenta e resposta no provedor ativo, incluindo Anthropic.
 
 ## Comandos, referências e histórico
 
@@ -434,7 +457,7 @@ A saída usa **Automático por padrão**. OpenAI compatible (incluindo OpenAI, G
 
 Quando o provedor informa truncamento de texto simples, o Codaro preserva a parte recebida e solicita apenas a continuação, sem ferramentas nessa chamada. O fluxo mantém o texto completo localmente, mas envia apenas uma cauda limitada para não inflar o contexto. Após até duas continuações, novos cortes entregam uma resposta explicitamente parcial, com `status: "incomplete"` no debug. Chamadas de ferramenta incompletas ou texto com formato de chamada não são executados nem continuados como ações: o sistema pede uma nova saída válida, com tentativas limitadas. Permanecem as proteções de tamanho de resposta, duração, contexto e orçamento da execução; Automático não significa geração ilimitada.
 
-A interface mostra o motivo específico, como “Resposta interrompida · Continuando o texto preservado”, “Limite de resposta atingido”, “Contexto ajustado” ou “Verificação pendente”. Para implementações, a tentativa de validação inclui a resposta anterior no histórico; respostas idênticas sem avanço de revisão, plano ou verificações interrompem o ciclo e preservam as alterações. Uma tarefa bloqueada é registrada como `status: "blocked"` em `.codaro/prompt.json`, mesmo quando uma resposta textual foi produzida. No Ollama, motivo de término e consumo são registrados também quando a saída é truncada. O debug distingue `output_tokens` (limite manual ou `null`) de `output_reserve_tokens` (reserva para planejar o contexto).
+A interface usa estados curtos como **Investigando…**, **Respondendo…** e **Revisando resposta…**. O motivo específico das revisões fica nos detalhes expansíveis e no tooltip da prévia, além do diagnóstico `.codaro/prompt.json`. Para implementações, a tentativa de validação inclui a resposta anterior no histórico; respostas idênticas sem avanço de revisão, plano ou verificações interrompem o ciclo e preservam as alterações. Uma tarefa bloqueada é registrada como `status: "blocked"` em `.codaro/prompt.json`, mesmo quando uma resposta textual foi produzida. No Ollama, motivo de término e consumo são registrados também quando a saída é truncada. O debug distingue `output_tokens` (limite manual ou `null`) de `output_reserve_tokens` (reserva para planejar o contexto).
 
 Perguntas reconhecidas sobre estrutura/arquitetura/pontos de entrada recebem uma recuperação inicial limitada de manifestos e candidatos: até cinco leituras de 60 linhas, 1.800 caracteres serializados por leitura e 6.000 caracteres ao todo, descontados do orçamento. Para pontos de entrada conhecidos, a leitura procura main/bootstrap mesmo após imports longos. O reconhecimento usa padrões em português/inglês e não classifica toda intenção. Metadados e nomes candidatos não substituem o conteúdo dos arquivos. As leituras entram na mensagem system como dados e são registradas em `local_retrievals`.
 
@@ -520,7 +543,7 @@ Arquivos do repositório são tratados como dados pelo prompt do agente. As ferr
 
 Uma conclusão de execução com pedido explícito de implementação exige mudança verificável no digest do projeto e validação da revisão atual. Perguntas consultivas continuam aceitas sem exigir citações. Quando o código já atende ao pedido, `finish_task(verified_no_change=true)` exige leitura atual e validação aprovada antes de registrar a conclusão; isso não representa garantia semântica de que os testes escolhidos cobrem toda a solicitação.
 
-Argumentos de ferramentas têm teto de 64.000 bytes UTF-8 de JSON serializado, além dos limites dos campos e do contexto. Divida operações maiores. Saídas com `finish_reason=length` ou `stop_reason=max_tokens` recebem até duas tentativas adicionais para uma resposta curta ou operação menor. JSON incompleto não executa ferramentas. O prazo da tarefa é observado pelos adaptadores, streaming e comandos, com timeout de transporte limitado ao tempo disponível; uma leitura síncrona já iniciada ainda pode aguardar seu timeout.
+Argumentos de ferramentas têm teto de 64.000 bytes UTF-8 de JSON serializado, além dos limites dos campos e do contexto. Divida operações maiores. Saídas com `finish_reason=length` ou `stop_reason=max_tokens` recebem até duas tentativas adicionais para uma resposta curta ou operação menor. JSON incompleto não executa ferramentas. O prazo da tarefa é observado pelos adaptadores, streaming e comandos. O transporte de modelo/catálogo interrompe a espera por conexão, cabeçalhos ou corpo quando há cancelamento/prazo; transportes customizados injetados mantêm seu próprio contrato.
 
 Detalhamento dos 13 achados corrigidos e critérios de regressão: [correções do fluxo do modelo](docs/MODEL_FLOW_FIXES.md).
 
@@ -529,13 +552,16 @@ Detalhamento dos 13 achados corrigidos e critérios de regressão: [correções 
 Veja a [estrutura do projeto e os limites dos módulos](docs/ARCHITECTURE.md)
 para localizar prompts, ferramentas, adaptadores de IA, comandos e componentes da UI.
 
+Veja também [qualidade e aceitação com provedores reais](docs/QUALITY.md): cobertura,
+avaliações no CI, testes opcionais com seus perfis BYOK e limites da validação.
+
 ```bash
 pytest -q
 ruff check .
 ruff format --check .
 ```
 
-Os testes verificam recuperação, atualização e migração do índice, rollback, restrições de arquivos, limites do agente, contratos HTTP, CLI, propostas de edição, conflitos, aplicação atômica e interação real com a interface Textual em modo headless. Os modelos e respostas HTTP são simulados; não há chamadas pagas ou acesso externo nos testes. O CI executa a suíte em Python 3.11, 3.12 e 3.13 no Linux. Em Linux, macOS e Windows, também constrói e instala o wheel e verifica imports, CLI, estilos, agente, diagnóstico e UI fora do checkout. Esses smoke tests não equivalem à suíte completa nos três sistemas. A auditoria local usa Python 3.12/Linux.
+Os testes verificam recuperação, atualização e migração do índice, rollback, restrições de arquivos, limites do agente, contratos HTTP, CLI, propostas de edição, conflitos, aplicação atômica e interação real com a interface Textual em modo headless. Por padrão, os modelos são simulados e não há chamadas pagas; o cancelamento também é exercitado com HTTP local quando sockets estão disponíveis. O CI executa a suíte em Python 3.11, 3.12 e 3.13 no Linux, publica cobertura em Python 3.12 e executa os casos de recuperação versionados como verificação de qualidade. Em Linux, macOS e Windows, também constrói e instala o wheel e verifica imports, CLI, estilos, agente, diagnóstico e UI fora do checkout. Esses smoke tests não equivalem à suíte completa nos três sistemas. Testes reais exigem `--live-provider PERFIL` ou execução manual do workflow de aceitação. A auditoria local usa Python 3.12/Linux.
 
 ## Comandos, ambiente e isolamento
 

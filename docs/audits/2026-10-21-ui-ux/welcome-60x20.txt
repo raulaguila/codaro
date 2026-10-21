@@ -1,0 +1,20 @@
+                                                            
+  ◈ Codaro                                                  
+  /tmp/codaro-ux-tdpkiopd/layout-60 · test-model            
+  Executar · Aprovação por ação · HTTP                      
+                                                            
+   Vamos trabalhar no seu projeto                           
+   Escolha um ponto de partida ou escreva sua pergunta.     
+   As respostas usam os arquivos locais; edições exigem     
+   sua aprovação.                                           
+                                                            
+       Explorar       Buscar código    Propor mudança       
+                                                        ▅▅  
+                                                            
+  Contexto: aguardando primeira chamada · /status           
+  Pronto                                                    
+ ────────────────────────────────────────────────────────── 
+  Pergunte ou peça uma mudança…                             
+                                                            
+  Enter envia · Alt+Enter linha · / ajuda · @ arquivo       
+ ^X Cancelar  ^Q Sair  ^L Mensagens  ^P Comandos            

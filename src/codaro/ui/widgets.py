@@ -25,19 +25,17 @@ class GenerationPreview(Collapsible):
         self.reasoning = reasoning
         self.text = ""
         self.state = "generating"
+        self.reason = ""
         self.content = Static("", markup=False, classes="generation-text")
         super().__init__(
             self.content,
-            title=(
-                "Raciocínio enviado pelo modelo · provisório"
-                if reasoning
-                else "Texto em geração · não validado"
-            ),
+            title=("Raciocínio · em andamento" if reasoning else "Respondendo…"),
             classes="generation-preview reasoning-preview"
             if reasoning
             else "generation-preview response-preview",
             collapsed=False,
         )
+        self.tooltip = "Texto provisório; a resposta final aparece ao concluir a interação."
 
     def update_text(self, text: str):
         limit = (
@@ -51,7 +49,8 @@ class GenerationPreview(Collapsible):
             if len(text) > limit
             else ""
         )
-        self.content.update(self.text + suffix)
+        detail = f"Motivo: {self.reason}\n\n" if self.state == "retry" and self.reason else ""
+        self.content.update(detail + self.text + suffix)
         # Render completed Markdown blocks; keep unmatched fences literal while streaming.
         stable = (
             not self.reasoning
@@ -63,6 +62,9 @@ class GenerationPreview(Collapsible):
 
     def finish(self, state: str, reason: str = ""):
         self.state = state
+        if reason:
+            self.reason = safe_preview(reason)
+            self.tooltip = self.reason
         if self.reasoning:
             self.title = (
                 "Raciocínio enviado pelo modelo · interrompido"
@@ -73,8 +75,8 @@ class GenerationPreview(Collapsible):
             return
         self.title = {
             "tools": "Etapa intermediária · chamada de ferramentas",
-            "retry": reason or "Etapa em revisão · nova tentativa",
-            "answer": "Prévia não validada · aguardando conclusão",
+            "retry": "Revisando resposta…",
+            "answer": "Concluindo resposta…",
             "accepted": "Prévia da resposta · geração concluída",
             "cancelled": "Prévia interrompida · sem resposta concluída",
         }.get(state, "Prévia interrompida · sem resposta concluída")
@@ -118,7 +120,12 @@ class ReasoningGroup(Collapsible):
     def add_preview(self, preview):
         self.steps += 1
         self.title = f"Raciocínio · {self.steps} etapas"
-        self.call_after_refresh(self.mount, preview)
+
+        def mount_step():
+            if self.is_attached:
+                self.query_one(Collapsible.Contents).mount(preview)
+
+        self.call_after_refresh(mount_step)
 
 
 class ActivityGroup(Collapsible):

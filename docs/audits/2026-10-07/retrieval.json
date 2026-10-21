@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "created": "2026-10-07T12:40:30.432179+00:00",
+  "mode": "retrieval",
+  "notice": "Métricas objetivas não substituem revisão semântica humana. O modo retrieval não avalia respostas da IA.",
+  "cases": [
+    {
+      "id": "codaro-native-tools",
+      "status": "success",
+      "repository_root": "/workspace/codaro",
+      "retrieval_precision_at_6": 0.3333333333333333,
+      "expected_path_recall": 1.0,
+      "expectations_passed": true,
+      "matches": [
+        {
+          "path": "src/codaro/provider.py",
+          "start_line": 22,
+          "end_line": 31
+        },
+        {
+          "path": "tests/test_context.py",
+          "start_line": 85,
+          "end_line": 91
+        },
+        {
+          "path": "tests/test_context.py",
+          "start_line": 94,
+          "end_line": 106
+        },
+        {
+          "path": "src/codaro/provider.py",
+          "start_line": 48,
+          "end_line": 49
+        },
+        {
+          "path": "src/codaro/anthropic.py",
+          "start_line": 116,
+          "end_line": 196
+        },
+        {
+          "path": "src/codaro/agent.py",
+          "start_line": 938,
+          "end_line": 956
+        }
+      ],
+      "duration_ms": 543.649
+    },
+    {
+      "id": "codaro-edit-safety",
+      "status": "success",
+      "repository_root": "/workspace/codaro",
+      "retrieval_precision_at_6": 1.0,
+      "expected_path_recall": 1.0,
+      "expectations_passed": true,
+      "matches": [
+        {
+          "path": "src/codaro/edits.py",
+          "start_line": 255,
+          "end_line": 283
+        },
+        {
+          "path": "src/codaro/edits.py",
+          "start_line": 349,
+          "end_line": 417
+        },
+        {
+          "path": "src/codaro/edits.py",
+          "start_line": 292,
+          "end_line": 347
+        },
+        {
+          "path": "src/codaro/edits.py",
+          "start_line": 49,
+          "end_line": 51
+        },
+        {
+          "path": "src/codaro/edits.py",
+          "start_line": 42,
+          "end_line": 47
+        },
+        {
+          "path": "src/codaro/edits.py",
+          "start_line": 138,
+          "end_line": 143
+        }
+      ],
+      "duration_ms": 46.48
+    },
+    {
+      "id": "demo-authorization",
+      "status": "success",
+      "repository_root": "/workspace/codaro/examples/demo",
+      "retrieval_precision_at_6": 1.0,
+      "expected_path_recall": 1.0,
+      "expectations_passed": true,
+      "matches": [
+        {
+          "path": "auth.py",
+          "start_line": 5,
+          "end_line": 7
+        },
+        {
+          "path": "auth.py",
+          "start_line": 10,
+          "end_line": 15
+        }
+      ],
+      "duration_ms": 25.752
+    }
+  ],
+  "passed": 3,
+  "total": 3
+}

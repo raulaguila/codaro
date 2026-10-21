@@ -1,0 +1,24 @@
+                                                                                
+  ◈ Codaro                                                                      
+  /tmp/codaro-ux-uawx3ikb/keyboard · test-model                                 
+  Perguntar · Aprovação por ação · HTTP                                         
+                                                                                
+  › Uma pergunta                                                                
+                                                                                
+   ▼ Provedor indisponível                                                      
+                                                                                
+   Local/ambiente / test-model                                                  
+   Não foi possível concluir: API indisponível.                                 
+                                                                                
+  ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔  
+                 Repetir                              Configurar                
+  ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁  
+                                                                                
+                                                                                
+  Contexto ≈ 36% · 11.8k · /status                                              
+  Pronto                                                                        
+ ────────────────────────────────────────────────────────────────────────────── 
+  Pergunte ou peça uma mudança…                                                 
+                                                                                
+  Enter envia · Alt+Enter linha · / ajuda · @ arquivo                           
+ Ctrl+X Cancelar  Ctrl+Q Sair  Ctrl+L Mensagens  Ctrl+P Comandos                

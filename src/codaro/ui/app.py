@@ -7,8 +7,10 @@ import logging
 import sqlite3
 import sys
 import threading
+import time
 from dataclasses import replace
 
+from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -24,14 +26,15 @@ from codaro.llm import (
     ContextCapacityError,
     ModelError,
     Settings,
-    create_provider,
 )
 from codaro.policies import Mode
 from codaro.storage import private_lock
+from codaro.ui import provider_actions
 from codaro.ui import streaming as stream_ui
 from codaro.ui.composer import Prompt
 from codaro.ui.formatting import short_path
 from codaro.ui.palette import system_commands
+from codaro.ui.recovery import RecoveryCard, failure_kind
 from codaro.ui.reviews import (
     ChangesReview,
     CommandReview,
@@ -52,7 +55,7 @@ class CodaroApp(App):
         Binding("ctrl+q", "quit", "Sair", priority=True, key_display="Ctrl+Q"),
         Binding("ctrl+l", "clear_chat", "Mensagens", priority=True, key_display="Ctrl+L"),
         Binding("ctrl+x", "cancel", "Cancelar", priority=True, key_display="Ctrl+X"),
-        Binding("escape", "cancel", "Cancelar", show=False),
+        Binding("escape", "escape", "Voltar", show=False),
         Binding("ctrl+p", "command_palette", "Comandos", priority=True, key_display="Ctrl+P"),
     ]
 
@@ -80,10 +83,12 @@ class CodaroApp(App):
             return
         prompt = self.query_one(Prompt)
         draft = prompt.value
+        selection = prompt.selection
         try:
             await self.local_command(command)
         finally:
             prompt.value = draft
+            prompt.selection = selection
 
     async def action_register_provider(self):
         await self.open_provider_menu("/providers")
@@ -91,7 +96,14 @@ class CodaroApp(App):
     async def action_select_provider_model(self):
         await self.open_provider_menu("/models")
 
-    def __init__(self, agent: Agent, *, resume: bool = False):
+    def __init__(
+        self,
+        agent: Agent,
+        *,
+        resume: bool = False,
+        setup_required: bool = False,
+        setup_profile: str | None = None,
+    ):
         super().__init__()
         self.is_macos = sys.platform == "darwin"
         if self.is_macos:
@@ -144,7 +156,14 @@ class CodaroApp(App):
         self.clear_backup = None
         self.show_reasoning = False
         self.reasoning_group: ReasoningGroup | None = None
-        self.provider_available = True
+        self.provider_available = not setup_required
+        self.setup_required = setup_required
+        self.setup_profile = setup_profile
+        self.completions_dismissed = False
+        self.pending_recovery = None
+        self.retry_recovery = None
+        self.generation_started = 0.0
+        self.generation_phase = "Investigando…"
 
     def shortcut_display(self, key: str) -> str:
         key = key.upper()
@@ -163,6 +182,7 @@ class CodaroApp(App):
     def welcome(self) -> Vertical:
         return Vertical(
             Static("Vamos trabalhar no seu projeto", id="welcome-title", markup=False),
+            Button("Configurar provedor", id="configure-start"),
             Static(
                 "Escolha um ponto de partida ou escreva sua pergunta.\n"
                 "As respostas usam os arquivos locais; edições exigem sua aprovação.",
@@ -175,7 +195,6 @@ class CodaroApp(App):
                 Button("Propor mudança", id="suggest-edit", disabled=not self.agent.allow_edits),
                 id="suggestions",
             ),
-            Button("Configurar provedor", id="configure-start"),
             id="welcome",
         )
 
@@ -207,6 +226,7 @@ class CodaroApp(App):
     async def on_mount(self):
         self.update_session_header()
         self.set_interval(0.08, self.flush_preview)
+        self.set_interval(1, self.update_generation_status)
         self.query_one(Prompt).focus()
         self.refresh_reference_paths()
         if self.resume_requested:
@@ -215,10 +235,32 @@ class CodaroApp(App):
             self.show_plan()
         except (ValueError, OSError) as exc:
             self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
+        if self.setup_required:
+            self.call_after_refresh(self.start_setup)
+
+    def start_setup(self):
+        from codaro.llm.profiles import ProviderStore
+        from codaro.ui.providers import ModelPicker, ProviderSetup
+
+        store = ProviderStore()
+        try:
+            if store.load()["profiles"]:
+                self.push_screen(
+                    ModelPicker(store, profile=self.setup_profile, onboarding=True),
+                    self.activate_provider,
+                )
+            else:
+                self.push_screen(
+                    ProviderSetup(store, onboarding=True),
+                    lambda name: self.provider_registered(name, store),
+                )
+        except (ValueError, OSError) as exc:
+            self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
 
     def on_resize(self):
         if self.query("#session"):
             self.update_session_header()
+            self.update_completions()
 
     def update_session_header(self):
         settings = self.agent.provider.settings
@@ -232,7 +274,9 @@ class CodaroApp(App):
             tls = "HTTP"
         root = short_path(self.agent.repository.root)
         width = max(20, self.size.width - 4)
-        identity = f"{root} · {settings.model}"
+        identity = (
+            f"{root} · {settings.model if self.provider_available else 'selecione um modelo'}"
+        )
         if len(identity) > width:
             identity = identity[: width - 1] + "…"
         summary = (
@@ -249,6 +293,15 @@ class CodaroApp(App):
             else f"Enter envia · {self.option_display('Enter')} nova linha · "
             "/ comandos · @ arquivo · ↑ histórico"
         )
+        for welcome in self.query("#welcome"):
+            compact = self.size.height < 25
+            welcome.query_one("#suggestions").styles.height = 1 if compact else 3
+            welcome.query_one("#welcome-description", Static).update(
+                "Pergunte sobre o código ou peça uma mudança.\nEdições exigem aprovação."
+                if compact
+                else "Escolha um ponto de partida ou escreva sua pergunta.\n"
+                "As respostas usam os arquivos locais; edições exigem sua aprovação."
+            )
 
     @work(thread=True, exclusive=True, group="files")
     def refresh_reference_paths(self):
@@ -273,25 +326,61 @@ class CodaroApp(App):
     def update_completions(self):
         options = self.completion_options()
         menu = self.query_one("#completion", Static)
-        menu.display = bool(options) and not self.busy
+        prompt = self.query_one(Prompt)
+        unread_row = int(self.query_one("#new-messages").display)
+        max_height = max(3, min(8, self.size.height - 16 - unread_row))
+        prompt.styles.height = min(max_height, max(3, prompt.wrapped_document.height + 2))
+        menu.display = bool(options) and not self.busy and not self.completions_dismissed
         self.query_one(Prompt).suggesting = menu.display
-        if options:
+        if options and menu.display:
             self.completion_index %= len(options)
-            first = max(0, min(self.completion_index - 2, len(options) - 5))
-            menu.update(
-                safe_preview(
-                    "\n".join(
-                        ("› " if i == self.completion_index else "  ") + item.label
-                        for i, item in enumerate(options)
-                        if first <= i < first + 5
-                    )
+            # Reserve at least four rows of chat, even when the composer grows.
+            fixed = (
+                6
+                + unread_row
+                + self.query_one("#session").region.height
+                + int(prompt.styles.height.value)
+            )
+            count = max(1, min(5, self.size.height - fixed - 5))
+            first = max(0, min(self.completion_index - count // 2, len(options) - count))
+            rows = []
+            width = max(10, self.size.width - 4)
+            for i in range(first, min(first + count, len(options))):
+                label = ("› " if i == self.completion_index else "  ") + safe_preview(
+                    options[i].label
                 )
-                + "\nTab completa · ↑↓ escolhem"
+                row = Text(label, no_wrap=True, overflow="ellipsis")
+                row.truncate(width, overflow="ellipsis")
+                rows.append(row)
+            menu.styles.height = len(rows) + 1
+            menu.update(Text("\n").join([*rows, Text("Tab completa · ↑↓ escolhem · Esc fecha")]))
+
+    def action_escape(self):
+        if self.query_one("#completion").display:
+            self.completions_dismissed = True
+            self.update_completions()
+        else:
+            self.action_cancel()
+
+    def set_generation_status(self, phase):
+        self.generation_phase = phase
+        if self.busy:
+            if not self.generation_started:
+                self.generation_started = time.monotonic()
+            self.update_generation_status()
+        else:
+            self.query_one("#status", Static).update(phase)
+
+    def update_generation_status(self):
+        if self.busy and self.generation_started:
+            elapsed = max(0, int(time.monotonic() - self.generation_started))
+            self.query_one("#status", Static).update(
+                f"{self.generation_phase} · {elapsed}s · {self.shortcut_display('x')} cancelar"
             )
 
     def on_prompt_complete(self, event: Prompt.Complete):
         options = self.completion_options()
-        if not options:
+        if not options or not self.query_one(Prompt).suggesting:
             self.action_focus_next()
             return
         option = options[self.completion_index % len(options)]
@@ -304,7 +393,11 @@ class CodaroApp(App):
         )
 
     def on_prompt_navigate(self, event: Prompt.Navigate):
-        if self.completion_options() and not event.history_only:
+        if (
+            self.query_one(Prompt).suggesting
+            and self.completion_options()
+            and not event.history_only
+        ):
             self.completion_index += event.direction
             self.update_completions()
             return
@@ -354,6 +447,14 @@ class CodaroApp(App):
             self.mount_message(Static("Revise as edições pendentes primeiro.", classes="notice"))
             return
         self.query_one(Prompt).value = ""
+        if name == "/settings":
+            from codaro.ui.preferences import PreferencesDialog
+
+            try:
+                self.push_screen(PreferencesDialog(), self.preferences_saved)
+            except (ValueError, OSError) as exc:
+                self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
+            return
         if name == "/integrations":
             if self.busy or self.agent.edits.pending:
                 self.mount_message(
@@ -673,78 +774,22 @@ class CodaroApp(App):
         self.mount_message(Static(safe_preview(text), classes="question", markup=False))
 
     def manage_provider_decision(self, result):
-        if not result:
-            return
-        from codaro.llm.profiles import ProviderStore
-        from codaro.ui.providers import ProviderSetup
-
-        store = ProviderStore()
-        if result.startswith("removed:"):
-            if self.agent.provider.settings.provider_id == result.removeprefix("removed:"):
-                self.provider_available = False
-                self.mount_message(
-                    Static("Provedor ativo removido · selecione outro modelo.", classes="notice")
-                )
-            return
-        profile = result.removeprefix("edit:") if result.startswith("edit:") else None
-        self.push_screen(
-            ProviderSetup(store, profile=profile),
-            lambda name: self.provider_edited(profile, name, store),
-        )
+        return provider_actions.manage_provider_decision(self, result)
 
     def provider_edited(self, previous, name, store):
-        if name and previous == self.agent.provider.settings.provider_id:
-            try:
-                self.activate_provider(store.active_settings(name), preserve_session=False)
-            except (ValueError, OSError) as exc:
-                self.provider_available = False
-                self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
-        self.provider_registered(name, store)
+        return provider_actions.provider_edited(self, previous, name, store)
 
     def provider_registered(self, name, store=None):
-        if name is not None:
-            from codaro.ui.providers import ModelPicker
+        return provider_actions.provider_registered(self, name, store)
 
-            self.push_screen(ModelPicker(store, profile=name), self.activate_provider)
+    def preferences_saved(self, saved):
+        if saved:
+            self.query_one("#status", Static).update(
+                "Preferências salvas · usadas na próxima inicialização"
+            )
 
     def activate_provider(self, settings: Settings | None, *, preserve_session=True):
-        if settings is None:
-            return
-        try:
-            current = self.agent.provider.settings
-            if (
-                preserve_session
-                and current.provider_id == settings.provider_id
-                and current.base_url == settings.base_url
-            ):
-                settings = replace(
-                    settings,
-                    tls_insecure=current.tls_insecure,
-                    timeout=current.timeout,
-                    token_encoding=current.token_encoding,
-                )
-            self.agent.set_provider(create_provider(settings))
-            self.provider_available = True
-            self.session.secret = settings.api_key
-            self.session.redact = self.agent.memory.redact
-            self.session_turns = self.session.redact(self.session_turns)
-            self.context_limit = self.agent.adaptive_input_limit
-            self.context_chars = self.context_tokens = 0
-            self.reported_tokens = None
-            self.update_session_header()
-            self.mount_message(
-                Static(
-                    safe_preview(
-                        f"Modelo selecionado: {settings.provider_id or 'ambiente'} / "
-                        f"{settings.model}\n"
-                        f"Contexto: {settings.context_window} tokens · {settings.context_source}"
-                    ),
-                    classes="notice",
-                    markup=False,
-                )
-            )
-        except (ValueError, OSError) as exc:
-            self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
+        return provider_actions.activate_provider(self, settings, preserve_session=preserve_session)
 
     def save_session(self):
         try:
@@ -940,8 +985,9 @@ class CodaroApp(App):
             return
         prompt = event.text_area
         self.completion_index = 0
-        self.update_completions()
+        self.completions_dismissed = False
         prompt.styles.height = min(8, max(3, prompt.wrapped_document.height + 2))
+        self.update_completions()
         if len(prompt.text) > 8000:
             self.prompt_too_long = True
             self.query_one("#status", Static).update(
@@ -963,10 +1009,16 @@ class CodaroApp(App):
         if follow:
             self.call_after_refresh(conversation.scroll_end, animate=False)
         else:
-            self.query_one("#new-messages", Button).display = True
+            button = self.query_one("#new-messages", Button)
+            if not button.display:
+                button.display = True
+                self.update_completions()
 
     async def on_prompt_submitted(self, event: Prompt.Submitted):
-        question = event.value.strip()
+        await self.submit_question(event.value)
+
+    async def submit_question(self, value: str, *, preserve_draft=False):
+        question = value.strip()
         if not question:
             return
         if self.busy:
@@ -978,9 +1030,9 @@ class CodaroApp(App):
             self.mount_message(
                 Static("Selecione outro provedor e modelo antes de enviar.", classes="notice")
             )
-            await self.local_command("/models")
+            await self.open_provider_menu("/models")
             return
-        if len(event.value) > 8000:
+        if len(value) > 8000:
             self.query_one("#status", Static).update(
                 "Mensagem excede 8.000 caracteres · reduza antes de enviar"
             )
@@ -994,6 +1046,11 @@ class CodaroApp(App):
             )
             return
         self.hide_welcome()
+        if self.pending_recovery is not None:
+            if preserve_draft:
+                self.retry_recovery = self.pending_recovery
+            self.pending_recovery.retire()
+            self.pending_recovery = None
         for button in self.query(".recovery-actions Button"):
             button.disabled = True
         for button in self.query("#execute-plan"):
@@ -1009,26 +1066,35 @@ class CodaroApp(App):
         self.plan_card = None
         self.answer_preview = None
         self.busy = True
+        self.generation_started = time.monotonic()
         self.cancelled.clear()
         self.response_text = self.rendered_text = ""
         self.reply = None
         self.speaker = None
-        event.input.value = ""
-        event.input.disabled = False
+        prompt = self.query_one(Prompt)
+        if not preserve_draft:
+            prompt.value = ""
+        prompt.disabled = False
+        self.update_completions()
         self.mount_message(Static(f"› {safe_preview(question)}", classes="question", markup=False))
-        self.query_one("#status", Static).update("Investigando…")
+        self.set_generation_status("Investigando…")
         self.investigate(question)
 
     def deliver(self, callback, *args):
         if self.is_running:
             try:
-                self.call_from_thread(callback, *args)
+                self.call_from_thread(self.deliver_if_mounted, callback, *args)
             except RuntimeError:
                 return
+
+    def deliver_if_mounted(self, callback, *args):
+        if self.is_running and self.query("#status"):
+            callback(*args)
 
     @work(thread=True, exclusive=True)
     def investigate(self, question: str):
         successful = False
+        outcome = "error"
         try:
             answer = self.agent.ask(
                 question,
@@ -1040,8 +1106,10 @@ class CodaroApp(App):
             successful = True
         except InvestigationCancelled:
             answer = "Investigação cancelada."
+            outcome = "cancelled"
         except ContextCapacityError as exc:
             answer = str(exc)
+            outcome = "context"
         except (ModelError, ValueError, OSError) as exc:
             message = str(exc)
             if self.agent.provider.settings.provider_id:
@@ -1049,6 +1117,8 @@ class CodaroApp(App):
                     "Confira CODARO_BASE_URL", "Confira a URL em Ctrl+P → Gerenciar provedores"
                 )
             answer = f"Não foi possível concluir: {message}"
+            if isinstance(exc, ModelError):
+                outcome = failure_kind(exc)
         except sqlite3.Error:
             answer = (
                 "Falha no índice SQLite. Confira permissões, espaço livre e integridade do índice."
@@ -1056,7 +1126,7 @@ class CodaroApp(App):
         except Exception:
             logger.exception("Unexpected investigation failure")
             answer = "Falha inesperada. Execute codaro ask para diagnosticar o fluxo."
-        self.deliver(self.finish, answer, successful)
+        self.deliver(self.finish, answer, successful, outcome)
 
     def activity(self, event: AgentEvent):
         return stream_ui.activity(self, event)
@@ -1097,11 +1167,13 @@ class CodaroApp(App):
     def discard_response(self):
         return stream_ui.discard_response(self)
 
-    def finish(self, answer: str, successful: bool = True):
+    def finish(self, answer: str, successful: bool = True, outcome: str = "provider"):
         self.finish_preview("answer" if successful else "cancelled")
         if self.activity_group is not None:
             self.activity_group.finish(successful)
         if successful:
+            if self.retry_recovery is not None and self.retry_recovery.is_attached:
+                self.retry_recovery.resolve()
             if self.agent.last_run_intent != "consultation":
                 self.show_plan()
             self.response_text = safe_preview(answer)
@@ -1117,29 +1189,21 @@ class CodaroApp(App):
                 self.answer_preview = None
             self.discard_response()
             settings = self.agent.provider.settings
-            self.mount_message(
-                Static(
-                    safe_preview(
-                        f"{settings.provider_id or 'Local/ambiente'} / {settings.model}\n" + answer
-                    ),
-                    classes="notice",
-                    markup=False,
-                )
+            self.pending_recovery = RecoveryCard(
+                safe_preview(
+                    f"{settings.provider_id or 'Local/ambiente'} / {settings.model}\n" + answer
+                ),
+                outcome,
             )
-            self.mount_message(
-                Horizontal(
-                    Button("Repetir", id="retry-question"),
-                    Button("Configurar", id="recover-provider"),
-                    Button("Outro modelo", id="recover-model"),
-                    classes="recovery-actions",
-                )
-            )
+            self.mount_message(self.pending_recovery)
         if successful:
             for proposal in self.agent.edits.pending:
                 card = ProposalCard(proposal)
                 self.proposal_cards[proposal.id] = card
                 self.mount_message(card)
         self.busy = False
+        self.retry_recovery = None
+        self.generation_started = 0.0
         self.update_session_header()
         prompt = self.query_one(Prompt)
         prompt.disabled = False
@@ -1182,6 +1246,7 @@ class CodaroApp(App):
         self.reply = self.speaker = None
         self.activity_group = self.plan_card = None
         self.reasoning_group = None
+        self.pending_recovery = self.retry_recovery = None
         self.answer_preview = self.generation_preview = self.reasoning_preview = None
         conversation = self.query_one("#conversation", VerticalScroll)
         await conversation.remove_children()
@@ -1192,6 +1257,7 @@ class CodaroApp(App):
             self.proposal_cards[proposal.id] = card
             self.mount_message(card)
         self.show_plan()
+        self.update_session_header()
         self.save_session()
         self.query_one(Prompt).focus()
         self.query_one("#new-messages").display = False
@@ -1256,21 +1322,19 @@ class CodaroApp(App):
         if event.button.id == "new-messages":
             self.query_one("#conversation", VerticalScroll).scroll_end(animate=False)
             event.button.display = False
+            self.update_completions()
             return
         if event.button.id == "retry-question" and not self.busy:
-            prompt = self.query_one(Prompt)
-            prompt.value = self.active_question
-            self.post_message(Prompt.Submitted(prompt))
+            self.run_worker(self.submit_question(self.active_question, preserve_draft=True))
             return
         if (
             event.button.id in {"recover-provider", "recover-model", "configure-start"}
             and not self.busy
         ):
-            self.run_worker(
-                self.open_provider_menu(
-                    "/providers" if event.button.id != "recover-model" else "/models"
-                )
-            )
+            command = "/models" if event.button.id == "recover-model" else "/providers"
+            if event.button.id == "recover-provider" and self.agent.provider.settings.provider_id:
+                command = "/provider-manage"
+            self.run_worker(self.open_provider_menu(command))
             return
         if event.button.id == "execute-plan":
             if self.busy:
@@ -1373,9 +1437,7 @@ class CodaroApp(App):
     def action_cancel(self):
         if self.busy:
             self.cancelled.set()
-            self.query_one("#status", Static).update(
-                "Cancelamento solicitado · aguardando resposta ativa…"
-            )
+            self.set_generation_status("Cancelamento solicitado · aguardando resposta ativa…")
 
     def on_unmount(self):
         self.cancelled.set()

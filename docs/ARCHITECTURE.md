@@ -92,7 +92,12 @@ antigos de compatibilidade não devem virar novas dependências internas.
 | Continuação de resposta | `agent/output.py` |
 | Protocolo de um provedor | Adaptador em `llm`, registrado em `factory.py` |
 | Descoberta de modelos | `llm/catalog.py` |
+| I/O HTTP cancelável | `llm/transport.py` |
+| Sessão, modo, provedor e calibração do agente | `agent/lifecycle.py` |
+| Aprovação e aplicação de alterações | `agent/reviews.py` |
+| Reconhecimento de pedidos | `intent.py` |
 | Cadastro e seleção persistida | `llm/profiles.py` |
+| Telas e ativação do provedor na UI | `ui/provider_actions.py` |
 | Comando do menu Ctrl+P | `ui/palette.py` |
 | Componente ou tela | `ui/widgets.py`, `reviews.py` ou módulo da tela |
 | Aparência | `ui/styles.tcss` |

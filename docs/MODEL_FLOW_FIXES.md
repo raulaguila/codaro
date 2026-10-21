@@ -26,8 +26,13 @@ Implementação de 8 de outubro de 2026 para os 13 achados da [auditoria origina
 - `read_conversation`: conteúdo histórico, paginado em até 4.000 caracteres, sem autorização para mudanças. Trechos atuais precisam ser relidos. Se o arquivo foi removido pela retenção, a prévia da memória permanece e `archive_available=false` informa a ausência.
 - Restrições e orientações obrigatórias não são removidas para fazer uma chamada caber. Se o mínimo for inviável, a operação para com progresso preservado; não há como garantir conclusão em toda janela/modelo.
 - Identificação de pedido de alteração usa verbos comuns em português/inglês. O digest, a revisão e os resultados de validação protegem os casos reconhecidos; não provam que qualquer solicitação em linguagem natural foi cumprida semanticamente. Um teste que passa também depende da qualidade do teste escolhido.
-- A adaptação de contexto conserva os limites de tempo, etapas e resultados. Não concede aprovação para ações. Leitura síncrona em andamento pode aguardar timeout antes de liberar a conexão, mesmo com o prazo atingido.
-- Chaves de provedores conhecidos na sessão são mascaradas. Outros segredos presentes no código não são identificados automaticamente. Os arquivos contêm código e devem permanecer fora do Git.
+- A adaptação de contexto conserva os limites de tempo, etapas e resultados. Não concede aprovação para ações. O transporte de modelo/catálogo agora interrompe I/O por cancelamento ou prazo, incluindo espera por cabeçalhos/corpo; transportes customizados injetados mantêm seu próprio contrato.
+- Chaves de provedores conhecidos na sessão são mascaradas. Também há reconhecimento conservador de padrões de credenciais em código, aplicado antes do envio e da persistência. Não existe detecção universal de segredos. Os arquivos contêm código e devem permanecer fora do Git.
+
+As melhorias posteriores de transporte, organização e avaliação estão descritas
+em [QUALITY.md](QUALITY.md). Os resultados históricos abaixo se referem à auditoria
+original; testes com provedores reais agora têm uma suíte opcional, sem presumir
+que ela foi executada contra qualquer servidor específico.
 
 ## Validação
 

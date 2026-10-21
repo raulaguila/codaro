@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass
 
 COMMANDS = {
+    "/settings": "Preferências de inicialização e limites avançados",
     "/integrations": "Cadastrar MCP ou plugin com teste de conexão",
     "/undo-turn": "Revisar e desfazer todos os arquivos de uma interação",
     "/redo": "Revisar e refazer a última interação desfeita",

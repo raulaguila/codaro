@@ -123,10 +123,12 @@ def test_ollama_truncation_retains_reason_usage_and_explicit_preview_event(tmp_p
     assert "tools" not in calls[1]
 
 
-def test_preview_displays_specific_retry_reason():
+def test_preview_keeps_specific_retry_reason_in_expandable_details():
     preview = GenerationPreview()
     preview.finish("retry", "Limite de resposta atingido · Gerando uma versão mais curta")
-    assert preview.title == "Limite de resposta atingido · Gerando uma versão mais curta"
+    assert preview.title == "Revisando resposta…"
+    assert preview.tooltip == "Limite de resposta atingido · Gerando uma versão mais curta"
+    assert "Limite de resposta atingido" in str(preview.content.render())
     assert preview.collapsed
 
 

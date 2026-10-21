@@ -8,6 +8,7 @@ import stat
 from pathlib import Path
 
 from codaro.llm import validate_message
+from codaro.redaction import redact_credentials
 from codaro.trace import atomic_write, timestamp
 
 MAX_SESSION_BYTES = 512_000
@@ -104,7 +105,7 @@ class SessionStore:
                 return {clean(key): clean(entry) for key, entry in item.items()}
             return item
 
-        return clean(value)
+        return redact_credentials(clean(value))
 
     def load(self) -> list[list[dict]]:
         if self.path.parent.is_symlink():

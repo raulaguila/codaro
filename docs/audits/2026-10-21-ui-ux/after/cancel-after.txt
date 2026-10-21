@@ -1,0 +1,30 @@
+                                                                                                    
+  ◈ Codaro                                                                                          
+  /tmp/codaro-ux-uawx3ikb/cancel · test-model · Perguntar · Aprovação por ação · HTTP               
+                                                                                                    
+  › Olá, como usar o assistente?                                                                    
+                                                                                                    
+   ▶ Raciocínio · 1 etapa                                                                           
+                                                                                                    
+   ▶ Prévia interrompida · sem resposta concluída                                                   
+                                                                                                    
+   ▼ Geração cancelada                                                                              
+                                                                                                    
+   Local/ambiente / test-model                                                                      
+   Investigação cancelada.                                                                          
+                                                                                                    
+  ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔  
+                                              Repetir                                               
+  ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁  
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+  Contexto ≈ 36% · 11.8k · /status                                                                  
+  Pronto                                                                                            
+ ────────────────────────────────────────────────────────────────────────────────────────────────── 
+  Próximo rascunho                                                                                  
+                                                                                                    
+  Enter envia · Alt+Enter nova linha · / comandos · @ arquivo · ↑ histórico                         
+ Ctrl+X Cancelar  Ctrl+Q Sair  Ctrl+L Mensagens  Ctrl+P Comandos                                    

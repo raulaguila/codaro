@@ -1,0 +1,2672 @@
+[
+  {
+    "scenario": "welcome",
+    "size": [
+      60,
+      20
+    ],
+    "header_text": "/tmp/codaro-ux-grggninv/layout-60-20 · test-model · Executar · Aprovação por ação · HTTP",
+    "header": {
+      "region": [
+        2,
+        2,
+        56,
+        1
+      ],
+      "clip": [
+        0,
+        0,
+        60,
+        20
+      ],
+      "visible_region": [
+        2,
+        2,
+        56,
+        1
+      ],
+      "fully_visible": true,
+      "disabled": false
+    },
+    "hint": {
+      "region": [
+        2,
+        18,
+        56,
+        1
+      ],
+      "clip": [
+        0,
+        0,
+        60,
+        20
+      ],
+      "visible_region": [
+        2,
+        18,
+        56,
+        1
+      ],
+      "fully_visible": true,
+      "disabled": false
+    },
+    "prompt": {
+      "region": [
+        1,
+        15,
+        58,
+        3
+      ],
+      "clip": [
+        0,
+        0,
+        60,
+        20
+      ],
+      "visible_region": [
+        1,
+        15,
+        58,
+        3
+      ],
+      "fully_visible": true,
+      "disabled": false
+    }
+  },
+  {
+    "scenario": "provider-form",
+    "size": [
+      60,
+      20
+    ],
+    "focused": "provider-kind",
+    "controls": {
+      "provider-kind": {
+        "region": [
+          7,
+          3,
+          43,
+          3
+        ],
+        "clip": [
+          7,
+          3,
+          43,
+          14
+        ],
+        "visible_region": [
+          7,
+          3,
+          43,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-name": {
+        "region": [
+          7,
+          7,
+          43,
+          3
+        ],
+        "clip": [
+          7,
+          3,
+          43,
+          14
+        ],
+        "visible_region": [
+          7,
+          7,
+          43,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-url": {
+        "region": [
+          7,
+          11,
+          43,
+          3
+        ],
+        "clip": [
+          7,
+          3,
+          43,
+          14
+        ],
+        "visible_region": [
+          7,
+          11,
+          43,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-key": {
+        "region": [
+          7,
+          15,
+          43,
+          3
+        ],
+        "clip": [
+          7,
+          3,
+          43,
+          14
+        ],
+        "visible_region": [
+          7,
+          15,
+          43,
+          2
+        ],
+        "fully_visible": false,
+        "disabled": false
+      },
+      "provider-tls": {
+        "region": [
+          7,
+          19,
+          56,
+          3
+        ],
+        "clip": [
+          7,
+          3,
+          43,
+          14
+        ],
+        "visible_region": [
+          7,
+          17,
+          43,
+          0
+        ],
+        "fully_visible": false,
+        "disabled": false
+      },
+      "provider-test-model": {
+        "region": [
+          7,
+          22,
+          43,
+          3
+        ],
+        "clip": [
+          7,
+          3,
+          43,
+          14
+        ],
+        "visible_region": [
+          7,
+          17,
+          43,
+          0
+        ],
+        "fully_visible": false,
+        "disabled": false
+      },
+      "provider-save": {
+        "region": [
+          7,
+          32,
+          28,
+          3
+        ],
+        "clip": [
+          7,
+          32,
+          43,
+          0
+        ],
+        "visible_region": [
+          7,
+          32,
+          28,
+          0
+        ],
+        "fully_visible": false,
+        "disabled": false
+      },
+      "provider-test": {
+        "region": [
+          7,
+          35,
+          16,
+          3
+        ],
+        "clip": [
+          7,
+          35,
+          43,
+          0
+        ],
+        "visible_region": [
+          7,
+          35,
+          16,
+          0
+        ],
+        "fully_visible": false,
+        "disabled": false
+      },
+      "provider-back": {
+        "region": [
+          23,
+          35,
+          16,
+          3
+        ],
+        "clip": [
+          7,
+          35,
+          43,
+          0
+        ],
+        "visible_region": [
+          23,
+          35,
+          16,
+          0
+        ],
+        "fully_visible": false,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "provider-close-focus",
+    "size": [
+      60,
+      20
+    ],
+    "focused": "prompt"
+  },
+  {
+    "scenario": "model-picker",
+    "size": [
+      60,
+      20
+    ],
+    "controls": {
+      "model-provider": {
+        "region": [
+          6,
+          3,
+          46,
+          3
+        ],
+        "clip": [
+          6,
+          2,
+          46,
+          18
+        ],
+        "visible_region": [
+          6,
+          3,
+          46,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "model-id": {
+        "region": [
+          6,
+          7,
+          46,
+          3
+        ],
+        "clip": [
+          6,
+          2,
+          46,
+          18
+        ],
+        "visible_region": [
+          6,
+          7,
+          46,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "model-use": {
+        "region": [
+          6,
+          17,
+          16,
+          3
+        ],
+        "clip": [
+          6,
+          17,
+          46,
+          3
+        ],
+        "visible_region": [
+          6,
+          17,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "model-refresh": {
+        "region": [
+          22,
+          17,
+          16,
+          3
+        ],
+        "clip": [
+          6,
+          17,
+          46,
+          3
+        ],
+        "visible_region": [
+          22,
+          17,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "model-back": {
+        "region": [
+          38,
+          17,
+          16,
+          3
+        ],
+        "clip": [
+          6,
+          17,
+          46,
+          3
+        ],
+        "visible_region": [
+          38,
+          17,
+          14,
+          3
+        ],
+        "fully_visible": false,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "command-approval",
+    "size": [
+      60,
+      20
+    ],
+    "focused": "reject-command",
+    "controls": {
+      "approve-command": {
+        "region": [
+          6,
+          13,
+          16,
+          3
+        ],
+        "clip": [
+          6,
+          13,
+          48,
+          3
+        ],
+        "visible_region": [
+          6,
+          13,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "reject-command": {
+        "region": [
+          23,
+          13,
+          16,
+          3
+        ],
+        "clip": [
+          6,
+          13,
+          48,
+          3
+        ],
+        "visible_region": [
+          23,
+          13,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "edit-approval",
+    "size": [
+      60,
+      20
+    ],
+    "focused": "back-edit",
+    "controls": {
+      "apply-edit": {
+        "region": [
+          13,
+          14,
+          10,
+          3
+        ],
+        "clip": [
+          3,
+          14,
+          53,
+          3
+        ],
+        "visible_region": [
+          13,
+          14,
+          10,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "reject-edit": {
+        "region": [
+          24,
+          14,
+          10,
+          3
+        ],
+        "clip": [
+          3,
+          14,
+          53,
+          3
+        ],
+        "visible_region": [
+          24,
+          14,
+          10,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "back-edit": {
+        "region": [
+          35,
+          14,
+          10,
+          3
+        ],
+        "clip": [
+          3,
+          14,
+          53,
+          3
+        ],
+        "visible_region": [
+          35,
+          14,
+          10,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "scope-approval",
+    "size": [
+      60,
+      20
+    ],
+    "focused": "cancel-scope",
+    "controls": {
+      "scope-json": {
+        "region": [
+          5,
+          10,
+          50,
+          2
+        ],
+        "clip": [
+          5,
+          4,
+          50,
+          12
+        ],
+        "visible_region": [
+          5,
+          10,
+          50,
+          2
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "grant-scope": {
+        "region": [
+          5,
+          13,
+          18,
+          3
+        ],
+        "clip": [
+          5,
+          13,
+          50,
+          3
+        ],
+        "visible_region": [
+          5,
+          13,
+          18,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "cancel-scope": {
+        "region": [
+          23,
+          13,
+          16,
+          3
+        ],
+        "clip": [
+          5,
+          13,
+          50,
+          3
+        ],
+        "visible_region": [
+          23,
+          13,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "welcome",
+    "size": [
+      80,
+      24
+    ],
+    "header_text": "/tmp/codaro-ux-grggninv/layout-80-24 · test-model · Executar · Aprovação por ação · HTTP",
+    "header": {
+      "region": [
+        2,
+        2,
+        76,
+        1
+      ],
+      "clip": [
+        0,
+        0,
+        80,
+        24
+      ],
+      "visible_region": [
+        2,
+        2,
+        76,
+        1
+      ],
+      "fully_visible": true,
+      "disabled": false
+    },
+    "hint": {
+      "region": [
+        2,
+        22,
+        76,
+        1
+      ],
+      "clip": [
+        0,
+        0,
+        80,
+        24
+      ],
+      "visible_region": [
+        2,
+        22,
+        76,
+        1
+      ],
+      "fully_visible": true,
+      "disabled": false
+    },
+    "prompt": {
+      "region": [
+        1,
+        19,
+        78,
+        3
+      ],
+      "clip": [
+        0,
+        0,
+        80,
+        24
+      ],
+      "visible_region": [
+        1,
+        19,
+        78,
+        3
+      ],
+      "fully_visible": true,
+      "disabled": false
+    }
+  },
+  {
+    "scenario": "provider-form",
+    "size": [
+      80,
+      24
+    ],
+    "focused": "provider-kind",
+    "controls": {
+      "provider-kind": {
+        "region": [
+          9,
+          3,
+          60,
+          3
+        ],
+        "clip": [
+          9,
+          3,
+          60,
+          17
+        ],
+        "visible_region": [
+          9,
+          3,
+          60,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-name": {
+        "region": [
+          9,
+          7,
+          60,
+          3
+        ],
+        "clip": [
+          9,
+          3,
+          60,
+          17
+        ],
+        "visible_region": [
+          9,
+          7,
+          60,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-url": {
+        "region": [
+          9,
+          11,
+          60,
+          3
+        ],
+        "clip": [
+          9,
+          3,
+          60,
+          17
+        ],
+        "visible_region": [
+          9,
+          11,
+          60,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-key": {
+        "region": [
+          9,
+          15,
+          60,
+          3
+        ],
+        "clip": [
+          9,
+          3,
+          60,
+          17
+        ],
+        "visible_region": [
+          9,
+          15,
+          60,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-tls": {
+        "region": [
+          9,
+          19,
+          56,
+          3
+        ],
+        "clip": [
+          9,
+          3,
+          60,
+          17
+        ],
+        "visible_region": [
+          9,
+          19,
+          56,
+          1
+        ],
+        "fully_visible": false,
+        "disabled": false
+      },
+      "provider-test-model": {
+        "region": [
+          9,
+          22,
+          60,
+          3
+        ],
+        "clip": [
+          9,
+          3,
+          60,
+          17
+        ],
+        "visible_region": [
+          9,
+          20,
+          60,
+          0
+        ],
+        "fully_visible": false,
+        "disabled": false
+      },
+      "provider-save": {
+        "region": [
+          9,
+          31,
+          28,
+          3
+        ],
+        "clip": [
+          9,
+          31,
+          60,
+          0
+        ],
+        "visible_region": [
+          9,
+          31,
+          28,
+          0
+        ],
+        "fully_visible": false,
+        "disabled": false
+      },
+      "provider-test": {
+        "region": [
+          9,
+          34,
+          16,
+          3
+        ],
+        "clip": [
+          9,
+          34,
+          60,
+          0
+        ],
+        "visible_region": [
+          9,
+          34,
+          16,
+          0
+        ],
+        "fully_visible": false,
+        "disabled": false
+      },
+      "provider-back": {
+        "region": [
+          25,
+          34,
+          16,
+          3
+        ],
+        "clip": [
+          9,
+          34,
+          60,
+          0
+        ],
+        "visible_region": [
+          25,
+          34,
+          16,
+          0
+        ],
+        "fully_visible": false,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "provider-close-focus",
+    "size": [
+      80,
+      24
+    ],
+    "focused": "prompt"
+  },
+  {
+    "scenario": "model-picker",
+    "size": [
+      80,
+      24
+    ],
+    "controls": {
+      "model-provider": {
+        "region": [
+          7,
+          4,
+          66,
+          3
+        ],
+        "clip": [
+          7,
+          3,
+          66,
+          18
+        ],
+        "visible_region": [
+          7,
+          4,
+          66,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "model-id": {
+        "region": [
+          7,
+          8,
+          66,
+          3
+        ],
+        "clip": [
+          7,
+          3,
+          66,
+          18
+        ],
+        "visible_region": [
+          7,
+          8,
+          66,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "model-use": {
+        "region": [
+          7,
+          18,
+          16,
+          3
+        ],
+        "clip": [
+          7,
+          18,
+          66,
+          3
+        ],
+        "visible_region": [
+          7,
+          18,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "model-refresh": {
+        "region": [
+          23,
+          18,
+          16,
+          3
+        ],
+        "clip": [
+          7,
+          18,
+          66,
+          3
+        ],
+        "visible_region": [
+          23,
+          18,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "model-back": {
+        "region": [
+          39,
+          18,
+          16,
+          3
+        ],
+        "clip": [
+          7,
+          18,
+          66,
+          3
+        ],
+        "visible_region": [
+          39,
+          18,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "command-approval",
+    "size": [
+      80,
+      24
+    ],
+    "focused": "reject-command",
+    "controls": {
+      "approve-command": {
+        "region": [
+          7,
+          15,
+          16,
+          3
+        ],
+        "clip": [
+          7,
+          15,
+          66,
+          3
+        ],
+        "visible_region": [
+          7,
+          15,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "reject-command": {
+        "region": [
+          24,
+          15,
+          16,
+          3
+        ],
+        "clip": [
+          7,
+          15,
+          66,
+          3
+        ],
+        "visible_region": [
+          24,
+          15,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "edit-approval",
+    "size": [
+      80,
+      24
+    ],
+    "focused": "back-edit",
+    "controls": {
+      "apply-edit": {
+        "region": [
+          24,
+          17,
+          10,
+          3
+        ],
+        "clip": [
+          4,
+          17,
+          72,
+          3
+        ],
+        "visible_region": [
+          24,
+          17,
+          10,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "reject-edit": {
+        "region": [
+          35,
+          17,
+          10,
+          3
+        ],
+        "clip": [
+          4,
+          17,
+          72,
+          3
+        ],
+        "visible_region": [
+          35,
+          17,
+          10,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "back-edit": {
+        "region": [
+          46,
+          17,
+          10,
+          3
+        ],
+        "clip": [
+          4,
+          17,
+          72,
+          3
+        ],
+        "visible_region": [
+          46,
+          17,
+          10,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "scope-approval",
+    "size": [
+      80,
+      24
+    ],
+    "focused": "cancel-scope",
+    "controls": {
+      "scope-json": {
+        "region": [
+          6,
+          8,
+          68,
+          7
+        ],
+        "clip": [
+          6,
+          4,
+          68,
+          15
+        ],
+        "visible_region": [
+          6,
+          8,
+          68,
+          7
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "grant-scope": {
+        "region": [
+          6,
+          16,
+          18,
+          3
+        ],
+        "clip": [
+          6,
+          16,
+          68,
+          3
+        ],
+        "visible_region": [
+          6,
+          16,
+          18,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "cancel-scope": {
+        "region": [
+          24,
+          16,
+          16,
+          3
+        ],
+        "clip": [
+          6,
+          16,
+          68,
+          3
+        ],
+        "visible_region": [
+          24,
+          16,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "welcome",
+    "size": [
+      120,
+      35
+    ],
+    "header_text": "/tmp/codaro-ux-grggninv/layout-120-35 · test-model · Executar · Aprovação por ação · HTTP",
+    "header": {
+      "region": [
+        2,
+        2,
+        116,
+        1
+      ],
+      "clip": [
+        0,
+        0,
+        120,
+        35
+      ],
+      "visible_region": [
+        2,
+        2,
+        116,
+        1
+      ],
+      "fully_visible": true,
+      "disabled": false
+    },
+    "hint": {
+      "region": [
+        2,
+        33,
+        116,
+        1
+      ],
+      "clip": [
+        0,
+        0,
+        120,
+        35
+      ],
+      "visible_region": [
+        2,
+        33,
+        116,
+        1
+      ],
+      "fully_visible": true,
+      "disabled": false
+    },
+    "prompt": {
+      "region": [
+        1,
+        30,
+        118,
+        3
+      ],
+      "clip": [
+        0,
+        0,
+        120,
+        35
+      ],
+      "visible_region": [
+        1,
+        30,
+        118,
+        3
+      ],
+      "fully_visible": true,
+      "disabled": false
+    }
+  },
+  {
+    "scenario": "provider-form",
+    "size": [
+      120,
+      35
+    ],
+    "focused": "provider-kind",
+    "controls": {
+      "provider-kind": {
+        "region": [
+          18,
+          4,
+          82,
+          3
+        ],
+        "clip": [
+          18,
+          4,
+          82,
+          27
+        ],
+        "visible_region": [
+          18,
+          4,
+          82,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-name": {
+        "region": [
+          18,
+          8,
+          82,
+          3
+        ],
+        "clip": [
+          18,
+          4,
+          82,
+          27
+        ],
+        "visible_region": [
+          18,
+          8,
+          82,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-url": {
+        "region": [
+          18,
+          12,
+          82,
+          3
+        ],
+        "clip": [
+          18,
+          4,
+          82,
+          27
+        ],
+        "visible_region": [
+          18,
+          12,
+          82,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-key": {
+        "region": [
+          18,
+          16,
+          82,
+          3
+        ],
+        "clip": [
+          18,
+          4,
+          82,
+          27
+        ],
+        "visible_region": [
+          18,
+          16,
+          82,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-tls": {
+        "region": [
+          18,
+          20,
+          56,
+          3
+        ],
+        "clip": [
+          18,
+          4,
+          82,
+          27
+        ],
+        "visible_region": [
+          18,
+          20,
+          56,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-test-model": {
+        "region": [
+          18,
+          23,
+          82,
+          3
+        ],
+        "clip": [
+          18,
+          4,
+          82,
+          27
+        ],
+        "visible_region": [
+          18,
+          23,
+          82,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-save": {
+        "region": [
+          18,
+          31,
+          28,
+          3
+        ],
+        "clip": [
+          18,
+          31,
+          82,
+          0
+        ],
+        "visible_region": [
+          18,
+          31,
+          28,
+          0
+        ],
+        "fully_visible": false,
+        "disabled": false
+      },
+      "provider-test": {
+        "region": [
+          18,
+          34,
+          16,
+          3
+        ],
+        "clip": [
+          18,
+          34,
+          82,
+          0
+        ],
+        "visible_region": [
+          18,
+          34,
+          16,
+          0
+        ],
+        "fully_visible": false,
+        "disabled": false
+      },
+      "provider-back": {
+        "region": [
+          34,
+          34,
+          16,
+          3
+        ],
+        "clip": [
+          18,
+          34,
+          82,
+          0
+        ],
+        "visible_region": [
+          34,
+          34,
+          16,
+          0
+        ],
+        "fully_visible": false,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "provider-close-focus",
+    "size": [
+      120,
+      35
+    ],
+    "focused": "prompt"
+  },
+  {
+    "scenario": "model-picker",
+    "size": [
+      120,
+      35
+    ],
+    "controls": {
+      "model-provider": {
+        "region": [
+          10,
+          10,
+          99,
+          3
+        ],
+        "clip": [
+          10,
+          9,
+          99,
+          17
+        ],
+        "visible_region": [
+          10,
+          10,
+          99,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "model-id": {
+        "region": [
+          10,
+          14,
+          99,
+          3
+        ],
+        "clip": [
+          10,
+          9,
+          99,
+          17
+        ],
+        "visible_region": [
+          10,
+          14,
+          99,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "model-use": {
+        "region": [
+          10,
+          23,
+          16,
+          3
+        ],
+        "clip": [
+          10,
+          23,
+          99,
+          3
+        ],
+        "visible_region": [
+          10,
+          23,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "model-refresh": {
+        "region": [
+          26,
+          23,
+          16,
+          3
+        ],
+        "clip": [
+          10,
+          23,
+          99,
+          3
+        ],
+        "visible_region": [
+          26,
+          23,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "model-back": {
+        "region": [
+          42,
+          23,
+          16,
+          3
+        ],
+        "clip": [
+          10,
+          23,
+          99,
+          3
+        ],
+        "visible_region": [
+          42,
+          23,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "command-approval",
+    "size": [
+      120,
+      35
+    ],
+    "focused": "reject-command",
+    "controls": {
+      "approve-command": {
+        "region": [
+          13,
+          20,
+          16,
+          3
+        ],
+        "clip": [
+          13,
+          20,
+          94,
+          3
+        ],
+        "visible_region": [
+          13,
+          20,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "reject-command": {
+        "region": [
+          30,
+          20,
+          16,
+          3
+        ],
+        "clip": [
+          13,
+          20,
+          94,
+          3
+        ],
+        "visible_region": [
+          30,
+          20,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "edit-approval",
+    "size": [
+      120,
+      35
+    ],
+    "focused": "back-edit",
+    "controls": {
+      "apply-edit": {
+        "region": [
+          44,
+          28,
+          10,
+          3
+        ],
+        "clip": [
+          5,
+          28,
+          110,
+          3
+        ],
+        "visible_region": [
+          44,
+          28,
+          10,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "reject-edit": {
+        "region": [
+          55,
+          28,
+          10,
+          3
+        ],
+        "clip": [
+          5,
+          28,
+          110,
+          3
+        ],
+        "visible_region": [
+          55,
+          28,
+          10,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "back-edit": {
+        "region": [
+          66,
+          28,
+          10,
+          3
+        ],
+        "clip": [
+          5,
+          28,
+          110,
+          3
+        ],
+        "visible_region": [
+          66,
+          28,
+          10,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "scope-approval",
+    "size": [
+      120,
+      35
+    ],
+    "focused": "cancel-scope",
+    "controls": {
+      "scope-json": {
+        "region": [
+          8,
+          9,
+          104,
+          16
+        ],
+        "clip": [
+          8,
+          5,
+          104,
+          24
+        ],
+        "visible_region": [
+          8,
+          9,
+          104,
+          16
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "grant-scope": {
+        "region": [
+          8,
+          26,
+          18,
+          3
+        ],
+        "clip": [
+          8,
+          26,
+          104,
+          3
+        ],
+        "visible_region": [
+          8,
+          26,
+          18,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "cancel-scope": {
+        "region": [
+          26,
+          26,
+          16,
+          3
+        ],
+        "clip": [
+          8,
+          26,
+          104,
+          3
+        ],
+        "visible_region": [
+          26,
+          26,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "welcome",
+    "size": [
+      160,
+      50
+    ],
+    "header_text": "/tmp/codaro-ux-grggninv/layout-160-50 · test-model · Executar · Aprovação por ação · HTTP",
+    "header": {
+      "region": [
+        2,
+        2,
+        156,
+        1
+      ],
+      "clip": [
+        0,
+        0,
+        160,
+        50
+      ],
+      "visible_region": [
+        2,
+        2,
+        156,
+        1
+      ],
+      "fully_visible": true,
+      "disabled": false
+    },
+    "hint": {
+      "region": [
+        2,
+        48,
+        156,
+        1
+      ],
+      "clip": [
+        0,
+        0,
+        160,
+        50
+      ],
+      "visible_region": [
+        2,
+        48,
+        156,
+        1
+      ],
+      "fully_visible": true,
+      "disabled": false
+    },
+    "prompt": {
+      "region": [
+        1,
+        45,
+        158,
+        3
+      ],
+      "clip": [
+        0,
+        0,
+        160,
+        50
+      ],
+      "visible_region": [
+        1,
+        45,
+        158,
+        3
+      ],
+      "fully_visible": true,
+      "disabled": false
+    }
+  },
+  {
+    "scenario": "provider-form",
+    "size": [
+      160,
+      50
+    ],
+    "focused": "provider-kind",
+    "controls": {
+      "provider-kind": {
+        "region": [
+          38,
+          9,
+          84,
+          3
+        ],
+        "clip": [
+          38,
+          8,
+          84,
+          34
+        ],
+        "visible_region": [
+          38,
+          9,
+          84,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-name": {
+        "region": [
+          38,
+          13,
+          84,
+          3
+        ],
+        "clip": [
+          38,
+          8,
+          84,
+          34
+        ],
+        "visible_region": [
+          38,
+          13,
+          84,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-url": {
+        "region": [
+          38,
+          17,
+          84,
+          3
+        ],
+        "clip": [
+          38,
+          8,
+          84,
+          34
+        ],
+        "visible_region": [
+          38,
+          17,
+          84,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-key": {
+        "region": [
+          38,
+          21,
+          84,
+          3
+        ],
+        "clip": [
+          38,
+          8,
+          84,
+          34
+        ],
+        "visible_region": [
+          38,
+          21,
+          84,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-tls": {
+        "region": [
+          38,
+          25,
+          56,
+          3
+        ],
+        "clip": [
+          38,
+          8,
+          84,
+          34
+        ],
+        "visible_region": [
+          38,
+          25,
+          56,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-test-model": {
+        "region": [
+          38,
+          28,
+          84,
+          3
+        ],
+        "clip": [
+          38,
+          8,
+          84,
+          34
+        ],
+        "visible_region": [
+          38,
+          28,
+          84,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-save": {
+        "region": [
+          38,
+          36,
+          28,
+          3
+        ],
+        "clip": [
+          38,
+          36,
+          84,
+          3
+        ],
+        "visible_region": [
+          38,
+          36,
+          28,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-test": {
+        "region": [
+          38,
+          39,
+          16,
+          3
+        ],
+        "clip": [
+          38,
+          39,
+          84,
+          3
+        ],
+        "visible_region": [
+          38,
+          39,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "provider-back": {
+        "region": [
+          54,
+          39,
+          16,
+          3
+        ],
+        "clip": [
+          38,
+          39,
+          84,
+          3
+        ],
+        "visible_region": [
+          54,
+          39,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "provider-close-focus",
+    "size": [
+      160,
+      50
+    ],
+    "focused": "prompt"
+  },
+  {
+    "scenario": "model-picker",
+    "size": [
+      160,
+      50
+    ],
+    "controls": {
+      "model-provider": {
+        "region": [
+          30,
+          17,
+          99,
+          3
+        ],
+        "clip": [
+          30,
+          16,
+          99,
+          17
+        ],
+        "visible_region": [
+          30,
+          17,
+          99,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "model-id": {
+        "region": [
+          30,
+          21,
+          99,
+          3
+        ],
+        "clip": [
+          30,
+          16,
+          99,
+          17
+        ],
+        "visible_region": [
+          30,
+          21,
+          99,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "model-use": {
+        "region": [
+          30,
+          30,
+          16,
+          3
+        ],
+        "clip": [
+          30,
+          30,
+          99,
+          3
+        ],
+        "visible_region": [
+          30,
+          30,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "model-refresh": {
+        "region": [
+          46,
+          30,
+          16,
+          3
+        ],
+        "clip": [
+          30,
+          30,
+          99,
+          3
+        ],
+        "visible_region": [
+          46,
+          30,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "model-back": {
+        "region": [
+          62,
+          30,
+          16,
+          3
+        ],
+        "clip": [
+          30,
+          30,
+          99,
+          3
+        ],
+        "visible_region": [
+          62,
+          30,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "command-approval",
+    "size": [
+      160,
+      50
+    ],
+    "focused": "reject-command",
+    "controls": {
+      "approve-command": {
+        "region": [
+          33,
+          28,
+          16,
+          3
+        ],
+        "clip": [
+          33,
+          28,
+          94,
+          3
+        ],
+        "visible_region": [
+          33,
+          28,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "reject-command": {
+        "region": [
+          50,
+          28,
+          16,
+          3
+        ],
+        "clip": [
+          33,
+          28,
+          94,
+          3
+        ],
+        "visible_region": [
+          50,
+          28,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "edit-approval",
+    "size": [
+      160,
+      50
+    ],
+    "focused": "back-edit",
+    "controls": {
+      "apply-edit": {
+        "region": [
+          64,
+          42,
+          10,
+          3
+        ],
+        "clip": [
+          6,
+          42,
+          148,
+          3
+        ],
+        "visible_region": [
+          64,
+          42,
+          10,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "reject-edit": {
+        "region": [
+          75,
+          42,
+          10,
+          3
+        ],
+        "clip": [
+          6,
+          42,
+          148,
+          3
+        ],
+        "visible_region": [
+          75,
+          42,
+          10,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "back-edit": {
+        "region": [
+          86,
+          42,
+          10,
+          3
+        ],
+        "clip": [
+          6,
+          42,
+          148,
+          3
+        ],
+        "visible_region": [
+          86,
+          42,
+          10,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "scope-approval",
+    "size": [
+      160,
+      50
+    ],
+    "focused": "cancel-scope",
+    "controls": {
+      "scope-json": {
+        "region": [
+          10,
+          10,
+          140,
+          29
+        ],
+        "clip": [
+          10,
+          7,
+          140,
+          36
+        ],
+        "visible_region": [
+          10,
+          10,
+          140,
+          29
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "grant-scope": {
+        "region": [
+          10,
+          40,
+          18,
+          3
+        ],
+        "clip": [
+          10,
+          40,
+          140,
+          3
+        ],
+        "visible_region": [
+          10,
+          40,
+          18,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      "cancel-scope": {
+        "region": [
+          28,
+          40,
+          16,
+          3
+        ],
+        "clip": [
+          10,
+          40,
+          140,
+          3
+        ],
+        "visible_region": [
+          28,
+          40,
+          16,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    }
+  },
+  {
+    "scenario": "palette",
+    "screen": "CommandPalette",
+    "commands": [
+      "Theme",
+      "Quit",
+      "Keys",
+      "Maximize",
+      "Screenshot",
+      "Cadastrar provedor",
+      "Selecionar provedor e modelo"
+    ]
+  },
+  {
+    "scenario": "slash-completion",
+    "displayed": true
+  },
+  {
+    "scenario": "file-completion",
+    "value": "@main.py "
+  },
+  {
+    "scenario": "clear-in-provider-modal",
+    "screen": "ProviderSetup",
+    "draft": "Rascunho preservado?"
+  },
+  {
+    "scenario": "clear-undo",
+    "turns": 0,
+    "session_turns": 0,
+    "draft": "Não devo sumir"
+  },
+  {
+    "scenario": "clear-keeps-task",
+    "same_task": true,
+    "status": "Pronto · conversa limpa"
+  },
+  {
+    "scenario": "mode-change",
+    "mode": "plan",
+    "header": "/tmp/codaro-ux-grggninv/interactions · test-model · Planejar · Aprovação por ação · HTTP"
+  },
+  {
+    "scenario": "multiline-composer",
+    "region": {
+      "region": [
+        1,
+        20,
+        98,
+        8
+      ],
+      "clip": [
+        0,
+        0,
+        100,
+        30
+      ],
+      "visible_region": [
+        1,
+        20,
+        98,
+        8
+      ],
+      "fully_visible": true,
+      "disabled": false
+    },
+    "hint": "Enter envia · Alt+Enter nova linha · / comandos · @ arquivo · ↑ histórico"
+  },
+  {
+    "scenario": "scroll-follow",
+    "before": 0,
+    "after": 163,
+    "maximum": 163
+  },
+  {
+    "scenario": "light-theme",
+    "theme": "textual-light",
+    "background": "Color(15, 23, 42)",
+    "conversation_background": "Color(0, 0, 0, a=0)"
+  },
+  {
+    "scenario": "provider-tab-reachable",
+    "focused": "provider-test",
+    "button": {
+      "region": [
+        9,
+        17,
+        16,
+        3
+      ],
+      "clip": [
+        9,
+        17,
+        60,
+        3
+      ],
+      "visible_region": [
+        9,
+        17,
+        16,
+        3
+      ],
+      "fully_visible": true,
+      "disabled": false
+    }
+  },
+  {
+    "scenario": "provider-error-visible",
+    "text": "Catálogo indisponível (HTTP 401). Confira o provedor, endereço e credencial.",
+    "status": {
+      "region": [
+        9,
+        13,
+        60,
+        2
+      ],
+      "clip": [
+        9,
+        3,
+        60,
+        17
+      ],
+      "visible_region": [
+        9,
+        13,
+        60,
+        2
+      ],
+      "fully_visible": true,
+      "disabled": false
+    },
+    "requests": 1,
+    "secret_visible": false,
+    "focused": null
+  },
+  {
+    "scenario": "provider-test-cancellation",
+    "still_open": true,
+    "saving": true,
+    "back_disabled": true
+  },
+  {
+    "scenario": "clear-rejects-pending",
+    "proposal_state": "rejected",
+    "original_file": "value = 1\n",
+    "modal": "Screen",
+    "status": "Pronto · conversa limpa"
+  },
+  {
+    "scenario": "clear-keeps-grant",
+    "policy": "task",
+    "paths": [
+      "src"
+    ],
+    "task_objective": "Atividade autorizada"
+  },
+  {
+    "scenario": "connection-failure",
+    "busy": false,
+    "notice": [
+      "Não foi possível concluir: Não foi possível conectar ao modelo. Confira CODARO_BASE_URL e se o servidor está ativo."
+    ],
+    "inline_error_actions": 0,
+    "status": "Pronto"
+  },
+  {
+    "scenario": "incompatible-model-selectable",
+    "metadata_before_use": "embedding-only\nContexto usado: 16384 · fallback: 16.384 tokens\nSaída máxima: não informada\nLimites aprendidos após rejeição ajustam o orçamento automaticamente.",
+    "error_after_use": "A API informa que este modelo não suporta ferramentas/chat."
+  },
+  {
+    "scenario": "stream-live",
+    "cancel": false,
+    "busy": true,
+    "prompt_disabled": true,
+    "preview": "Texto em geração · não validado",
+    "reasoning": "Raciocínio enviado pelo modelo · provisório"
+  },
+  {
+    "scenario": "stream-finish",
+    "cancel": false,
+    "busy": false,
+    "focused": "prompt",
+    "status": "Pronto",
+    "answer": "## Resultado\n\nParte da resposta recebida em streaming.\n\nResposta completa para o teste da interface.",
+    "activity_title": "Geração concluída",
+    "question_recoverable": true
+  },
+  {
+    "scenario": "stream-live",
+    "cancel": true,
+    "busy": true,
+    "prompt_disabled": true,
+    "preview": "Texto em geração · não validado",
+    "reasoning": "Raciocínio enviado pelo modelo · provisório"
+  },
+  {
+    "scenario": "cancel-request",
+    "status": "Cancelamento solicitado · aguardando resposta ativa…"
+  },
+  {
+    "scenario": "stream-finish",
+    "cancel": true,
+    "busy": false,
+    "focused": "prompt",
+    "status": "Pronto",
+    "answer": "",
+    "activity_title": "Geração interrompida",
+    "question_recoverable": true
+  }
+]

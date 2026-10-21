@@ -1,0 +1,30 @@
+                                                                                                    
+  ◈ Codaro                                                                                          
+  /tmp/codaro-ux-uawx3ikb/cancel · test-model · Perguntar · Aprovação por ação · HTTP               
+                                                                                                    
+  › Olá, como usar o assistente?                                                                    
+                                                                                                    
+   ▶ Raciocínio · 1 etapa                                                                           
+   █ ▶ Investigação                                                                                 
+                                                                                                    
+   ▼ Respondendo…                                                                                   
+   Resposta                                                                                         
+                                                                                                    
+   Primeira parte recebida em streaming.                                                            
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+  Contexto ≈ 36% · 11.8k · /status                                                                  
+  Respondendo… · 0s · Ctrl+X cancelar                                                               
+ ────────────────────────────────────────────────────────────────────────────────────────────────── 
+  Pergunte ou peça uma mudança…                                                                     
+                                                                                                    
+  Enter envia · Alt+Enter nova linha · / comandos · @ arquivo · ↑ histórico                         
+ Ctrl+X Cancelar  Ctrl+Q Sair  Ctrl+L Mensagens  Ctrl+P Comandos                                    

@@ -7,9 +7,12 @@ import re
 
 import httpx
 
+from codaro.llm.config import Settings
 from codaro.llm.errors import (
     ModelError,
+    RequestCancelled,
 )
+from codaro.llm.transport import model_client
 
 MAX_CATALOG_BYTES = 4_000_000
 
@@ -27,10 +30,16 @@ def text(value, limit=200):
 
 
 class ModelCatalog:
-    def __init__(self, profile, *, transport=None):
+    def __init__(self, profile, *, transport=None, cancelled=None):
         self.profile, self.transport = profile, transport
+        self.cancelled = cancelled
+
+    def check_cancelled(self):
+        if self.cancelled is not None and self.cancelled.is_set():
+            raise RequestCancelled("Consulta cancelada.")
 
     def request(self, method, url, **kwargs):
+        self.check_cancelled()
         headers = {}
         key = self.profile["api_key"]
         if key:
@@ -41,13 +50,15 @@ class ModelCatalog:
         if self.profile["kind"] == "anthropic":
             headers["anthropic-version"] = "2023-06-01"
         try:
-            with httpx.Client(
+            settings = Settings(
+                self.profile["base_url"],
+                "catalog",
                 timeout=15,
-                verify=not self.profile["tls_insecure"],
-                transport=self.transport,
-                follow_redirects=False,
-            ) as client:
+                tls_insecure=self.profile["tls_insecure"],
+            )
+            with model_client(settings, self.transport, self.cancelled) as client:
                 with client.stream(method, url, headers=headers, **kwargs) as response:
+                    self.check_cancelled()
                     if response.status_code >= 300:
                         raise ModelError(
                             f"Catálogo indisponível (HTTP {response.status_code}). "
@@ -55,6 +66,7 @@ class ModelCatalog:
                         )
                     raw = bytearray()
                     for chunk in response.iter_bytes():
+                        self.check_cancelled()
                         raw.extend(chunk)
                         if len(raw) > MAX_CATALOG_BYTES:
                             raise ModelError("Catálogo excede o limite de 4 MB.")
@@ -63,6 +75,7 @@ class ModelCatalog:
                 raise ValueError("invalid catalog")
             return data
         except httpx.RequestError as exc:
+            self.check_cancelled()
             raise ModelError("Não foi possível consultar o catálogo do provedor.") from exc
         except (ValueError, RecursionError) as exc:
             raise ModelError("O provedor retornou um catálogo inválido.") from exc

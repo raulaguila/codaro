@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<10", "ruff>=0.11,<1"]
+dev = ["pytest>=8,<10", "pytest-cov>=7,<8", "ruff>=0.11,<1"]
 tokenizer = ["tiktoken>=0.8,<1"]
 
 [project.scripts]
@@ -39,6 +39,16 @@ include = ["/src", "/tests", "/scripts", "/evaluations", "/docs/*.md", "/example
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["live: optional model requests against an explicitly selected provider"]
+
+[tool.coverage.run]
+source = ["codaro"]
+branch = true
+relative_files = true
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
 
 [tool.ruff]
 target-version = "py311"

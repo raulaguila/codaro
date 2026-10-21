@@ -28,7 +28,8 @@ from codaro.llm.protocol import (
     validate_message,
 )
 from codaro.llm.streaming import check_cancelled, merge_fragment, sse_events
-from codaro.runtime import redact_request, remaining_seconds
+from codaro.llm.transport import model_client
+from codaro.runtime import redact_request
 from codaro.trace import current_flow
 
 
@@ -160,14 +161,7 @@ class OpenAICompatible:
         if self.settings.api_key:
             headers["Authorization"] = f"Bearer {self.settings.api_key}"
         try:
-            with httpx.Client(
-                timeout=httpx.Timeout(
-                    min(self.settings.timeout, remaining_seconds() or self.settings.timeout),
-                    connect=min(10, remaining_seconds() or 10),
-                ),
-                transport=self.transport,
-                verify=not self.settings.tls_insecure,
-            ) as client:
+            with model_client(self.settings, self.transport, cancelled) as client:
                 negotiated_usage = False
                 for attempt in range(4):
                     check_cancelled(cancelled)
@@ -263,10 +257,12 @@ class OpenAICompatible:
                 "Confira o modelo, a URL e a credencial."
             ) from exc
         except httpx.TimeoutException as exc:
+            check_cancelled(cancelled)
             raise ModelError(
                 "Tempo de resposta do modelo esgotado. Confira CODARO_TIMEOUT."
             ) from exc
         except httpx.RequestError as exc:
+            check_cancelled(cancelled)
             raise ModelError(
                 "Não foi possível conectar ao modelo. Confira CODARO_BASE_URL "
                 "e se o servidor está ativo."

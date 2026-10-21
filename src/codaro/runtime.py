@@ -3,6 +3,8 @@
 import time
 from contextvars import ContextVar
 
+from codaro.redaction import redact_credentials
+
 request_deadline = ContextVar("codaro_deadline", default=None)
 request_artifacts = ContextVar("codaro_artifacts", default=None)
 request_budget = ContextVar("codaro_budget", default=None)
@@ -16,7 +18,7 @@ def remaining_seconds():
 
 def redact_request(value):
     redact = request_redactor.get()
-    return redact(value) if redact else value
+    return redact(value) if redact else redact_credentials(value)
 
 
 class RunBudget:

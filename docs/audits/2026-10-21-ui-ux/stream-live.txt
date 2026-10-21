@@ -1,0 +1,30 @@
+                                                                                                    
+  ◈ Codaro                                                                                          
+  /tmp/codaro-ux-tdpkiopd/stream · test-model · Perguntar · Aprovação por ação · HTTP               
+                                                                                                    
+  › Olá, como usar o assistente?                                                                    
+                                                                                                    
+   ▶ Raciocínio · 1 etapa                                                                           
+   █ ▶ Investigação                                                                                 
+                                                                                                    
+   ▼ Texto em geração · não validado                                                                
+   Resposta                                                                                         
+                                                                                                    
+   Primeira parte recebida em streaming.                                                            
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+  Contexto ≈ 4,263/11,776 · configuração padrão/ambiente · /status                                  
+  Gerando resposta… · Ctrl+X para cancelar                                                          
+ ────────────────────────────────────────────────────────────────────────────────────────────────── 
+  Pergunte ou peça uma mudança…                                                                     
+                                                                                                    
+  Enter envia · Alt+Enter nova linha · / comandos · @ arquivo · ↑ histórico                         
+ Ctrl+X Cancelar  Ctrl+Q Sair  Ctrl+L Mensagens  Ctrl+P Comandos                                    

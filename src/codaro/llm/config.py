@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
@@ -91,87 +90,6 @@ class Settings:
     def from_env(
         cls, *, tls_insecure: bool | None = None, context_window: int | None = None
     ) -> Settings:
-        from codaro.llm.profiles import ProviderStore
+        from codaro.configuration import resolve_configuration
 
-        store, selected = ProviderStore(), os.getenv("CODARO_PROVIDER", "").strip()
-        configured = None
-        if selected or not any(
-            os.getenv(name) for name in ("CODARO_BASE_URL", "CODARO_MODEL", "CODARO_API_KEY")
-        ):
-            if selected or store.load()["active"]:
-                configured = store.active_settings(selected or None)
-        if tls_insecure is None:
-            raw = (
-                os.getenv(
-                    "CODARO_TLS_INSECURE", str(configured.tls_insecure) if configured else "false"
-                )
-                .strip()
-                .lower()
-            )
-            values = {
-                "1": True,
-                "true": True,
-                "yes": True,
-                "on": True,
-                "0": False,
-                "false": False,
-                "no": False,
-                "off": False,
-            }
-            if raw not in values:
-                raise ValueError("CODARO_TLS_INSECURE deve ser true/false ou 1/0.")
-            tls_insecure = values[raw]
-        try:
-            timeout = float(os.getenv("CODARO_TIMEOUT", "90"))
-        except ValueError as exc:
-            raise ValueError("CODARO_TIMEOUT deve ser um número.") from exc
-        try:
-            window = (
-                context_window
-                if context_window is not None
-                else int(
-                    os.getenv(
-                        "CODARO_CONTEXT_WINDOW",
-                        str(configured.context_window) if configured else "16384",
-                    )
-                )
-            )
-            raw_output = os.getenv(
-                "CODARO_MAX_OUTPUT_TOKENS",
-                str(configured.max_output_tokens)
-                if configured and configured.max_output_tokens is not None
-                else "auto",
-            )
-            output = None if raw_output.strip().casefold() in {"", "auto"} else int(raw_output)
-        except ValueError as exc:
-            raise ValueError(
-                "Use inteiros para CODARO_CONTEXT_WINDOW e CODARO_MAX_OUTPUT_TOKENS; "
-                "a saída também aceita auto."
-            ) from exc
-        if output is not None and configured and configured.model_max_output_tokens:
-            output = min(output, configured.model_max_output_tokens, 32768)
-        return cls(
-            base_url=configured.base_url
-            if configured
-            else os.getenv("CODARO_BASE_URL", "http://localhost:11434/v1").strip().rstrip("/"),
-            model=configured.model
-            if configured
-            else os.getenv("CODARO_MODEL", "qwen2.5:7b").strip(),
-            api_key=configured.api_key if configured else os.getenv("CODARO_API_KEY", "").strip(),
-            timeout=timeout,
-            tls_insecure=tls_insecure,
-            context_window=window,
-            max_output_tokens=output,
-            token_encoding=os.getenv("CODARO_TOKEN_ENCODING", "").strip() or None,
-            provider_id=configured.provider_id if configured else "",
-            api_style=configured.api_style if configured else "openai",
-            model_max_output_tokens=configured.model_max_output_tokens if configured else None,
-            include_stream_usage=configured.include_stream_usage if configured else False,
-            context_source=(
-                "configuração do usuário"
-                if context_window is not None or os.getenv("CODARO_CONTEXT_WINDOW")
-                else configured.context_source
-                if configured
-                else "configuração padrão/ambiente"
-            ),
-        )
+        return resolve_configuration(tls_insecure=tls_insecure, context_window=context_window).model

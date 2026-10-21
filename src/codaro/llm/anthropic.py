@@ -24,7 +24,8 @@ from codaro.llm.protocol import (
     validate_message,
 )
 from codaro.llm.streaming import check_cancelled, sse_events
-from codaro.runtime import redact_request, remaining_seconds
+from codaro.llm.transport import model_client
+from codaro.runtime import redact_request
 
 
 class Anthropic(OpenAICompatible):
@@ -144,14 +145,7 @@ class Anthropic(OpenAICompatible):
         payload = redact_request(payload)
         headers = {"x-api-key": self.settings.api_key, "anthropic-version": "2023-06-01"}
         try:
-            with httpx.Client(
-                timeout=httpx.Timeout(
-                    min(self.settings.timeout, remaining_seconds() or self.settings.timeout),
-                    connect=min(10, remaining_seconds() or 10),
-                ),
-                verify=not self.settings.tls_insecure,
-                transport=self.transport,
-            ) as client:
+            with model_client(self.settings, self.transport, cancelled) as client:
                 for attempt in range(3):
                     check_cancelled(cancelled)
                     from codaro.trace import current_flow
@@ -215,6 +209,7 @@ class Anthropic(OpenAICompatible):
                         check_cancelled(cancelled)
                         return message
         except httpx.RequestError as exc:
+            check_cancelled(cancelled)
             raise ModelError("Não foi possível conectar à Anthropic.") from exc
         except (KeyError, ValueError, TypeError, RecursionError) as exc:
             raise ModelError("Resposta incompatível com a API Messages da Anthropic.") from exc

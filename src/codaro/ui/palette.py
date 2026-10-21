@@ -17,6 +17,7 @@ def system_commands(app, framework_commands):
         )
         return
     actions = {
+        "Preferências": ("/settings", "Modo inicial, retomada e limites avançados"),
         "Cadastrar provedor": (
             "/providers",
             "Cadastrar API key e listar modelos do provedor (BYOK).",

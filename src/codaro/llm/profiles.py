@@ -5,7 +5,10 @@ from __future__ import annotations
 import json
 import os
 import re
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from codaro.llm.catalog import ModelCatalog, positive, text
 from codaro.llm.config import Settings
@@ -17,6 +20,19 @@ from codaro.storage import private_json, private_lock
 from codaro.trace import atomic_write, timestamp
 
 MAX_CONFIG_BYTES = 4_000_000
+
+
+@dataclass(frozen=True)
+class ProviderChange:
+    """A prepared remote lookup; only commit() can change local configuration."""
+
+    store: ProviderStore
+    apply: Callable[[dict], None]
+    result: Any
+
+    def commit(self):
+        self.store.mutate(self.apply)
+        return self.result
 
 
 class ProviderStore:
@@ -94,9 +110,18 @@ class ProviderStore:
         return name, value["profiles"][name]
 
     def register(self, kind, key, *, name=None, base_url=None, tls_insecure=False):
+        return self.prepare_register(
+            kind, key, name=name, base_url=base_url, tls_insecure=tls_insecure
+        ).commit()
+
+    def prepare_register(
+        self, kind, key, *, name=None, base_url=None, tls_insecure=False, cancelled=None
+    ):
         if kind not in PRESETS:
             raise ValueError("Provedor desconhecido; use um preset ou custom.")
         name = name or kind
+        if name == "env":
+            raise ValueError("O nome env é reservado à configuração por variáveis de ambiente.")
         if not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", name):
             raise ValueError("Nome do perfil inválido.")
         if name in self.load()["profiles"]:
@@ -113,7 +138,9 @@ class ProviderStore:
             "tls_insecure": tls_insecure,
             "model": "",
         }
-        profile["models"] = ModelCatalog(profile, transport=self.transport).list()
+        profile["models"] = ModelCatalog(
+            profile, transport=self.transport, cancelled=cancelled
+        ).list()
         profile["updated_at"] = timestamp()
 
         def add(value):
@@ -121,12 +148,33 @@ class ProviderStore:
                 raise ValueError("Perfil já existe ou limite de 32 perfis atingido.")
             value["profiles"][name] = profile
 
-        self.mutate(add)
-        return profile["models"]
+        return ProviderChange(self, add, profile["models"])
 
     def update(self, kind, key, *, previous_name, name=None, base_url=None, tls_insecure=False):
+        return self.prepare_update(
+            kind,
+            key,
+            previous_name=previous_name,
+            name=name,
+            base_url=base_url,
+            tls_insecure=tls_insecure,
+        ).commit()
+
+    def prepare_update(
+        self,
+        kind,
+        key,
+        *,
+        previous_name,
+        name=None,
+        base_url=None,
+        tls_insecure=False,
+        cancelled=None,
+    ):
         previous_name, old = self.profile(previous_name)
         name = name or previous_name
+        if name == "env" and previous_name != "env":
+            raise ValueError("O nome env é reservado à configuração por variáveis de ambiente.")
         if kind not in PRESETS or not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", name):
             raise ValueError("Provedor ou nome de perfil inválido.")
         settings = Settings(
@@ -141,7 +189,9 @@ class ProviderStore:
             "api_key": key,
             "tls_insecure": tls_insecure,
         }
-        candidate["models"] = ModelCatalog(candidate, transport=self.transport).list()
+        candidate["models"] = ModelCatalog(
+            candidate, transport=self.transport, cancelled=cancelled
+        ).list()
         if not any(item["id"] == old["model"] for item in candidate["models"]):
             candidate["model"] = ""
         if kind != old["kind"] or settings.base_url != old["base_url"]:
@@ -158,8 +208,7 @@ class ProviderStore:
             if value["active"] == previous_name:
                 value["active"] = name
 
-        self.mutate(save)
-        return candidate["models"]
+        return ProviderChange(self, save, candidate["models"])
 
     def test_connection(
         self,
@@ -197,7 +246,7 @@ class ProviderStore:
         check_cancel()
         if on_stage:
             on_stage("catálogo")
-        catalog = ModelCatalog(profile, transport=self.transport)
+        catalog = ModelCatalog(profile, transport=self.transport, cancelled=cancelled)
         models = catalog.list()
         check_cancel()
         if model_id:
@@ -219,7 +268,11 @@ class ProviderStore:
         name, profile = self.profile(name)
         if not refresh:
             return profile["models"]
-        models = ModelCatalog(profile, transport=self.transport).list()
+        return self.prepare_refresh(name).commit()
+
+    def prepare_refresh(self, name, *, cancelled=None):
+        name, profile = self.profile(name)
+        models = ModelCatalog(profile, transport=self.transport, cancelled=cancelled).list()
 
         def save(value):
             current = value["profiles"].get(name)
@@ -227,15 +280,17 @@ class ProviderStore:
                 raise ValueError("O perfil mudou durante a consulta; tente novamente.")
             current.update(models=models, updated_at=timestamp())
 
-        self.mutate(save)
-        return models
+        return ProviderChange(self, save, models)
 
     def select(self, name, model_id, *, context_window=None):
+        return self.prepare_select(name, model_id, context_window=context_window).commit()
+
+    def prepare_select(self, name, model_id, *, context_window=None, cancelled=None):
         name, profile = self.profile(name)
         model = next((model for model in profile["models"] if model["id"] == model_id), None)
         if model is None:
             raise ValueError("Modelo não está no catálogo; atualize a lista do provedor.")
-        model = ModelCatalog(profile, transport=self.transport).details(model)
+        model = ModelCatalog(profile, transport=self.transport, cancelled=cancelled).details(model)
         if model["tools"] is False:
             raise ValueError("A API informa que este modelo não suporta ferramentas/chat.")
         overrides = dict(profile.get("context_overrides", {}))
@@ -255,8 +310,7 @@ class ProviderStore:
             current["context_overrides"] = overrides
             value["active"] = name
 
-        self.mutate(save)
-        return self.settings_for(name, candidate, model)
+        return ProviderChange(self, save, self.settings_for(name, candidate, model))
 
     def settings_for(self, name, profile, model):
         override = profile.get("context_overrides", {}).get(model["id"])

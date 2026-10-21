@@ -4,6 +4,8 @@ import json
 import re
 import unicodedata
 
+from codaro.intent import is_information_request as is_information_request
+
 
 def serialize(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
@@ -25,35 +27,6 @@ def is_project_overview(question: str) -> bool:
         text,
     )
     return bool(entrypoints or project and (overview or explanation))
-
-
-def is_information_request(question: str) -> bool:
-    """Only explicit consultations bypass a pending implementation task."""
-    text = question.strip().casefold()
-    text_continuation = re.match(
-        r"(?:continue|continuar)\s+(?:(?:a|essa|esta|the)\s+)?"
-        r"(?:resposta|explicação|explicacao|texto|answer|explanation|text)\b",
-        text,
-    )
-    if text_continuation:
-        text = text[text_continuation.end() :]
-    if re.search(
-        r"\b(implemente|implementar|crie|criar|corrija|corrigir|altere|alterar|"
-        r"adicione|adicionar|remova|remover|execute|executar|continue|continuar|"
-        r"valide|validar|refatore|ajuste|atualize|faça|faca|mude|substitua|"
-        r"aplique|edite|editar|teste|testar|implement|create|fix|change|"
-        r"add|remove|run|execute|continue|validate|refactor|update|delete|test)\b",
-        text,
-    ):
-        return False
-    return bool(
-        text_continuation
-        or re.match(
-            r"(?:explique|descreva|fale sobre|o que|qual|quais|quem|como|onde|"
-            r"explain|describe|what|which|who|how|where)\b",
-            text,
-        )
-    )
 
 
 def cites_observed_lines(answer: str, evidence: list[tuple[str, int, int]]) -> bool:

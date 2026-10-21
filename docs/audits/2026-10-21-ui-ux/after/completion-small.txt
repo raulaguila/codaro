@@ -1,0 +1,20 @@
+                                                            
+  ◈ Codaro                                                  
+  /tmp/codaro-ux-uawx3ikb/composer · test-model             
+  Perguntar · Aprovação por ação · HTTP                     
+                                                            
+   Vamos trabalhar no seu projeto                           
+                   Configurar provedor                      
+   Pergunte sobre o código ou peça uma mudança.             
+  Contexto: aguardando primeira chamada · /status           
+  Pronto                                                    
+  › /integrations · Cadastrar MCP ou plugin com teste de …  
+    /undo-turn · Revisar e desfazer todos os arquivos de …  
+    /redo · Revisar e refazer a última interação desfeita   
+    /sessions · Listar sessões independentes                
+  Tab completa · ↑↓ escolhem · Esc fecha                    
+ ────────────────────────────────────────────────────────── 
+  /                                                         
+                                                            
+  Enter envia · Alt+Enter linha · / ajuda · @ arquivo       
+ ^X Cancelar  ^Q Sair  ^L Mensagens  ^P Comandos            
