@@ -25,7 +25,8 @@ class NewConversation(ModalScreen[str | None]):
             yield Static("Nova conversa e tarefa", markup=False)
             yield Static(
                 "Descarta propostas pendentes, limpa o contexto e revoga o escopo anterior. "
-                "Arquivos já alterados são mantidos. A conversa anterior fica na memória.",
+                "Encerra o plano atual. Arquivos já alterados são mantidos. "
+                "A conversa anterior fica na memória.",
                 markup=False,
             )
             yield Static("Objetivo da nova tarefa (opcional)", markup=False)

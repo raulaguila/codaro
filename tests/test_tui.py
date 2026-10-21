@@ -698,14 +698,14 @@ def test_full_width_chat_preserves_draft_and_messages_on_resize(tmp_path):
     run_ui(scenario())
 
 
-def test_starter_suggestion_fills_draft_without_calling_model(tmp_path):
+def test_clean_start_preserves_draft_without_calling_model(tmp_path):
     model = UIModel()
     app = CodaroApp(Agent(Repository(tmp_path), model, allow_edits=True))
 
     async def scenario():
         async with app.run_test(size=(120, 35)) as pilot:
-            await pilot.click("#suggest-explore")
-            assert "estrutura" in app.query_one(Prompt).text
+            assert not app.query("#suggestions, #configure-start")
+            app.query_one(Prompt).value = "Explique a estrutura do projeto"
             assert app.focused is app.query_one(Prompt)
             assert not model.started.is_set()
             await pilot.press("enter")
@@ -1161,7 +1161,8 @@ def test_modes_plan_transition_and_local_task_scope_review(tmp_path):
             await pilot.press("enter")
             await wait_ready(app, pilot)
             await pilot.pause()
-            assert app.plan_card is not None
+            assert app.query_one("#execution-plan").display
+            assert app.query_one("#execution-plan").parent.id == "composer"
             assert agent.tasks.current()["state"] == "planned"
             await pilot.click("#execute-plan")
             assert agent.mode.value == "execute"
@@ -1179,7 +1180,7 @@ def test_modes_plan_transition_and_local_task_scope_review(tmp_path):
             await pilot.pause()
             assert agent.policy.kind == "task"
             assert agent.policy.paths == ("src",)
-            assert "Aprovação por tarefa" in str(app.query_one("#session", Static).render())
+            assert "Aprovação por tarefa" in app.query_one("#session", Static).tooltip
             await app.local_command("/mode ask")
             assert agent.mode.value == "ask"
             assert agent.policy.kind == "action"

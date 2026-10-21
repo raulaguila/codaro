@@ -18,8 +18,11 @@ def review_changes(agent, proposals):
     agent._detail(AgentEvent("status", "Aguardando aprovação", " · ".join(paths)))
     started = time.monotonic()
     try:
-        approved = agent.policy.permits_paths(task["id"], paths) or (
-            agent.approve_edit is not None and agent.approve_edit(proposals, agent._cancelled)
+        automatic = agent.policy.auto_edits and all(proposal.after_exists for proposal in proposals)
+        approved = (
+            automatic
+            or agent.policy.permits_paths(task["id"], paths)
+            or (agent.approve_edit is not None and agent.approve_edit(proposals, agent._cancelled))
         )
     finally:
         agent._deadline += time.monotonic() - started
@@ -32,6 +35,7 @@ def review_changes(agent, proposals):
             "paths": paths,
             "approved": bool(approved),
             "policy": agent.policy.kind,
+            "automatic_edits": bool(automatic),
         },
     )
     changes = []

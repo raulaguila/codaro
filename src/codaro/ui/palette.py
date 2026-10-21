@@ -17,6 +17,7 @@ def system_commands(app, framework_commands):
         )
         return
     actions = {
+        "Modo de trabalho": ("/mode", "Perguntar, planejar ou executar; aprovação de edições"),
         "Preferências": ("/settings", "Modo inicial, retomada e limites avançados"),
         "Cadastrar provedor": (
             "/providers",

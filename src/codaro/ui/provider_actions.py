@@ -72,6 +72,7 @@ def activate_provider(app, settings: Settings | None, *, preserve_session=True):
         app.agent.set_provider(create_provider(settings))
         app.provider_available = True
         app.setup_required = False
+        app.hide_welcome()
         app.session.secret = settings.api_key
         app.session.redact = app.agent.memory.redact
         app.session_turns = app.session.redact(app.session_turns)
@@ -79,16 +80,12 @@ def activate_provider(app, settings: Settings | None, *, preserve_session=True):
         app.context_chars = app.context_tokens = 0
         app.reported_tokens = None
         app.update_session_header()
-        app.mount_message(
-            Static(
-                safe_preview(
-                    f"Modelo selecionado: {settings.provider_id or 'ambiente'} / "
-                    f"{settings.model}\n"
-                    f"Contexto: {settings.context_window} tokens · {settings.context_source}"
-                ),
-                classes="notice",
-                markup=False,
-            )
+        app.query_one("#context-meter", Static).update("")
+        app.query_one(
+            "#context-meter", Static
+        ).tooltip = f"Janela: {settings.context_window:,} tokens · {settings.context_source}"
+        app.query_one("#status", Static).update(
+            safe_preview("Modelo selecionado · " + settings.model)
         )
     except (ValueError, OSError) as exc:
         app.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))

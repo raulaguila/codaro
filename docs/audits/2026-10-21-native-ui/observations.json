@@ -1,0 +1,794 @@
+[
+  {
+    "capture": "welcome-60x20",
+    "size": [
+      60,
+      20
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        60,
+        11
+      ],
+      "#composer": [
+        0,
+        14,
+        60,
+        6
+      ],
+      "#prompt": [
+        2,
+        15,
+        56,
+        3
+      ],
+      "#execution-plan": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "capture": "plan-chat-60x20",
+    "size": [
+      60,
+      20
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        60,
+        6
+      ],
+      "#composer": [
+        0,
+        9,
+        60,
+        11
+      ],
+      "#prompt": [
+        2,
+        15,
+        56,
+        3
+      ],
+      "#execution-plan": [
+        2,
+        10,
+        56,
+        4
+      ]
+    }
+  },
+  {
+    "capture": "plan-collapsed-60x20",
+    "size": [
+      60,
+      20
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        60,
+        9
+      ],
+      "#composer": [
+        0,
+        12,
+        60,
+        8
+      ],
+      "#prompt": [
+        2,
+        15,
+        56,
+        3
+      ],
+      "#execution-plan": [
+        2,
+        13,
+        56,
+        1
+      ]
+    }
+  },
+  {
+    "capture": "mode-60x20",
+    "size": [
+      60,
+      20
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        60,
+        9
+      ],
+      "#composer": [
+        0,
+        12,
+        60,
+        8
+      ],
+      "#prompt": [
+        2,
+        15,
+        56,
+        3
+      ],
+      "#execution-plan": [
+        2,
+        13,
+        56,
+        1
+      ]
+    }
+  },
+  {
+    "capture": "edit-policy-60x20",
+    "size": [
+      60,
+      20
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        60,
+        9
+      ],
+      "#composer": [
+        0,
+        12,
+        60,
+        8
+      ],
+      "#prompt": [
+        2,
+        15,
+        56,
+        3
+      ],
+      "#execution-plan": [
+        2,
+        13,
+        56,
+        1
+      ]
+    }
+  },
+  {
+    "capture": "plan-cancelled-60x20",
+    "size": [
+      60,
+      20
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        60,
+        11
+      ],
+      "#composer": [
+        0,
+        14,
+        60,
+        6
+      ],
+      "#prompt": [
+        2,
+        15,
+        56,
+        3
+      ],
+      "#execution-plan": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "capture": "welcome-80x24",
+    "size": [
+      80,
+      24
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        80,
+        15
+      ],
+      "#composer": [
+        0,
+        18,
+        80,
+        6
+      ],
+      "#prompt": [
+        2,
+        19,
+        76,
+        3
+      ],
+      "#execution-plan": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "capture": "plan-chat-80x24",
+    "size": [
+      80,
+      24
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        80,
+        10
+      ],
+      "#composer": [
+        0,
+        13,
+        80,
+        11
+      ],
+      "#prompt": [
+        2,
+        19,
+        76,
+        3
+      ],
+      "#execution-plan": [
+        2,
+        14,
+        76,
+        4
+      ]
+    }
+  },
+  {
+    "capture": "plan-collapsed-80x24",
+    "size": [
+      80,
+      24
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        80,
+        13
+      ],
+      "#composer": [
+        0,
+        16,
+        80,
+        8
+      ],
+      "#prompt": [
+        2,
+        19,
+        76,
+        3
+      ],
+      "#execution-plan": [
+        2,
+        17,
+        76,
+        1
+      ]
+    }
+  },
+  {
+    "capture": "mode-80x24",
+    "size": [
+      80,
+      24
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        80,
+        13
+      ],
+      "#composer": [
+        0,
+        16,
+        80,
+        8
+      ],
+      "#prompt": [
+        2,
+        19,
+        76,
+        3
+      ],
+      "#execution-plan": [
+        2,
+        17,
+        76,
+        1
+      ]
+    }
+  },
+  {
+    "capture": "edit-policy-80x24",
+    "size": [
+      80,
+      24
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        80,
+        13
+      ],
+      "#composer": [
+        0,
+        16,
+        80,
+        8
+      ],
+      "#prompt": [
+        2,
+        19,
+        76,
+        3
+      ],
+      "#execution-plan": [
+        2,
+        17,
+        76,
+        1
+      ]
+    }
+  },
+  {
+    "capture": "plan-cancelled-80x24",
+    "size": [
+      80,
+      24
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        80,
+        15
+      ],
+      "#composer": [
+        0,
+        18,
+        80,
+        6
+      ],
+      "#prompt": [
+        2,
+        19,
+        76,
+        3
+      ],
+      "#execution-plan": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "capture": "welcome-120x35",
+    "size": [
+      120,
+      35
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        120,
+        26
+      ],
+      "#composer": [
+        0,
+        29,
+        120,
+        6
+      ],
+      "#prompt": [
+        2,
+        30,
+        116,
+        3
+      ],
+      "#execution-plan": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "capture": "plan-chat-120x35",
+    "size": [
+      120,
+      35
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        120,
+        20
+      ],
+      "#composer": [
+        0,
+        23,
+        120,
+        12
+      ],
+      "#prompt": [
+        2,
+        30,
+        116,
+        3
+      ],
+      "#execution-plan": [
+        2,
+        24,
+        116,
+        5
+      ]
+    }
+  },
+  {
+    "capture": "plan-collapsed-120x35",
+    "size": [
+      120,
+      35
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        120,
+        24
+      ],
+      "#composer": [
+        0,
+        27,
+        120,
+        8
+      ],
+      "#prompt": [
+        2,
+        30,
+        116,
+        3
+      ],
+      "#execution-plan": [
+        2,
+        28,
+        116,
+        1
+      ]
+    }
+  },
+  {
+    "capture": "mode-120x35",
+    "size": [
+      120,
+      35
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        120,
+        24
+      ],
+      "#composer": [
+        0,
+        27,
+        120,
+        8
+      ],
+      "#prompt": [
+        2,
+        30,
+        116,
+        3
+      ],
+      "#execution-plan": [
+        2,
+        28,
+        116,
+        1
+      ]
+    }
+  },
+  {
+    "capture": "edit-policy-120x35",
+    "size": [
+      120,
+      35
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        120,
+        24
+      ],
+      "#composer": [
+        0,
+        27,
+        120,
+        8
+      ],
+      "#prompt": [
+        2,
+        30,
+        116,
+        3
+      ],
+      "#execution-plan": [
+        2,
+        28,
+        116,
+        1
+      ]
+    }
+  },
+  {
+    "capture": "plan-cancelled-120x35",
+    "size": [
+      120,
+      35
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        120,
+        26
+      ],
+      "#composer": [
+        0,
+        29,
+        120,
+        6
+      ],
+      "#prompt": [
+        2,
+        30,
+        116,
+        3
+      ],
+      "#execution-plan": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "capture": "welcome-160x50",
+    "size": [
+      160,
+      50
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        160,
+        41
+      ],
+      "#composer": [
+        0,
+        44,
+        160,
+        6
+      ],
+      "#prompt": [
+        2,
+        45,
+        156,
+        3
+      ],
+      "#execution-plan": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "capture": "plan-chat-160x50",
+    "size": [
+      160,
+      50
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        160,
+        35
+      ],
+      "#composer": [
+        0,
+        38,
+        160,
+        12
+      ],
+      "#prompt": [
+        2,
+        45,
+        156,
+        3
+      ],
+      "#execution-plan": [
+        2,
+        39,
+        156,
+        5
+      ]
+    }
+  },
+  {
+    "capture": "plan-collapsed-160x50",
+    "size": [
+      160,
+      50
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        160,
+        39
+      ],
+      "#composer": [
+        0,
+        42,
+        160,
+        8
+      ],
+      "#prompt": [
+        2,
+        45,
+        156,
+        3
+      ],
+      "#execution-plan": [
+        2,
+        43,
+        156,
+        1
+      ]
+    }
+  },
+  {
+    "capture": "mode-160x50",
+    "size": [
+      160,
+      50
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        160,
+        39
+      ],
+      "#composer": [
+        0,
+        42,
+        160,
+        8
+      ],
+      "#prompt": [
+        2,
+        45,
+        156,
+        3
+      ],
+      "#execution-plan": [
+        2,
+        43,
+        156,
+        1
+      ]
+    }
+  },
+  {
+    "capture": "edit-policy-160x50",
+    "size": [
+      160,
+      50
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        160,
+        39
+      ],
+      "#composer": [
+        0,
+        42,
+        160,
+        8
+      ],
+      "#prompt": [
+        2,
+        45,
+        156,
+        3
+      ],
+      "#execution-plan": [
+        2,
+        43,
+        156,
+        1
+      ]
+    }
+  },
+  {
+    "capture": "plan-cancelled-160x50",
+    "size": [
+      160,
+      50
+    ],
+    "geometry": {
+      "#conversation": [
+        0,
+        3,
+        160,
+        41
+      ],
+      "#composer": [
+        0,
+        44,
+        160,
+        6
+      ],
+      "#prompt": [
+        2,
+        45,
+        156,
+        3
+      ],
+      "#execution-plan": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  }
+]

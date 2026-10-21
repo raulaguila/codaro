@@ -14,7 +14,9 @@ from codaro.agent import Agent
 from codaro.llm import Settings
 from codaro.repository import Repository
 from codaro.ui.app import CodaroApp
-from codaro.ui.composer import Prompt
+from codaro.ui.composer import Composer, Prompt
+from codaro.ui.modes import ModePicker
+from codaro.ui.plan import ExecutionPlan
 
 
 class Model:
@@ -33,6 +35,12 @@ async def scenario():
         async with CodaroApp(agent).run_test(size=(120, 35)) as pilot:
             app = pilot.app
             assert app.query_one(Prompt)
+            assert app.query_one(Composer)
+            assert app.query_one(ExecutionPlan).parent is app.query_one(Composer)
+            app.open_mode_picker()
+            await pilot.pause()
+            assert isinstance(app.screen, ModePicker)
+            await pilot.press("escape")
             await pilot.press("ctrl+p")
             await pilot.pause()
             assert "command-palette" in app.screen.id

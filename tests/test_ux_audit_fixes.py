@@ -49,7 +49,8 @@ def test_provider_actions_and_mode_stay_visible_on_small_terminals(tmp_path, siz
     async def scenario():
         async with app.run_test(size=size) as pilot:
             await pilot.pause()
-            assert app.query_one("#session").region.height == 2
+            assert app.query_one("#session").region.height == 1
+            assert app.query_one("#select-mode").region.height == 1
             app.push_screen(ProviderSetup(store))
             await pilot.pause()
             for identifier in ["provider-save", "provider-test", "provider-back"]:

@@ -1,5 +1,10 @@
 # Correções da auditoria de UI e UX do Codaro
 
+A adoção da nova proposta começou com a [primeira etapa nativa](audits/2026-10-21-native-ui/README.md):
+início limpo, composer, plano persistente e seletor compacto de modo com aprovação de edições.
+As evidências históricas abaixo descrevem a interface anterior; a documentação da nova etapa
+identifica o que foi substituído e o que permanece pendente.
+
 Os 17 achados da auditoria de 7 de outubro de 2026 foram tratados nos fluxos do chat, configuração e navegação. A limpeza de mensagens preserva propostas e explica tarefa/escopo mantidos; uma nova atividade confirma o descarte de propostas e revoga permissões. O acompanhamento do chat respeita a posição de leitura.
 
 | Achado | Comportamento entregue | Validação |

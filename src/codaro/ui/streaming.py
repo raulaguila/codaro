@@ -56,6 +56,7 @@ def activity(app, event: AgentEvent):
     elif event.kind == "tool_start":
         app.set_generation_status(safe_preview(f"{event.title}… · {event.detail}".rstrip(" ·")))
     elif event.kind == "tool_end":
+        app.show_plan()
         duration = f"{event.elapsed_ms:.0f} ms" if event.elapsed_ms is not None else ""
         if app.activity_group is None:
             app.activity_group = ActivityGroup()

@@ -17,7 +17,7 @@ from textual.binding import Binding
 from textual.command import CommandPalette
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, Collapsible, Footer, Markdown, Static, TextArea
+from textual.widgets import Button, Markdown, Static, TextArea
 
 from codaro.agent import Agent, AgentEvent, InvestigationCancelled
 from codaro.index import CodeIndex, safe_preview
@@ -31,9 +31,10 @@ from codaro.policies import Mode
 from codaro.storage import private_lock
 from codaro.ui import provider_actions
 from codaro.ui import streaming as stream_ui
-from codaro.ui.composer import Prompt
+from codaro.ui.composer import Composer, Prompt
 from codaro.ui.formatting import short_path
 from codaro.ui.palette import system_commands
+from codaro.ui.plan import ExecutionPlan
 from codaro.ui.recovery import RecoveryCard, failure_kind
 from codaro.ui.reviews import (
     ChangesReview,
@@ -42,6 +43,7 @@ from codaro.ui.reviews import (
     ExternalToolReview,
     ScopeReview,
 )
+from codaro.ui.theme import CODARO_THEME
 from codaro.ui.widgets import ActivityGroup, GenerationPreview, ProposalCard, ReasoningGroup
 
 logger = logging.getLogger(__name__)
@@ -105,6 +107,8 @@ class CodaroApp(App):
         setup_profile: str | None = None,
     ):
         super().__init__()
+        self.register_theme(CODARO_THEME)
+        self.theme = CODARO_THEME.name
         self.is_macos = sys.platform == "darwin"
         if self.is_macos:
             # The extended terminal keyboard protocol names Command "super".
@@ -152,7 +156,7 @@ class CodaroApp(App):
         if not agent.legacy:
             agent.approve_edit = self.approve_changes
         agent.approve_external = self.approve_external
-        self.plan_card: Collapsible | None = None
+        self.cancel_plan_id: str | None = None
         self.clear_backup = None
         self.show_reasoning = False
         self.reasoning_group: ReasoningGroup | None = None
@@ -180,48 +184,23 @@ class CodaroApp(App):
         return super().get_key_display(binding)
 
     def welcome(self) -> Vertical:
-        return Vertical(
-            Static("Vamos trabalhar no seu projeto", id="welcome-title", markup=False),
-            Button("Configurar provedor", id="configure-start"),
-            Static(
-                "Escolha um ponto de partida ou escreva sua pergunta.\n"
-                "As respostas usam os arquivos locais; edições exigem sua aprovação.",
-                id="welcome-description",
-                markup=False,
-            ),
-            Horizontal(
-                Button("Explorar", id="suggest-explore"),
-                Button("Buscar código", id="suggest-search"),
-                Button("Propor mudança", id="suggest-edit", disabled=not self.agent.allow_edits),
-                id="suggestions",
-            ),
-            id="welcome",
-        )
+        children = []
+        if not self.provider_available:
+            children = [
+                Static("Conecte um provedor para começar.", markup=False),
+                Button("Configurar provedor", id="configure-start"),
+            ]
+        return Vertical(*children, id="welcome")
 
     def compose(self) -> ComposeResult:
         yield Static("◈ Codaro", id="brand", markup=False)
-        yield Static("", id="session", markup=False)
+        with Horizontal(id="session-header"):
+            yield Static("", id="session", markup=False)
+            yield Button(self.agent.mode.label + " ▾", id="select-mode")
         with VerticalScroll(id="conversation"):
             yield self.welcome()
         yield Button("Novas mensagens ↓", id="new-messages")
-        yield Static(
-            "Contexto: aguardando primeira chamada · /status", id="context-meter", markup=False
-        )
-        yield Static("Pronto", id="status")
-        yield Static("", id="completion", markup=False)
-        yield Prompt(
-            placeholder="Pergunte ou peça uma mudança…",
-            id="prompt",
-            show_line_numbers=False,
-            highlight_cursor_line=False,
-        )
-        yield Static(
-            f"Enter envia · {self.option_display('Enter')} nova linha · "
-            "/ comandos · @ arquivo · ↑ histórico",
-            id="prompt-hint",
-            markup=False,
-        )
-        yield Footer(show_command_palette=False)
+        yield Composer(id="composer")
 
     async def on_mount(self):
         self.update_session_header()
@@ -264,44 +243,75 @@ class CodaroApp(App):
 
     def update_session_header(self):
         settings = self.agent.provider.settings
-        mode = (
-            self.agent.mode.label
-            + " · "
-            + ("Aprovação por tarefa" if self.agent.policy.kind == "task" else "Aprovação por ação")
-        )
         tls = "TLS sem verificação" if settings.tls_insecure else "TLS verificação ativa"
         if settings.base_url.startswith("http://"):
             tls = "HTTP"
         root = short_path(self.agent.repository.root)
-        width = max(20, self.size.width - 4)
+        width = max(10, self.size.width - 20)
         identity = (
             f"{root} · {settings.model if self.provider_available else 'selecione um modelo'}"
         )
         if len(identity) > width:
             identity = identity[: width - 1] + "…"
-        summary = (
-            f"{identity} · {mode}" if len(identity + mode) + 6 < width else f"{identity}\n{mode}"
-        )
-        summary = f"{tls} · {summary}" if settings.tls_insecure else f"{summary} · {tls}"
+        summary = f"{tls} · {identity}" if settings.tls_insecure else identity
+        if len(summary) > width:
+            summary = summary[: width - 1] + "…"
         session = self.query_one("#session", Static)
         session.update(safe_preview(summary))
         session.set_class(settings.tls_insecure, "insecure")
-        session.tooltip = safe_preview(str(self.agent.repository.root) + " · " + settings.model)
+        session.tooltip = safe_preview(
+            str(self.agent.repository.root)
+            + " · "
+            + settings.model
+            + " · "
+            + tls
+            + (" · Aprovação por tarefa" if self.agent.policy.kind == "task" else "")
+        )
+        mode = self.query_one("#select-mode", Button)
+        mode.label = (
+            self.agent.mode.label + (" · auto" if self.agent.policy.auto_edits else "") + " ▾"
+        )
+        mode.disabled = self.busy
+        mode.tooltip = (
+            "Edições automáticas nesta conversa; comandos e remoções exigem aprovação"
+            if self.agent.policy.auto_edits
+            else "Trocar modo e revisar a aprovação de edições"
+        )
         self.query_one("#prompt-hint", Static).update(
-            f"Enter envia · {self.option_display('Enter')} linha · / ajuda · @ arquivo"
+            f"Enter envia · {self.option_display('Enter')} linha · / comandos"
             if width < 80
             else f"Enter envia · {self.option_display('Enter')} nova linha · "
-            "/ comandos · @ arquivo · ↑ histórico"
+            "/ comandos · Ctrl+P menu"
         )
-        for welcome in self.query("#welcome"):
-            compact = self.size.height < 25
-            welcome.query_one("#suggestions").styles.height = 1 if compact else 3
-            welcome.query_one("#welcome-description", Static).update(
-                "Pergunte sobre o código ou peça uma mudança.\nEdições exigem aprovação."
-                if compact
-                else "Escolha um ponto de partida ou escreva sua pergunta.\n"
-                "As respostas usam os arquivos locais; edições exigem sua aprovação."
+        self.query_one(ExecutionPlan).fit(self.size.height)
+
+    def open_mode_picker(self):
+        if self.busy or isinstance(self.screen, ModalScreen):
+            return
+        from codaro.ui.modes import ModePicker
+
+        self.push_screen(
+            ModePicker(self.agent.mode, auto_edits=self.agent.policy.auto_edits),
+            self.mode_selected,
+        )
+
+    def mode_selected(self, selection):
+        if selection is None:
+            self.query_one(Prompt).focus()
+            return
+        mode, automatic = selection
+        try:
+            self.agent.set_mode(mode)
+            self.agent.policy.auto_edits = automatic
+            self.update_session_header()
+            self.query_one("#status", Static).update(
+                "Edições automáticas · comandos e remoções com autorização"
+                if automatic
+                else "Modo: " + mode.label + " · edições com autorização"
             )
+        except (ValueError, OSError) as exc:
+            self.query_one("#status", Static).update(safe_preview(str(exc)))
+        self.query_one(Prompt).focus()
 
     @work(thread=True, exclusive=True, group="files")
     def refresh_reference_paths(self):
@@ -330,7 +340,7 @@ class CodaroApp(App):
         unread_row = int(self.query_one("#new-messages").display)
         max_height = max(3, min(8, self.size.height - 16 - unread_row))
         prompt.styles.height = min(max_height, max(3, prompt.wrapped_document.height + 2))
-        menu.display = bool(options) and not self.busy and not self.completions_dismissed
+        menu.display = bool(options) and not self.completions_dismissed
         self.query_one(Prompt).suggesting = menu.display
         if options and menu.display:
             self.completion_index %= len(options)
@@ -340,6 +350,7 @@ class CodaroApp(App):
                 + unread_row
                 + self.query_one("#session").region.height
                 + int(prompt.styles.height.value)
+                + self.query_one(ExecutionPlan).region.height
             )
             count = max(1, min(5, self.size.height - fixed - 5))
             first = max(0, min(self.completion_index - count // 2, len(options) - count))
@@ -353,7 +364,11 @@ class CodaroApp(App):
                 row.truncate(width, overflow="ellipsis")
                 rows.append(row)
             menu.styles.height = len(rows) + 1
-            menu.update(Text("\n").join([*rows, Text("Tab completa · ↑↓ escolhem · Esc fecha")]))
+            menu.update(
+                Text("\n").join(
+                    [*rows, Text("↑↓ escolher · Enter abrir · Tab completa · Esc fecha")]
+                )
+            )
 
     def action_escape(self):
         if self.query_one("#completion").display:
@@ -447,6 +462,9 @@ class CodaroApp(App):
             self.mount_message(Static("Revise as edições pendentes primeiro.", classes="notice"))
             return
         self.query_one(Prompt).value = ""
+        if name == "/mode" and not argument:
+            self.open_mode_picker()
+            return
         if name == "/settings":
             from codaro.ui.preferences import PreferencesDialog
 
@@ -595,8 +613,6 @@ class CodaroApp(App):
                 if selected:
                     self.agent.set_mode(selected)
                     self.update_session_header()
-                    for button in self.query("#suggest-edit"):
-                        button.disabled = not self.agent.allow_edits
                 policy_label = "por tarefa" if self.agent.policy.kind == "task" else "por ação"
                 text = f"Modo: {self.agent.mode.label}. Permissões: {policy_label}."
                 if name == "/execute" and self.agent.tasks.current():
@@ -755,6 +771,7 @@ class CodaroApp(App):
                 f"Projeto: {self.agent.repository.root}\n"
                 f"Modelo: {self.agent.provider.settings.model}\n"
                 f"Modo: {self.agent.mode.label} · aprovação {self.agent.policy.kind}\n"
+                f"Edições automáticas nesta conversa: {self.agent.policy.auto_edits}\n"
                 f"Turnos no contexto: {len(self.agent.turns)}\n"
                 f"Turnos da conversa: {len(self.session_turns)}\n"
                 f"Último contexto enviado: {self.context_chars} "
@@ -1015,6 +1032,15 @@ class CodaroApp(App):
                 self.update_completions()
 
     async def on_prompt_submitted(self, event: Prompt.Submitted):
+        if self.query_one(Prompt).suggesting and event.value.startswith("/"):
+            options = self.completion_options()
+            if options:
+                command = options[self.completion_index % len(options)].value.strip()
+                self.completions_dismissed = True
+                self.query_one(Prompt).value = ""
+                await self.open_provider_menu(command)
+                self.query_one(Prompt).focus()
+                return
         await self.submit_question(event.value)
 
     async def submit_question(self, value: str, *, preserve_draft=False):
@@ -1063,9 +1089,9 @@ class CodaroApp(App):
         self.active_question = question
         self.activity_group = None
         self.reasoning_group = None
-        self.plan_card = None
         self.answer_preview = None
         self.busy = True
+        self.update_session_header()
         self.generation_started = time.monotonic()
         self.cancelled.clear()
         self.response_text = self.rendered_text = ""
@@ -1133,21 +1159,24 @@ class CodaroApp(App):
 
     def show_plan(self):
         task = self.agent.tasks.current()
-        if not task or not task["plan"]:
+        self.query_one(ExecutionPlan).set_task(task, busy=self.busy)
+        self.query_one(ExecutionPlan).fit(self.size.height)
+        self.call_after_refresh(self.update_completions)
+
+    def cancel_execution_plan(self):
+        task = self.agent.tasks.current()
+        if not task or task["state"] in {"completed", "cancelled"}:
             return
-        symbols = {"todo": "○", "doing": "◉", "done": "✓"}
-        text = "\n".join(f"{symbols[step['state']]} {step['title']}" for step in task["plan"])
-        text += "\n\nCritérios de aceite:\n" + "\n".join(task["criteria"])
-        if self.plan_card is None:
-            self.plan_card = Collapsible(
-                Static(safe_preview(text), markup=False),
-                Button("Executar plano", id="execute-plan"),
-                title="Plano da tarefa",
-                collapsed=False,
-            )
-            self.mount_message(self.plan_card)
+        if self.busy:
+            self.cancel_plan_id = task["id"]
+            self.action_cancel()
+            self.query_one("#status", Static).update("Cancelando plano · preservando alterações…")
         else:
-            self.plan_card.query_one(Static).update(safe_preview(text))
+            self.agent.tasks.state("cancelled", "Plano cancelado pelo usuário.")
+            self.agent.policy.reset()
+            self.show_plan()
+            self.update_session_header()
+            self.query_one("#status", Static).update("Plano cancelado · alterações preservadas")
 
     def append_delta(self, delta: str):
         return stream_ui.append_delta(self, delta)
@@ -1168,14 +1197,18 @@ class CodaroApp(App):
         return stream_ui.discard_response(self)
 
     def finish(self, answer: str, successful: bool = True, outcome: str = "provider"):
+        if self.cancel_plan_id:
+            task = self.agent.tasks.current()
+            if task and task["id"] == self.cancel_plan_id:
+                self.agent.tasks.state("cancelled", "Plano cancelado pelo usuário.")
+                self.agent.policy.reset()
+            self.cancel_plan_id = None
         self.finish_preview("answer" if successful else "cancelled")
         if self.activity_group is not None:
             self.activity_group.finish(successful)
         if successful:
             if self.retry_recovery is not None and self.retry_recovery.is_attached:
                 self.retry_recovery.resolve()
-            if self.agent.last_run_intent != "consultation":
-                self.show_plan()
             self.response_text = safe_preview(answer)
             if self.answer_preview is not None:
                 self.reply = self.answer_preview.accept(self.response_text)
@@ -1202,6 +1235,7 @@ class CodaroApp(App):
                 self.proposal_cards[proposal.id] = card
                 self.mount_message(card)
         self.busy = False
+        self.show_plan()
         self.retry_recovery = None
         self.generation_started = 0.0
         self.update_session_header()
@@ -1244,7 +1278,7 @@ class CodaroApp(App):
         self.session_turns.clear()
         self.response_text = self.rendered_text = ""
         self.reply = self.speaker = None
-        self.activity_group = self.plan_card = None
+        self.activity_group = None
         self.reasoning_group = None
         self.pending_recovery = self.retry_recovery = None
         self.answer_preview = self.generation_preview = self.reasoning_preview = None
@@ -1278,7 +1312,6 @@ class CodaroApp(App):
             card = ProposalCard(proposal)
             self.proposal_cards[proposal.id] = card
             self.mount_message(card)
-        self.plan_card = None
         self.show_plan()
 
     async def action_new_conversation(self):
@@ -1298,6 +1331,9 @@ class CodaroApp(App):
             for proposal in list(self.agent.edits.pending):
                 self.agent.edits.reject(proposal.id)
             self.agent.policy.reset()
+            previous = self.agent.tasks.current()
+            if previous and previous["state"] not in {"completed", "cancelled"}:
+                self.agent.tasks.state("cancelled", "Encerrado ao começar outra conversa.")
             self.agent.tasks.mutate(lambda data: data.update(active=None))
             self.agent.memory.clear_task()
             await self.action_clear_chat()
@@ -1319,6 +1355,16 @@ class CodaroApp(App):
             )
 
     def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "select-mode":
+            self.open_mode_picker()
+            return
+        if event.button.id == "toggle-plan":
+            self.query_one(ExecutionPlan).toggle()
+            self.show_plan()
+            return
+        if event.button.id == "cancel-plan":
+            self.cancel_execution_plan()
+            return
         if event.button.id == "new-messages":
             self.query_one("#conversation", VerticalScroll).scroll_end(animate=False)
             event.button.display = False
@@ -1343,17 +1389,6 @@ class CodaroApp(App):
             self.update_session_header()
             self.query_one(Prompt).value = "Execute o plano da tarefa ativa e valide o resultado."
             self.query_one(Prompt).focus()
-            return
-        suggestions = {
-            "suggest-explore": "Explique a estrutura deste projeto e seus pontos de entrada.",
-            "suggest-search": "Localize as validações de entrada e explique onde elas são usadas.",
-            "suggest-edit": "Proponha uma melhoria pequena no código com diff para revisão.",
-        }
-        if event.button.id in suggestions and not self.busy:
-            prompt = self.query_one(Prompt)
-            prompt.value = suggestions[event.button.id]
-            prompt.move_cursor(prompt.document.end)
-            prompt.focus()
             return
         if (event.button.id or "").startswith("validate-") and not self.busy:
             if self.agent.edits.pending:

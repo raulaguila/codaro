@@ -327,7 +327,7 @@ def test_cancellation_during_review_records_cancelled_task_without_writes(tmp_pa
     with pytest.raises(RequestCancelled):
         agent.ask("Criar", cancelled=cancelled)
     assert not (tmp_path / "x.py").exists()
-    assert agent.tasks.current()["state"] == "cancelled"
+    assert agent.tasks.current()["state"] == "blocked"
     assert not agent.edits.pending
 
 

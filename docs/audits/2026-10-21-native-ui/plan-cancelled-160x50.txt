@@ -1,0 +1,50 @@
+                                                                                                                                                                
+  ◈ Codaro                                                                                                                                                      
+  /tmp/codaro-native-ui-frnzm7ep · qwen3.8:27b                                                                                                  Executar ▾      
+                                                                                                                                                                
+  │ Como funciona a autenticação?                                                                                                                               
+                                                                                                                                                                
+   Codaro                                                                                                                                                       
+   A validação fica em src/auth.py. Falta tratar usuários ausentes.                                                                                             
+                                                                                                                                                                
+                                                                                                                                                                
+  │ Corrija esse caso mantendo o contrato atual.                                                                                                                
+                                                                                                                                                                
+   █ ▶ 1 ação · 1 leitura · 12 ms                                                                                                                               
+   ▶ Raciocínio · 1 etapa                                                                                                                                       
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   Pergunte ou peça uma mudança…                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+  Plano cancelado · alterações preservadas                                                                                                                      
+  Enter envia · Alt+Enter nova linha · / comandos · Ctrl+P menu                                                                                                 

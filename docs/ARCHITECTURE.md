@@ -99,6 +99,10 @@ antigos de compatibilidade não devem virar novas dependências internas.
 | Cadastro e seleção persistida | `llm/profiles.py` |
 | Telas e ativação do provedor na UI | `ui/provider_actions.py` |
 | Comando do menu Ctrl+P | `ui/palette.py` |
+| Input e informações junto ao campo | `ui/composer.py` |
+| Plano fixo e projeção do progresso | `ui/plan.py` |
+| Seletor de modo e confirmação de aprovação automática | `ui/modes.py` |
+| Paleta visual padrão | `ui/theme.py` |
 | Componente ou tela | `ui/widgets.py`, `reviews.py` ou módulo da tela |
 | Aparência | `ui/styles.tcss` |
 | Novo grupo de comandos CLI | `cli_commands`, com registro explícito em `cli.py` |

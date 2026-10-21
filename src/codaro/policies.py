@@ -22,6 +22,7 @@ class ApprovalPolicy:
     task_id: str = ""
     paths: tuple[str, ...] = ()
     commands: tuple[tuple[str, ...], ...] = ()
+    auto_edits: bool = False
 
     def grant(self, task_id, paths, commands):
         if not task_id or not isinstance(paths, list) or not isinstance(commands, list):
@@ -48,6 +49,7 @@ class ApprovalPolicy:
 
     def reset(self):
         self.kind, self.task_id, self.paths, self.commands = "action", "", (), ()
+        self.auto_edits = False
 
     def permits_paths(self, task_id, paths):
         return (

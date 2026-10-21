@@ -541,12 +541,9 @@ class Agent:
         except BaseException as exc:
             if self.mode != Mode.ASK:
                 try:
-                    self.tasks.state(
-                        "cancelled"
-                        if isinstance(exc, (RequestCancelled, KeyboardInterrupt))
-                        else "blocked",
-                        str(exc),
-                    )
+                    # Interrupting a generation pauses the task; only an explicit
+                    # user cancellation ends its plan and removes it from the composer.
+                    self.tasks.state("blocked", str(exc))
                     flow.data["task"] = self.tasks.current()
                 except (ValueError, OSError):
                     pass

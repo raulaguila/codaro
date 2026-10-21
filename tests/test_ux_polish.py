@@ -198,9 +198,10 @@ def test_compact_layout_keeps_setup_chat_and_completion_hint_visible(tmp_path, s
 
     async def scenario():
         async with app.run_test(size=size) as pilot:
-            configure = app.query_one("#configure-start")
-            clip = app.screen._compositor.find_widget(configure).clip
-            assert configure.region.intersection(clip) == configure.region
+            mode = app.query_one("#select-mode")
+            clip = app.screen._compositor.find_widget(mode).clip
+            assert mode.region.intersection(clip) == mode.region
+            assert not app.query("#suggestions, #configure-start")
             prompt = app.query_one(Prompt)
             await pilot.press("/")
             assert app.query_one("#conversation").region.height >= 4

@@ -1,27 +1,45 @@
 Screen { background: $background; }
 #brand { height: 1; margin: 1 2 0 2; color: $text; text-style: bold; }
-#session { height: auto; max-height: 2; margin: 0 2; color: $text-muted; }
+#session-header { height: 1; margin: 0 2; }
+#session { height: 1; width: 1fr; color: $text-muted; text-wrap: nowrap;
+    text-overflow: ellipsis; }
+#select-mode { width: 18; min-width: 12; height: 1; min-height: 1; padding: 0;
+    border: none; background: $background; color: $text-muted; }
+#select-mode:hover, #select-mode:focus { background: $panel; color: $text; border: none; }
 #session.insecure { color: $warning; }
 #conversation { width: 100%; height: 1fr; padding: 0 2; }
-#welcome { height: auto; max-width: 78; margin: 1; }
-#welcome-title { height: 1; color: $text; text-style: bold; }
-#welcome-description { height: auto; margin-bottom: 1; color: $text-muted; }
-#suggestions { height: 3; }
-#welcome Button { width: 1fr; min-width: 12; background: $panel; border: none; }
-#welcome Button:hover, #welcome Button:focus { border: round $accent; }
-#prompt { height: 3; max-height: 8; margin: 0 1; border: none;
-          border-top: solid $primary; padding: 0 1; }
-#prompt:focus { border-top: solid $accent; }
-#completion { display: none; height: auto; max-height: 7; margin: 0 2; color: $text-muted; }
+#welcome { height: auto; margin: 1 0; }
+#welcome Static { height: auto; color: $text-muted; }
+#composer { height: auto; padding: 0 2; border-top: solid $primary; }
+#composer:focus-within { border-top: solid $accent; }
+#prompt { height: 3; max-height: 8; margin: 0; border: none; padding: 0 1;
+    background: $background; }
+#completion { display: none; height: auto; max-height: 7; color: $text-muted; }
 #completion { text-overflow: ellipsis; text-wrap: nowrap; }
-#prompt-hint { height: 1; margin: 0 2; color: $text-muted; }
-#context-meter { height: 1; margin: 0 2; color: $text-muted; }
+#prompt-hint { height: 1; color: $text-muted; }
+#composer-meta { height: 1; }
+#context-meter { height: 1; width: auto; max-width: 42%; color: $text-muted;
+    text-wrap: nowrap; text-overflow: ellipsis; text-align: right; }
 #new-messages { display: none; height: 1; min-height: 1; border: none; margin: 0 2; }
-#status { height: 1; margin: 0 2; color: $text; }
+#status { height: 1; width: 1fr; color: $text-muted;
+    text-wrap: nowrap; text-overflow: ellipsis; }
+#execution-plan { display: none; height: auto; margin-bottom: 1; }
+#plan-heading { height: 1; }
+#execution-plan Button { height: 1; min-height: 1; border: none; padding: 0;
+    background: $background; color: $text-muted; text-style: none; }
+#execution-plan Button:hover, #execution-plan Button:focus {
+    background: $panel; color: $text; border: none; }
+#toggle-plan { width: 1fr; text-align: left; content-align: left middle;
+    text-wrap: nowrap; text-overflow: ellipsis; }
+#cancel-plan { width: 16; min-width: 16; }
+#plan-steps { height: auto; max-height: 5; padding-left: 2; }
+#plan-list { height: auto; color: $text-muted; }
+#execute-plan { width: auto; margin-top: 1; }
 .recovery-actions { height: 3; }
 .recovery-actions Button { width: 1fr; min-width: 8; padding: 0; }
 #configure-start { height: 1; min-height: 1; width: auto; border: none; padding: 0; }
-.question { height: auto; margin: 1 0; color: $text; }
+.question { height: auto; margin: 1 0; padding: 0 1; color: $text;
+    background: $panel; border-left: solid $primary; }
 .assistant { margin: 0; padding: 0 1; background: $background; }
 .speaker { height: 1; margin: 1 1 0 1; color: $text; text-style: bold; }
 .tool-card { height: auto; margin: 0 1; border: none; border-left: thick $primary;

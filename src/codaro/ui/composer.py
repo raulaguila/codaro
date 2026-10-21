@@ -1,8 +1,29 @@
 from __future__ import annotations
 
 from textual.binding import Binding
+from textual.containers import Horizontal, Vertical
 from textual.message import Message
-from textual.widgets import TextArea
+from textual.widgets import Static, TextArea
+
+from codaro.ui.plan import ExecutionPlan
+
+
+class Composer(Vertical):
+    """A fixed input area; conversation scrolling cannot move the active plan."""
+
+    def compose(self):
+        yield ExecutionPlan()
+        yield Static("", id="completion", markup=False)
+        yield Prompt(
+            placeholder="Pergunte ou peça uma mudança…",
+            id="prompt",
+            show_line_numbers=False,
+            highlight_cursor_line=False,
+        )
+        with Horizontal(id="composer-meta"):
+            yield Static("Pronto", id="status", markup=False)
+            yield Static("", id="context-meter", markup=False)
+        yield Static("", id="prompt-hint", markup=False)
 
 
 class Prompt(TextArea):
