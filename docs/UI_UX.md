@@ -5,6 +5,10 @@ início limpo, composer, plano persistente e seletor compacto de modo com aprova
 As evidências históricas abaixo descrevem a interface anterior; a documentação da nova etapa
 identifica o que foi substituído e o que permanece pendente.
 
+A [revisão de fidelidade ao protótipo](audits/2026-10-21-prototype-fidelity/README.md)
+substitui a composição anterior de cabeçalho, mensagens, etapas, input e seletores.
+Inclui perguntas com opções no campo compartilhado e capturas comparativas da CLI real.
+
 Os 17 achados da auditoria de 7 de outubro de 2026 foram tratados nos fluxos do chat, configuração e navegação. A limpeza de mensagens preserva propostas e explica tarefa/escopo mantidos; uma nova atividade confirma o descarte de propostas e revoga permissões. O acompanhamento do chat respeita a posição de leitura.
 
 | Achado | Comportamento entregue | Validação |

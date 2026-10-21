@@ -1,0 +1,34 @@
+Ruff: All checks passed!
+git diff --check: passed
+36 native captures: all recorded controls fully visible
+
+Suíte completa
+ssssss.................................................................. [ 10%]
+...s.................................................................... [ 20%]
+........................................................................ [ 30%]
+.............................sssssssss.................................. [ 40%]
+........................................................................ [ 50%]
+........................................................................ [ 60%]
+........................................................................ [ 70%]
+........................................................................ [ 81%]
+........................................................................ [ 91%]
+..............................................................           [100%]
+694 passed, 16 skipped in 139.31s (0:02:19)
+
+Aceitação de fidelidade
+.........                                                                [100%]
+9 passed in 5.78s
+
+Formato
+192 files already formatted
+
+Wheel
+* Getting build dependencies for wheel...
+* Building wheel...
+Successfully built codaro-0.1.1-py3-none-any.whl
+
+Pacote instalado
+Installed package: CLI, imports, CSS, agent, diagnostics and UI passed.
+
+Capturas
+Captured 36 native states; comparison and six previews exported

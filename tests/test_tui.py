@@ -507,6 +507,7 @@ def test_reasoning_and_live_answer_have_distinct_visible_blocks(tmp_path):
                 assert reasoning is not None and answer is not None
                 assert "Raciocínio" in reasoning.title
                 assert app.reasoning_group.collapsed
+                app.activity_group.collapsed = False
                 app.reasoning_group.collapsed = False
                 await pilot.pause()
                 assert reasoning.content.visible and answer.content.visible

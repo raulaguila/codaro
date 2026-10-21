@@ -750,7 +750,10 @@ class Agent:
                     *(
                         tool.schema
                         for tool in self.registry.tools.values()
-                        if tool.source.startswith(("mcp:", "plugin:"))
+                        if (
+                            tool.source == "interaction"
+                            or tool.source.startswith(("mcp:", "plugin:"))
+                        )
                         and (tool.read_only or self.mode == Mode.EXECUTE)
                     ),
                     *([] if self.mode == Mode.ASK else TASK_TOOLS),

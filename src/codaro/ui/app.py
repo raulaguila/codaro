@@ -33,8 +33,10 @@ from codaro.ui import provider_actions
 from codaro.ui import streaming as stream_ui
 from codaro.ui.composer import Composer, Prompt
 from codaro.ui.formatting import short_path
+from codaro.ui.messages import UserMessage
 from codaro.ui.palette import system_commands
 from codaro.ui.plan import ExecutionPlan
+from codaro.ui.questions import QuestionDock
 from codaro.ui.recovery import RecoveryCard, failure_kind
 from codaro.ui.reviews import (
     ChangesReview,
@@ -74,6 +76,8 @@ class CodaroApp(App):
         self.show_reasoning = not self.show_reasoning
         if self.reasoning_group is not None:
             self.reasoning_group.collapsed = not self.show_reasoning
+            if self.show_reasoning and self.activity_group is not None:
+                self.activity_group.collapsed = False
         self.query_one("#status", Static).update(
             "Raciocínio expandido" if self.show_reasoning else "Raciocínio recolhido"
         )
@@ -157,6 +161,12 @@ class CodaroApp(App):
             agent.approve_edit = self.approve_changes
         agent.approve_external = self.approve_external
         self.cancel_plan_id: str | None = None
+        self.pending_user_question = None
+        self.question_resolved = None
+        self.question_draft = None
+        from codaro.agent.questions import register_questions
+
+        register_questions(agent, self.ask_user_question)
         self.clear_backup = None
         self.show_reasoning = False
         self.reasoning_group: ReasoningGroup | None = None
@@ -193,9 +203,12 @@ class CodaroApp(App):
         return Vertical(*children, id="welcome")
 
     def compose(self) -> ComposeResult:
-        yield Static("◈ Codaro", id="brand", markup=False)
         with Horizontal(id="session-header"):
+            yield Static(
+                Text.assemble(("◈ ", self.get_css_variables()["accent"]), "Codaro"), id="brand"
+            )
             yield Static("", id="session", markup=False)
+            yield Button("", id="select-model")
             yield Button(self.agent.mode.label + " ▾", id="select-mode")
         with VerticalScroll(id="conversation"):
             yield self.welcome()
@@ -242,17 +255,14 @@ class CodaroApp(App):
             self.update_completions()
 
     def update_session_header(self):
+        self.set_class(self.size.height < 25, "short-terminal")
         settings = self.agent.provider.settings
         tls = "TLS sem verificação" if settings.tls_insecure else "TLS verificação ativa"
         if settings.base_url.startswith("http://"):
             tls = "HTTP"
-        root = short_path(self.agent.repository.root)
-        width = max(10, self.size.width - 20)
-        identity = (
-            f"{root} · {settings.model if self.provider_available else 'selecione um modelo'}"
-        )
-        if len(identity) > width:
-            identity = identity[: width - 1] + "…"
+        root = self.agent.repository.root.name or short_path(self.agent.repository.root)
+        width = max(10, self.size.width - 42)
+        identity = root
         summary = f"{tls} · {identity}" if settings.tls_insecure else identity
         if len(summary) > width:
             summary = summary[: width - 1] + "…"
@@ -267,6 +277,11 @@ class CodaroApp(App):
             + tls
             + (" · Aprovação por tarefa" if self.agent.policy.kind == "task" else "")
         )
+        model = self.query_one("#select-model", Button)
+        model.label = safe_preview(settings.model if self.provider_available else "Conectar modelo")
+        model.tooltip = settings.model
+        model.disabled = self.busy
+        model.styles.max_width = max(12, min(32, self.size.width // 3))
         mode = self.query_one("#select-mode", Button)
         mode.label = (
             self.agent.mode.label + (" · auto" if self.agent.policy.auto_edits else "") + " ▾"
@@ -278,12 +293,14 @@ class CodaroApp(App):
             else "Trocar modo e revisar a aprovação de edições"
         )
         self.query_one("#prompt-hint", Static).update(
-            f"Enter envia · {self.option_display('Enter')} linha · / comandos"
-            if width < 80
+            "Enter envia · / comandos · Ctrl+P menu"
+            if self.size.width < 80
             else f"Enter envia · {self.option_display('Enter')} nova linha · "
             "/ comandos · Ctrl+P menu"
         )
-        self.query_one(ExecutionPlan).fit(self.size.height)
+        self.query_one(ExecutionPlan).fit(
+            self.size.height, answering=bool(self.pending_user_question)
+        )
 
     def open_mode_picker(self):
         if self.busy or isinstance(self.screen, ModalScreen):
@@ -338,9 +355,14 @@ class CodaroApp(App):
         menu = self.query_one("#completion", Static)
         prompt = self.query_one(Prompt)
         unread_row = int(self.query_one("#new-messages").display)
-        max_height = max(3, min(8, self.size.height - 16 - unread_row))
-        prompt.styles.height = min(max_height, max(3, prompt.wrapped_document.height + 2))
-        menu.display = bool(options) and not self.completions_dismissed
+        reserved = self.query_one(ExecutionPlan).region.height
+        if self.pending_user_question:
+            reserved += self.query_one(QuestionDock).region.height
+        max_height = max(2, min(8, self.size.height - 16 - unread_row - reserved))
+        prompt.styles.height = min(max_height, max(2, prompt.wrapped_document.height + 1))
+        menu.display = (
+            bool(options) and not self.completions_dismissed and not self.pending_user_question
+        )
         self.query_one(Prompt).suggesting = menu.display
         if options and menu.display:
             self.completion_index %= len(options)
@@ -371,7 +393,9 @@ class CodaroApp(App):
             )
 
     def action_escape(self):
-        if self.query_one("#completion").display:
+        if self.pending_user_question:
+            self.query_one("#status", Static).update("Pergunta pausada · responda para continuar")
+        elif self.query_one("#completion").display:
             self.completions_dismissed = True
             self.update_completions()
         else:
@@ -388,6 +412,8 @@ class CodaroApp(App):
 
     def update_generation_status(self):
         if self.busy and self.generation_started:
+            if self.pending_user_question:
+                return
             elapsed = max(0, int(time.monotonic() - self.generation_started))
             self.query_one("#status", Static).update(
                 f"{self.generation_phase} · {elapsed}s · {self.shortcut_display('x')} cancelar"
@@ -408,6 +434,9 @@ class CodaroApp(App):
         )
 
     def on_prompt_navigate(self, event: Prompt.Navigate):
+        if self.pending_user_question:
+            self.query_one(QuestionDock).navigate(event.direction)
+            return
         if (
             self.query_one(Prompt).suggesting
             and self.completion_options()
@@ -843,9 +872,7 @@ class CodaroApp(App):
         conversation = self.query_one("#conversation", VerticalScroll)
         await conversation.remove_children()
         for turn in turns[-30:]:
-            self.mount_message(
-                Static("› " + safe_preview(turn[0]["content"]), classes="question", markup=False)
-            )
+            self.mount_message(UserMessage(turn[0]["content"]))
             self.mount_message(Static("Codaro", classes="speaker", markup=False))
             self.mount_message(
                 Markdown(safe_preview(turn[-1]["content"]), classes="assistant", open_links=False)
@@ -1001,9 +1028,11 @@ class CodaroApp(App):
         if event.text_area.id != "prompt":
             return
         prompt = event.text_area
+        if self.pending_user_question:
+            self.query_one(QuestionDock).set_free_answer(bool(prompt.value.strip()))
         self.completion_index = 0
         self.completions_dismissed = False
-        prompt.styles.height = min(8, max(3, prompt.wrapped_document.height + 2))
+        prompt.styles.height = min(8, max(2, prompt.wrapped_document.height + 1))
         self.update_completions()
         if len(prompt.text) > 8000:
             self.prompt_too_long = True
@@ -1032,6 +1061,9 @@ class CodaroApp(App):
                 self.update_completions()
 
     async def on_prompt_submitted(self, event: Prompt.Submitted):
+        if self.pending_user_question:
+            self.answer_user_question(event.value)
+            return
         if self.query_one(Prompt).suggesting and event.value.startswith("/"):
             options = self.completion_options()
             if options:
@@ -1042,6 +1074,68 @@ class CodaroApp(App):
                 self.query_one(Prompt).focus()
                 return
         await self.submit_question(event.value)
+
+    def ask_user_question(self, question, cancelled):
+        ready, response = threading.Event(), []
+
+        def resolved(value):
+            response.append(value)
+            ready.set()
+
+        self.deliver(self.show_user_question, question, resolved)
+        while not ready.wait(0.05):
+            if not self.is_running or cancelled is not None and cancelled.is_set():
+                self.deliver(self.clear_user_question)
+                raise InvestigationCancelled("Pergunta interrompida; nenhuma resposta presumida.")
+        return {"question": question["question"], "user_response": response[0]}
+
+    def show_user_question(self, question, resolved):
+        prompt = self.query_one(Prompt)
+        self.question_draft = (prompt.value, prompt.selection)
+        self.pending_user_question, self.question_resolved = question, resolved
+        prompt.value = ""
+        prompt.placeholder = "Escreva sua resposta…"
+        prompt.answering = True
+        self.query_one(QuestionDock).set_question(question)
+        self.query_one(Composer).add_class("answering")
+        self.query_one(ExecutionPlan).fit(self.size.height, answering=True)
+        self.query_one("#status", Static).update("Aguardando sua resposta")
+        self.generation_phase = "Aguardando sua resposta"
+        self.update_completions()
+        prompt.focus()
+
+    def clear_user_question(self):
+        if self.pending_user_question is None:
+            return
+        self.pending_user_question = self.question_resolved = None
+        self.query_one(QuestionDock).set_question(None)
+        self.query_one(Composer).remove_class("answering")
+        prompt = self.query_one(Prompt)
+        prompt.answering = False
+        prompt.placeholder = "Pergunte ou peça uma mudança…"
+        if self.question_draft is not None:
+            prompt.value, prompt.selection = self.question_draft
+        self.question_draft = None
+        self.query_one(ExecutionPlan).fit(self.size.height)
+
+    def answer_user_question(self, text):
+        question = self.pending_user_question
+        if not question:
+            return
+        answer = self.query_one(QuestionDock).answer(text, question)
+        if not answer or len(answer) > 8000:
+            self.query_one("#status", Static).update(
+                "Escolha uma opção ou escreva até 8.000 caracteres"
+            )
+            return
+        resolved = self.question_resolved
+        self.mount_message(
+            Static(safe_preview(question["question"]), classes="speaker", markup=False)
+        )
+        self.mount_message(UserMessage(answer))
+        self.clear_user_question()
+        resolved(answer)
+        self.set_generation_status("Continuando…")
 
     async def submit_question(self, value: str, *, preserve_draft=False):
         question = value.strip()
@@ -1102,7 +1196,7 @@ class CodaroApp(App):
             prompt.value = ""
         prompt.disabled = False
         self.update_completions()
-        self.mount_message(Static(f"› {safe_preview(question)}", classes="question", markup=False))
+        self.mount_message(UserMessage(question))
         self.set_generation_status("Investigando…")
         self.investigate(question)
 
@@ -1160,7 +1254,9 @@ class CodaroApp(App):
     def show_plan(self):
         task = self.agent.tasks.current()
         self.query_one(ExecutionPlan).set_task(task, busy=self.busy)
-        self.query_one(ExecutionPlan).fit(self.size.height)
+        self.query_one(ExecutionPlan).fit(
+            self.size.height, answering=bool(self.pending_user_question)
+        )
         self.call_after_refresh(self.update_completions)
 
     def cancel_execution_plan(self):
@@ -1355,6 +1451,15 @@ class CodaroApp(App):
             )
 
     def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "question-send":
+            self.answer_user_question(self.query_one(Prompt).value)
+            return
+        if event.button.id == "question-pause":
+            self.action_escape()
+            return
+        if event.button.id == "select-model":
+            self.run_worker(self.open_provider_menu("/models"))
+            return
         if event.button.id == "select-mode":
             self.open_mode_picker()
             return

@@ -1,0 +1,866 @@
+[
+  {
+    "capture": "welcome-60x20",
+    "size": [
+      60,
+      20
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          4,
+          16,
+          54,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          40,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "plan-chat-60x20",
+    "size": [
+      60,
+      20
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          4,
+          16,
+          54,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          40,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "stages-expanded-60x20",
+    "size": [
+      60,
+      20
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          4,
+          16,
+          54,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          40,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "streaming-60x20",
+    "size": [
+      60,
+      20
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          4,
+          16,
+          54,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          40,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "question-60x20",
+    "size": [
+      60,
+      20
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          6,
+          15,
+          28,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          40,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      },
+      "#question-send": {
+        "region": [
+          46,
+          15,
+          10,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "mode-60x20",
+    "size": [
+      60,
+      20
+    ],
+    "controls": {
+      "#mode-apply": {
+        "region": [
+          44,
+          11,
+          12,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "edit-policy-60x20",
+    "size": [
+      60,
+      20
+    ],
+    "controls": {
+      "#mode-apply": {
+        "region": [
+          44,
+          14,
+          12,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "provider-60x20",
+    "size": [
+      60,
+      20
+    ],
+    "controls": {
+      "#provider-save": {
+        "region": [
+          38,
+          17,
+          16,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "models-60x20",
+    "size": [
+      60,
+      20
+    ],
+    "controls": {
+      "#model-use": {
+        "region": [
+          6,
+          17,
+          16,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "welcome-80x24",
+    "size": [
+      80,
+      24
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          4,
+          20,
+          74,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          60,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "plan-chat-80x24",
+    "size": [
+      80,
+      24
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          4,
+          20,
+          74,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          60,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "stages-expanded-80x24",
+    "size": [
+      80,
+      24
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          4,
+          20,
+          74,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          60,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "streaming-80x24",
+    "size": [
+      80,
+      24
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          4,
+          20,
+          74,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          60,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "question-80x24",
+    "size": [
+      80,
+      24
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          6,
+          19,
+          48,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          60,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      },
+      "#question-send": {
+        "region": [
+          66,
+          19,
+          10,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "mode-80x24",
+    "size": [
+      80,
+      24
+    ],
+    "controls": {
+      "#mode-apply": {
+        "region": [
+          64,
+          11,
+          12,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "edit-policy-80x24",
+    "size": [
+      80,
+      24
+    ],
+    "controls": {
+      "#mode-apply": {
+        "region": [
+          64,
+          17,
+          12,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "provider-80x24",
+    "size": [
+      80,
+      24
+    ],
+    "controls": {
+      "#provider-save": {
+        "region": [
+          51,
+          20,
+          22,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "models-80x24",
+    "size": [
+      80,
+      24
+    ],
+    "controls": {
+      "#model-use": {
+        "region": [
+          7,
+          20,
+          22,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "welcome-120x35",
+    "size": [
+      120,
+      35
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          4,
+          31,
+          114,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          100,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "plan-chat-120x35",
+    "size": [
+      120,
+      35
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          4,
+          31,
+          114,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          100,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "stages-expanded-120x35",
+    "size": [
+      120,
+      35
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          4,
+          31,
+          114,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          100,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "streaming-120x35",
+    "size": [
+      120,
+      35
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          4,
+          31,
+          114,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          100,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "question-120x35",
+    "size": [
+      120,
+      35
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          6,
+          30,
+          88,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          100,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      },
+      "#question-send": {
+        "region": [
+          106,
+          30,
+          10,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "mode-120x35",
+    "size": [
+      120,
+      35
+    ],
+    "controls": {
+      "#mode-apply": {
+        "region": [
+          104,
+          11,
+          12,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "edit-policy-120x35",
+    "size": [
+      120,
+      35
+    ],
+    "controls": {
+      "#mode-apply": {
+        "region": [
+          104,
+          18,
+          12,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "provider-120x35",
+    "size": [
+      120,
+      35
+    ],
+    "controls": {
+      "#provider-save": {
+        "region": [
+          71,
+          29,
+          24,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "models-120x35",
+    "size": [
+      120,
+      35
+    ],
+    "controls": {
+      "#model-use": {
+        "region": [
+          20,
+          28,
+          26,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "welcome-160x50",
+    "size": [
+      160,
+      50
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          4,
+          46,
+          154,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          140,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "plan-chat-160x50",
+    "size": [
+      160,
+      50
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          4,
+          46,
+          154,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          140,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "stages-expanded-160x50",
+    "size": [
+      160,
+      50
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          4,
+          46,
+          154,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          140,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "streaming-160x50",
+    "size": [
+      160,
+      50
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          4,
+          46,
+          154,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          140,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "question-160x50",
+    "size": [
+      160,
+      50
+    ],
+    "controls": {
+      "#prompt": {
+        "region": [
+          6,
+          45,
+          128,
+          2
+        ],
+        "fully_visible": true
+      },
+      "#select-mode": {
+        "region": [
+          140,
+          1,
+          18,
+          1
+        ],
+        "fully_visible": true
+      },
+      "#question-send": {
+        "region": [
+          146,
+          45,
+          10,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "mode-160x50",
+    "size": [
+      160,
+      50
+    ],
+    "controls": {
+      "#mode-apply": {
+        "region": [
+          144,
+          11,
+          12,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "edit-policy-160x50",
+    "size": [
+      160,
+      50
+    ],
+    "controls": {
+      "#mode-apply": {
+        "region": [
+          144,
+          18,
+          12,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "provider-160x50",
+    "size": [
+      160,
+      50
+    ],
+    "controls": {
+      "#provider-save": {
+        "region": [
+          91,
+          37,
+          24,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  },
+  {
+    "capture": "models-160x50",
+    "size": [
+      160,
+      50
+    ],
+    "controls": {
+      "#model-use": {
+        "region": [
+          40,
+          35,
+          26,
+          1
+        ],
+        "fully_visible": true
+      }
+    }
+  }
+]

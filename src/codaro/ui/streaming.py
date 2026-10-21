@@ -8,7 +8,8 @@ from textual.widgets import Markdown, Static
 from codaro.agent import AgentEvent
 from codaro.index import safe_preview
 from codaro.llm import MAX_MESSAGE_CHARS
-from codaro.ui.widgets import ActivityGroup, GenerationPreview, ReasoningGroup
+from codaro.ui.stages import ensure_stages, progress
+from codaro.ui.widgets import GenerationPreview, ReasoningGroup
 
 
 def activity(app, event: AgentEvent):
@@ -54,14 +55,19 @@ def activity(app, event: AgentEvent):
             app.answer_preview.finish("retry", event.title)
             app.answer_preview = None
     elif event.kind == "tool_start":
+        progress(
+            app, event.title + (" · " + event.detail.split("\n", 1)[0] if event.detail else "")
+        )
         app.set_generation_status(safe_preview(f"{event.title}… · {event.detail}".rstrip(" ·")))
     elif event.kind == "tool_end":
         app.show_plan()
         duration = f"{event.elapsed_ms:.0f} ms" if event.elapsed_ms is not None else ""
-        if app.activity_group is None:
-            app.activity_group = ActivityGroup()
-            app.mount_message(app.activity_group)
-        app.activity_group.add(event)
+        ensure_stages(app).add(event)
+        progress(
+            app,
+            completed=event.title
+            + (" · " + event.detail.split("\n", 1)[0] if event.detail else ""),
+        )
         app.set_generation_status(f"{event.title} · {duration}")
     else:
         app.set_generation_status("Investigando…")
@@ -78,6 +84,11 @@ def append_delta(app, delta: str):
 
 
 def append_reasoning(app, delta: str):
+    details = ensure_stages(app)
+    details.has_reasoning = True
+    if not details.events:
+        details.title = "Etapas · raciocínio do modelo · detalhes"
+    progress(app, "Analisando o projeto")
     if app.reasoning_preview is None:
         app.reasoning_preview = GenerationPreview(reasoning=True)
         app.reasoning_preview.collapsed = False
@@ -85,7 +96,17 @@ def append_reasoning(app, delta: str):
             app.reasoning_group = ReasoningGroup(
                 app.reasoning_preview, collapsed=not app.show_reasoning
             )
-            app.mount_message(app.reasoning_group)
+            group = app.reasoning_group
+
+            def mount_reasoning():
+                from textual.widgets import Collapsible
+
+                if details.is_attached:
+                    details.query_one(Collapsible.Contents).mount(group)
+                    if app.show_reasoning:
+                        details.collapsed = False
+
+            app.call_after_refresh(mount_reasoning)
         else:
             app.reasoning_group.add_preview(app.reasoning_preview)
     app.reasoning_preview.update_text((app.reasoning_preview.text + safe_preview(delta))[:4001])
@@ -99,10 +120,7 @@ def flush_preview(app):
     follow = conversation.is_vertical_scroll_end
     if app.generation_preview is None:
         app.generation_preview = GenerationPreview()
-        if app.activity_group is None:
-            app.activity_group = ActivityGroup()
-            app.mount_message(app.activity_group)
-        app.activity_group.add_preview(app.generation_preview)
+        ensure_stages(app).add_preview(app.generation_preview)
         app.mount_message(app.generation_preview)
     app.generation_preview.update_text(app.draft_text)
     app.draft_rendered = app.draft_text
@@ -116,6 +134,8 @@ def finish_preview(app, state: str, reason: str = ""):
         app.generation_preview.finish(state, reason)
         if state == "answer":
             app.answer_preview = app.generation_preview
+        elif app.activity_group is not None:
+            app.activity_group.archive(app.generation_preview)
     if app.reasoning_preview is not None:
         app.reasoning_preview.finish(state)
         app.reasoning_preview = None

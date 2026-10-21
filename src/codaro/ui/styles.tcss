@@ -1,18 +1,52 @@
-Screen { background: $background; }
-#brand { height: 1; margin: 1 2 0 2; color: $text; text-style: bold; }
-#session-header { height: 1; margin: 0 2; }
+Screen#_default { background: $background; }
+ModalScreen { background: #080d14 70%; }
+ModePicker { background: transparent; }
+#conversation, #plan-steps, #question-dock, #mode-fields, #model-fields {
+    scrollbar-size: 1 1; scrollbar-color: $primary 30%; scrollbar-background: $background; }
+#brand { height: 1; width: 12; color: $text; text-style: bold; }
+#session-header { height: 3; padding: 1 2 0 2; border-bottom: solid $primary 30%; }
 #session { height: 1; width: 1fr; color: $text-muted; text-wrap: nowrap;
     text-overflow: ellipsis; }
-#select-mode { width: 18; min-width: 12; height: 1; min-height: 1; padding: 0;
-    border: none; background: $background; color: $text-muted; }
+#select-mode, #select-model { height: 1; min-height: 1; padding: 0;
+    border: none; background: $background; color: $text-muted; text-style: none; }
+#select-mode { width: 18; min-width: 12; background: $panel; margin-left: 1; }
+#select-model { width: auto; min-width: 8; max-width: 32; text-overflow: ellipsis;
+    text-wrap: nowrap; }
+#select-model:hover, #select-model:focus { background: $panel; color: $text; border: none; }
 #select-mode:hover, #select-mode:focus { background: $panel; color: $text; border: none; }
 #session.insecure { color: $warning; }
 #conversation { width: 100%; height: 1fr; padding: 0 2; }
 #welcome { height: auto; margin: 1 0; }
 #welcome Static { height: auto; color: $text-muted; }
-#composer { height: auto; padding: 0 2; border-top: solid $primary; }
-#composer:focus-within { border-top: solid $accent; }
-#prompt { height: 3; max-height: 8; margin: 0; border: none; padding: 0 1;
+#composer { height: auto; padding: 0 2; }
+#response-card { height: auto; }
+#question-dock, #question-pause, #question-send { display: none; }
+#question-dock { height: auto; max-height: 9; overflow-y: auto; }
+#question-dock Static { height: auto; }
+.question-label { color: $text-muted; }
+#question-title { margin-top: 1; color: $text; }
+#question-why { color: $text-muted; }
+#question-options { height: auto; border: none; padding: 0; background: $panel; }
+#question-options > .option-list--option-highlighted { background: $primary 15%;
+    text-style: none; color: $text; }
+.free-answer #question-options > .option-list--option-highlighted {
+    background: $panel; color: $text-muted; }
+.answering #response-card { border: round $primary 65%; padding: 0 1; background: $panel; }
+.answering #entry { border: none; }
+.answering #entry:focus-within { border: none; }
+.answering #prompt { background: $panel; }
+.answering #question-pause, .answering #question-send { display: block;
+    height: 1; min-height: 1; width: 10; min-width: 8; border: none; padding: 0;
+    margin-left: 1; text-style: none; background: $panel; color: $text-muted; }
+.answering #question-send { background: $accent; color: $background; text-style: bold; }
+.answering #question-send:hover { background: $accent-lighten-1; color: $background; }
+.short-terminal #question-dock { max-height: 4; }
+.short-terminal #question-title { margin-top: 0; }
+.short-terminal .question-label, .short-terminal #question-why { display: none; }
+#entry { height: auto; border-top: solid $primary; }
+#entry:focus-within { border-top: solid $accent; }
+#entry-mark { width: 2; height: 1; color: $accent; }
+#prompt { height: 2; max-height: 8; width: 1fr; margin: 0; border: none; padding: 0;
     background: $background; }
 #completion { display: none; height: auto; max-height: 7; color: $text-muted; }
 #completion { text-overflow: ellipsis; text-wrap: nowrap; }
@@ -23,7 +57,7 @@ Screen { background: $background; }
 #new-messages { display: none; height: 1; min-height: 1; border: none; margin: 0 2; }
 #status { height: 1; width: 1fr; color: $text-muted;
     text-wrap: nowrap; text-overflow: ellipsis; }
-#execution-plan { display: none; height: auto; margin-bottom: 1; }
+#execution-plan { display: none; height: auto; border-top: solid $primary 65%; }
 #plan-heading { height: 1; }
 #execution-plan Button { height: 1; min-height: 1; border: none; padding: 0;
     background: $background; color: $text-muted; text-style: none; }
@@ -31,7 +65,7 @@ Screen { background: $background; }
     background: $panel; color: $text; border: none; }
 #toggle-plan { width: 1fr; text-align: left; content-align: left middle;
     text-wrap: nowrap; text-overflow: ellipsis; }
-#cancel-plan { width: 16; min-width: 16; }
+#cancel-plan { width: 16; min-width: 16; background: $panel; }
 #plan-steps { height: auto; max-height: 5; padding-left: 2; }
 #plan-list { height: auto; color: $text-muted; }
 #execute-plan { width: auto; margin-top: 1; }
@@ -39,15 +73,14 @@ Screen { background: $background; }
 .recovery-actions Button { width: 1fr; min-width: 8; padding: 0; }
 #configure-start { height: 1; min-height: 1; width: auto; border: none; padding: 0; }
 .question { height: auto; margin: 1 0; padding: 0 1; color: $text;
-    background: $panel; border-left: solid $primary; }
+    background: $panel; border-left: solid $primary 35%; }
 .assistant { margin: 0; padding: 0 1; background: $background; }
-.speaker { height: 1; margin: 1 1 0 1; color: $text; text-style: bold; }
-.tool-card { height: auto; margin: 0 1; border: none; border-left: thick $primary;
+.speaker { height: 1; margin: 1 1 0 1; color: $accent; text-style: bold; }
+.tool-card { height: auto; margin: 0; border: none;
              padding: 0; }
-.tool-card.error { border-left: thick $error; }
-.tool-card.success { border-left: thick $success; }
-.tool-card CollapsibleTitle { color: $text-muted; }
-.tool-card > Contents { padding: 0 1; }
+.tool-card.error > CollapsibleTitle { color: $warning; }
+.tool-card > CollapsibleTitle { color: $text-muted; background: $background; }
+.tool-card > Contents { padding: 0 1; border-left: solid $primary 30%; margin-left: 1; }
 .generation-previews { height: auto; }
 .generation-preview { height: auto; border: none; padding: 0; }
 .generation-preview > Contents { padding: 0 1; }
@@ -56,9 +89,19 @@ Screen { background: $background; }
 .reasoning-preview { margin: 0 1 1 1; }
 .reasoning-group { height: auto; border: none; margin: 0; padding: 0; }
 .reasoning-group > CollapsibleTitle { color: $text-muted; }
+.tool-card, .reasoning-group, .generation-preview { background: $background; }
+.reasoning-group > CollapsibleTitle, .generation-preview > CollapsibleTitle {
+    background: $background; }
 .reasoning-preview .generation-text { color: $text-muted; text-style: italic;
                                      max-height: 8; overflow-y: auto; }
 .response-preview { margin: 1 0; }
+.response-preview.live-answer > CollapsibleTitle { display: none; }
+.response-preview.live-answer > Contents { padding: 0 1; }
+.live-speaker { height: 1; color: $accent; text-style: bold; margin-bottom: 1; }
+.turn-stages { height: auto; margin: 0 1; }
+.live-steps { height: auto; max-height: 2; padding-left: 2; color: $text-muted; }
+.intermediate-step { height: auto; border: none; padding: 0; color: $text-muted; }
+.intermediate-step > Contents { max-height: 8; overflow-y: auto; }
 
 .notice { height: auto; margin: 1; color: $warning; }
 .notice.neutral { color: $text-muted; }
@@ -67,3 +110,18 @@ Screen { background: $background; }
 .recovery-card.neutral > CollapsibleTitle,
 .recovery-card.resolved > CollapsibleTitle { color: $text-muted; }
 .recovery-card > Contents { padding: 0; }
+
+/* Dialogs use the same quiet frame and fixed actions as the approved proposal. */
+#review, #command-review, #preferences-form, #new-conversation, #provider-manager {
+    border: round $primary 35%; background: $surface; }
+#review { width: 90%; max-width: 100; height: 85%; }
+#review-title { color: $text; padding: 0 2; }
+#review-actions { height: 2; padding: 0; border-top: solid $primary 30%; }
+#review-actions Button, #command-review Button, #preferences-actions Button,
+#new-conversation Button, .profile-actions Button {
+    height: 1; min-height: 1; border: none; background: $surface; color: $text-muted;
+    text-style: none; }
+#review-actions #apply-edit, #preferences-actions #preferences-save {
+    background: $accent; color: $background; text-style: bold; }
+#review-actions #reject-edit { color: $error; }
+#preferences-actions { height: 2; border-top: solid $primary 30%; }

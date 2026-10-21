@@ -38,9 +38,22 @@ class ExecutionPlan(Vertical):
             label += " · " + current
         self.query_one("#toggle-plan", Button).label = safe_preview(label)
         symbols = {"todo": "○", "doing": "◌", "done": "✓"}
-        self.query_one("#plan-list", Static).update(
-            safe_preview("\n".join(f"{symbols[s['state']]} {s['title']}" for s in steps))
-        )
+        from rich.text import Text
+
+        colors = self.app.get_css_variables()
+        content = Text()
+        for index, step in enumerate(steps):
+            color = colors[
+                {"done": "success", "doing": "accent", "todo": "text-muted"}[step["state"]]
+            ]
+            if index:
+                content.append("\n")
+            content.append(symbols[step["state"]] + " ", style=color)
+            content.append(
+                safe_preview(step["title"]),
+                style=colors["foreground"] if step["state"] == "doing" else colors["text-muted"],
+            )
+        self.query_one("#plan-list", Static).update(content)
         self.query_one("#plan-steps").display = self.expanded
         execute = self.query_one("#execute-plan", Button)
         execute.display = task["state"] == "planned"
@@ -49,5 +62,7 @@ class ExecutionPlan(Vertical):
     def toggle(self):
         self.expanded = not self.expanded
 
-    def fit(self, height):
-        self.query_one("#plan-steps").styles.max_height = 3 if height < 25 else 5
+    def fit(self, height, *, answering=False):
+        self.query_one("#plan-steps").styles.max_height = (
+            1 if answering and height < 25 else 3 if height < 25 or answering else 5
+        )

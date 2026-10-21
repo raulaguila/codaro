@@ -9,6 +9,7 @@ from codaro.provider_ui import ModelPicker, ProviderSetup
 from codaro.providers import ProviderStore
 from codaro.repository import Repository
 from codaro.tui import CodaroApp, Prompt
+from codaro.ui.model_list import ModelList
 
 
 def test_chat_registration_and_model_selection_updates_live_budgets(tmp_path, monkeypatch):
@@ -51,7 +52,7 @@ def test_chat_registration_and_model_selection_updates_live_budgets(tmp_path, mo
                 if isinstance(app.screen, ModelPicker):
                     break
             assert isinstance(app.screen, ModelPicker)
-            app.screen.query_one("#model-id", Select).value = "small-test"
+            app.screen.query_one("#model-id", ModelList).value = "small-test"
             await pilot.pause()
             await pilot.click("#model-use")
             for _ in range(100):

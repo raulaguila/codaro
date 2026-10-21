@@ -143,7 +143,7 @@ def test_expanded_mode_policy_keeps_confirmation_visible(tmp_path, size):
             await pilot.pause()
             app.screen.query_one("#edit-policy").collapsed = False
             await pilot.pause()
-            for selector in ("#mode-apply", "#mode-cancel"):
+            for selector in ("#mode-apply", "#mode-help"):
                 button = app.screen.query_one(selector)
                 clip = app.screen._compositor.find_widget(button).clip
                 assert button.region.intersection(clip) == button.region
@@ -152,7 +152,7 @@ def test_expanded_mode_policy_keeps_confirmation_visible(tmp_path, size):
             await pilot.pause()
             assert app.screen.query_one("#mode-apply").region == before
             text = "\n".join(strip.text for strip in app.screen._compositor.render_strips())
-            assert "Aplicar" in text and "Cancelar" in text
+            assert "Aplicar" in text and "Esc fechar" in text
             await pilot.press("escape")
             assert not app.agent.policy.auto_edits
 

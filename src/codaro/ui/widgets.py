@@ -28,11 +28,12 @@ class GenerationPreview(Collapsible):
         self.reason = ""
         self.content = Static("", markup=False, classes="generation-text")
         super().__init__(
+            *([] if reasoning else [Static("Codaro", classes="live-speaker", markup=False)]),
             self.content,
             title=("Raciocínio · em andamento" if reasoning else "Respondendo…"),
             classes="generation-preview reasoning-preview"
             if reasoning
-            else "generation-preview response-preview",
+            else "generation-preview response-preview live-answer",
             collapsed=False,
         )
         self.tooltip = "Texto provisório; a resposta final aparece ao concluir a interação."
@@ -83,6 +84,7 @@ class GenerationPreview(Collapsible):
         if state != "answer":
             self.update_text(self.text)
             self.collapsed = True
+            self.remove_class("live-answer")
 
     def accept(self, answer: str) -> Markdown:
         self.state = "accepted"
@@ -114,12 +116,17 @@ class ReasoningGroup(Collapsible):
     def __init__(self, preview, *, collapsed=True):
         self.steps = 1
         super().__init__(
-            preview, title="Raciocínio · 1 etapa", collapsed=collapsed, classes="reasoning-group"
+            preview,
+            title="Raciocínio do modelo · 1 etapa",
+            collapsed=collapsed,
+            classes="reasoning-group",
+            collapsed_symbol="▸",
+            expanded_symbol="▾",
         )
 
     def add_preview(self, preview):
         self.steps += 1
-        self.title = f"Raciocínio · {self.steps} etapas"
+        self.title = f"Raciocínio do modelo · {self.steps} etapas"
 
         def mount_step():
             if self.is_attached:
@@ -135,15 +142,43 @@ class ActivityGroup(Collapsible):
         self.events: list[AgentEvent] = []
         self.generations: list[GenerationPreview] = []
         self.details = Static("", markup=False)
-        super().__init__(self.details, title="Investigação", classes="tool-card", collapsed=True)
+        self.has_reasoning = False
+        super().__init__(
+            self.details,
+            title="Etapas · detalhes",
+            classes="tool-card",
+            collapsed=True,
+            collapsed_symbol="▸",
+            expanded_symbol="▾",
+        )
+
+    def archive(self, preview):
+        archived = Collapsible(
+            Static(preview.text[:4000], markup=False),
+            title=preview.title,
+            collapsed=True,
+            classes="intermediate-step",
+            collapsed_symbol="▸",
+            expanded_symbol="▾",
+        )
+
+        def mount_archive():
+            if self.is_attached:
+                self.query_one(Collapsible.Contents).mount(archived)
+
+        self.call_after_refresh(mount_archive)
+        preview.display = False
 
     def add_preview(self, preview: GenerationPreview):
         self.generations.append(preview)
 
     def finish(self, successful: bool):
-        if not self.events:
+        if not self.events and not self.has_reasoning:
             self.title = "Geração concluída" if successful else "Geração interrompida"
             self.display = False
+        parent = self.parent
+        if hasattr(parent, "finish"):
+            parent.finish()
 
     def add(self, event: AgentEvent):
         self.events.append(event)
@@ -161,7 +196,9 @@ class ActivityGroup(Collapsible):
         if errors:
             parts.append(f"{errors} {'erro' if errors == 1 else 'erros'}")
         self.title = (
-            " · ".join(parts) + f" · {sum(item.elapsed_ms or 0 for item in self.events):.0f} ms"
+            "Etapas · "
+            + " · ".join(parts)
+            + f" · {sum(item.elapsed_ms or 0 for item in self.events):.0f} ms"
         )
         self.set_class(bool(errors), "error")
         self.set_class(not errors, "success")
@@ -173,7 +210,7 @@ class ActivityGroup(Collapsible):
         )
         if len(text) > 48_000:
             text = "… detalhes anteriores em .codaro/prompt.json\n" + text[-48_000:]
-        self.details.update(text)
+        self.details.update("FERRAMENTAS\n" + text)
 
 
 class ProposalCard(Vertical):

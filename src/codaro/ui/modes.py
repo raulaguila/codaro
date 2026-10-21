@@ -18,17 +18,23 @@ DESCRIPTIONS = {
 class ModePicker(ModalScreen[tuple[Mode, bool] | None]):
     DEFAULT_CSS = """
     ModePicker { align: right top; background: transparent; }
-    #mode-picker { width: 68; max-width: 96%; height: 11; max-height: 80%;
-        margin: 3 1 0 0; padding: 0 1; border: round $accent; background: $surface; }
+    #mode-picker { width: 62; max-width: 96%; height: 11; max-height: 80%;
+        margin: 3 2 0 0; padding: 0 1; border: round $primary 35%; background: $surface; }
     #mode-fields { height: 1fr; }
     #mode-picker Static { height: auto; }
-    #mode-options { height: 5; border: none; padding: 0; }
+    #mode-options { height: 3; border: none; padding: 0; background: $surface; }
+    #mode-options > .option-list--option { padding: 0 1; }
+    #mode-options > .option-list--option-highlighted { background: $primary 15%;
+        color: $text; text-style: none; }
     #edit-policy { border: none; padding: 0; height: auto; }
     #edit-policy > Contents { padding: 0; }
     #edit-policy RadioSet { height: auto; border: none; padding: 0; }
-    #mode-actions { height: 1; margin-top: 1; }
+    #mode-actions { height: 3; padding-top: 1; border-top: solid $primary 30%; }
+    #mode-help { width: 1fr; height: 1; color: $text-muted; }
     #mode-actions Button { height: 1; min-height: 1; border: none;
-        width: 1fr; min-width: 8; padding: 0; }
+        width: 12; min-width: 8; padding: 0; background: $accent;
+        color: $background; text-style: bold; }
+    #mode-apply:hover, #mode-apply:focus { background: $accent-lighten-1; color: $background; }
     """
     BINDINGS = [
         Binding("escape", "back", "Voltar", priority=True),
@@ -69,7 +75,9 @@ class ModePicker(ModalScreen[tuple[Mode, bool] | None]):
                         markup=False,
                     )
             with Horizontal(id="mode-actions"):
-                yield Button("Cancelar", id="mode-cancel")
+                yield Static(
+                    "↑↓ navegar · Enter aplicar · Esc fechar", id="mode-help", markup=False
+                )
                 yield Button("Aplicar", id="mode-apply", variant="primary")
 
     def on_mount(self):
@@ -86,8 +94,15 @@ class ModePicker(ModalScreen[tuple[Mode, bool] | None]):
     def fit(self):
         policy = self.query_one("#edit-policy", Collapsible)
         self.query_one("#mode-picker").styles.height = (
-            17 if policy.display and not policy.collapsed else 11
+            17 if policy.display and not policy.collapsed else 10
         )
+        automatic = self.query_one("#edit-auto", RadioButton).value
+        policy.title = "Edições: " + (
+            "aprovar automaticamente" if automatic else "pedir autorização"
+        )
+
+    def on_radio_set_changed(self):
+        self.fit()
 
     def on_collapsible_expanded(self):
         self.fit()
@@ -99,9 +114,6 @@ class ModePicker(ModalScreen[tuple[Mode, bool] | None]):
         self.update_policy()
 
     def action_apply_mode(self):
-        if self.focused is self.query_one("#mode-cancel"):
-            self.action_back()
-            return
         index = self.query_one(OptionList).highlighted
         if index is not None:
             mode = self.modes[index]
@@ -115,8 +127,6 @@ class ModePicker(ModalScreen[tuple[Mode, bool] | None]):
         event.stop()
         if event.button.id == "mode-apply":
             self.action_apply_mode()
-        elif event.button.id == "mode-cancel":
-            self.action_back()
 
     def on_click(self, event):
         if event.widget is self:

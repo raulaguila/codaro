@@ -6,7 +6,7 @@ import httpx
 import pytest
 from test_tui import UIModel, run_ui, wait_ready
 from textual.containers import VerticalScroll
-from textual.widgets import Button, Collapsible, Input, Select, Static
+from textual.widgets import Button, Collapsible, Input, Static
 
 from codaro.agent import Agent, AgentEvent
 from codaro.llm import ContextCapacityError, ModelError
@@ -15,6 +15,7 @@ from codaro.llm.profiles import ProviderStore
 from codaro.repository import Repository
 from codaro.ui.app import CodaroApp
 from codaro.ui.composer import Prompt
+from codaro.ui.model_list import ModelList
 from codaro.ui.providers import ModelPicker, ProviderSetup
 from codaro.ui.recovery import RecoveryCard
 
@@ -38,6 +39,7 @@ def test_all_reasoning_steps_disappear_when_group_is_collapsed(tmp_path):
             assert group.collapsed
             assert "SEGREDO_ETAPA" not in rendered(app)
             assert "etapa encerrada" not in rendered(app)
+            app.activity_group.collapsed = False
             group.collapsed = False
             await pilot.pause()
             assert "SEGREDO_ETAPA_2" in rendered(app)
@@ -148,7 +150,7 @@ def test_cancel_remote_lookup_cannot_write_a_late_result(tmp_path, monkeypatch, 
                 screen.query_one("#provider-key", Input).value = "new-fake-key"
                 button, back = "provider-save", "provider-back"
             else:
-                screen.query_one("#model-id", Select).value = "other"
+                screen.query_one("#model-id", ModelList).value = "other"
                 button, back = (
                     ("model-refresh" if operation == "refresh" else "model-use"),
                     "model-back",

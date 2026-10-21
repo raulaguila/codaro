@@ -3,9 +3,10 @@ from __future__ import annotations
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
-from textual.widgets import Static, TextArea
+from textual.widgets import Button, Static, TextArea
 
 from codaro.ui.plan import ExecutionPlan
+from codaro.ui.questions import QuestionDock
 
 
 class Composer(Vertical):
@@ -14,12 +15,18 @@ class Composer(Vertical):
     def compose(self):
         yield ExecutionPlan()
         yield Static("", id="completion", markup=False)
-        yield Prompt(
-            placeholder="Pergunte ou peça uma mudança…",
-            id="prompt",
-            show_line_numbers=False,
-            highlight_cursor_line=False,
-        )
+        with Vertical(id="response-card"):
+            yield QuestionDock(id="question-dock")
+            with Horizontal(id="entry"):
+                yield Static("›", id="entry-mark", markup=False)
+                yield Prompt(
+                    placeholder="Pergunte ou peça uma mudança…",
+                    id="prompt",
+                    show_line_numbers=False,
+                    highlight_cursor_line=False,
+                )
+                yield Button("Pausar", id="question-pause")
+                yield Button("Enviar ↵", id="question-send", variant="primary")
         with Horizontal(id="composer-meta"):
             yield Static("Pronto", id="status", markup=False)
             yield Static("", id="context-meter", markup=False)
@@ -30,6 +37,7 @@ class Prompt(TextArea):
     """A wrapping composer with explicit submission and portable newline shortcuts."""
 
     suggesting = False
+    answering = False
 
     BINDINGS = [
         Binding("enter", "submit", "Enviar", show=False, priority=True),
@@ -78,14 +86,16 @@ class Prompt(TextArea):
 
     def action_previous(self):
         row = self.wrapped_document.location_to_offset(self.cursor_location).y
-        if (self.suggesting or row == 0) and self.selection.is_empty:
+        if (self.answering or self.suggesting or row == 0) and self.selection.is_empty:
             self.post_message(self.Navigate(-1))
         else:
             self.action_cursor_up()
 
     def action_next(self):
         row = self.wrapped_document.location_to_offset(self.cursor_location).y
-        if (self.suggesting or row == self.wrapped_document.height - 1) and self.selection.is_empty:
+        if (
+            self.answering or self.suggesting or row == self.wrapped_document.height - 1
+        ) and self.selection.is_empty:
             self.post_message(self.Navigate(1))
         else:
             self.action_cursor_down()

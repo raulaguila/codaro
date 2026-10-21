@@ -1,0 +1,20 @@
+                                                            
+  ◈ Codaro    codaro       qwen3.8:27b      Executar ▾      
+────────────────────────────────────────────────────────────
+  │ Corrija esse caso mantendo o contrato atual.            
+                                                            
+    ▸ Etapas · 1 ação · 1 leitura · 12 ms                ▂  
+     ✓ Ler linhas · src/auth.py:1–80                        
+     ◌ Analisando o projeto                              ▄  
+                                                            
+   Novas mensagens ↓                                        
+  ────────────────────────────────────────────────────────  
+  ▾ Plano · 1/4 concluídas · Corrigir a v… Cancelar plano   
+    ✓ Investigar a autenticação                             
+    ◌ Corrigir a validação de usuários                      
+    ○ Cobrir os cenários de permissão                    ▆  
+  ────────────────────────────────────────────────────────  
+  › Pergunte ou peça uma mudança…                           
+                                                            
+  Respondendo…                     Contexto ≈ 13% · 122.4…  
+  Enter envia · / comandos · Ctrl+P menu                    

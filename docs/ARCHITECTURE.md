@@ -103,6 +103,9 @@ antigos de compatibilidade não devem virar novas dependências internas.
 | Plano fixo e projeção do progresso | `ui/plan.py` |
 | Seletor de modo e confirmação de aprovação automática | `ui/modes.py` |
 | Paleta visual padrão | `ui/theme.py` |
+| Hierarquia de mensagens e etapas | `ui/messages.py`, `ui/stages.py` |
+| Perguntas interativas e espera por resposta real | `agent/questions.py`, `ui/questions.py` |
+| Lista pesquisável de modelos | `ui/model_list.py` |
 | Componente ou tela | `ui/widgets.py`, `reviews.py` ou módulo da tela |
 | Aparência | `ui/styles.tcss` |
 | Novo grupo de comandos CLI | `cli_commands`, com registro explícito em `cli.py` |

@@ -14,19 +14,23 @@ from textual.widgets import Button, Checkbox, Collapsible, Input, Select, Static
 from codaro.llm import ModelError, RequestCancelled, Settings
 from codaro.llm.endpoints import PRESETS
 from codaro.llm.profiles import ProviderStore
+from codaro.ui.model_list import ModelList
 
 
 class ProviderSetup(ModalScreen[str | None]):
     DEFAULT_CSS = """
     ProviderSetup { align: center middle; background: #000000 65%; }
-    #provider-form { width: 95%; max-width: 90; height: 36; max-height: 90%; padding: 0 1;
-        background: $surface; border: round $accent; }
+    #provider-form { width: 90%; max-width: 76; height: 28; max-height: 90%; padding: 0 2;
+        background: $surface; border: round $primary 35%; }
     #provider-fields { height: 1fr; }
     #provider-fields Input, #provider-fields Select { margin-bottom: 0; }
     #provider-form Static { height: auto; }
     #provider-fields Checkbox { width: 100%; height: auto; }
-    #provider-actions, .provider-test-actions { height: 3; }
-    #provider-form Button { width: 1fr; min-width: 8; padding: 0; }
+    #provider-actions { height: 2; border-top: solid $primary 30%; }
+    #provider-form Button { width: 1fr; min-width: 8; padding: 0; height: 1;
+        min-height: 1; border: none; background: $surface; color: $text-muted; text-style: none; }
+    #provider-actions #provider-save { background: $accent; color: $background; text-style: bold; }
+    #provider-actions #provider-save:hover { background: $accent-lighten-1; color: $background; }
     #provider-error { max-height: 3; }
     #provider-advanced { height: auto; border: none; padding: 0; }
     #provider-advanced > Contents { padding: 0; }
@@ -73,13 +77,13 @@ class ProviderSetup(ModalScreen[str | None]):
                     markup=False,
                 )
                 yield Input(password=True, id="provider-key")
-                yield Static("Nome do perfil (opcional)", markup=False)
-                yield Input(self.profile_name or "", id="provider-name")
                 with Collapsible(
-                    title="Conexão e teste de ferramentas",
+                    title="Avançado · URL, TLS e teste do modelo",
                     collapsed=not bool(profile),
                     id="provider-advanced",
                 ):
+                    yield Static("Nome do perfil (opcional)", markup=False)
+                    yield Input(self.profile_name or "", id="provider-name")
                     yield Static("URL base da API", markup=False)
                     yield Input(profile.get("base_url", PRESETS["openai"]), id="provider-url")
                     yield Checkbox(
@@ -102,6 +106,8 @@ class ProviderSetup(ModalScreen[str | None]):
                 )
             yield Static("", id="provider-error", markup=False)
             with Horizontal(id="provider-actions"):
+                yield Button("Testar conexão", id="provider-test")
+                yield Button("Cancelar", id="provider-back")
                 yield Button(
                     "Testar e continuar"
                     if self.onboarding
@@ -111,9 +117,6 @@ class ProviderSetup(ModalScreen[str | None]):
                     id="provider-save",
                     variant="primary",
                 )
-            with Horizontal(classes="provider-test-actions"):
-                yield Button("Testar conexão", id="provider-test")
-                yield Button("Voltar", id="provider-back")
 
     def on_unmount(self):
         self.cancel_event.set()
@@ -281,13 +284,19 @@ class ProviderSetup(ModalScreen[str | None]):
 class ModelPicker(ModalScreen[Settings | None]):
     DEFAULT_CSS = """
     ModelPicker { align: center middle; background: #000000 65%; }
-    #model-form { width: 95%; max-width: 105; height: 20; max-height: 90%; padding: 0 1;
-        background: $surface; border: round $accent; }
+    #model-form { width: 90%; max-width: 86; height: 25; max-height: 90%; padding: 0 2;
+        background: $surface; border: round $primary 35%; }
     #model-fields { height: 1fr; }
     #model-form Select { margin-bottom: 0; }
     #model-form Static { height: auto; }
-    #model-actions { height: 3; }
-    #model-actions Button { width: 1fr; min-width: 8; padding: 0; }
+    #model-id { height: 6; border: none; padding: 0; background: $surface; }
+    #model-id > .option-list--option-highlighted { background: $primary 15%;
+        color: $text; text-style: none; }
+    #model-actions { height: 2; border-top: solid $primary 30%; }
+    #model-actions Button { width: 1fr; min-width: 8; padding: 0; height: 1;
+        min-height: 1; border: none; background: $surface; color: $text-muted; text-style: none; }
+    #model-actions #model-use { background: $accent; color: $background; text-style: bold; }
+    #model-actions #model-use:hover { background: $accent-lighten-1; color: $background; }
     #model-info { max-height: 4; }
     """
     BINDINGS = [Binding("escape", "back", "Voltar")]
@@ -322,8 +331,8 @@ class ModelPicker(ModalScreen[Settings | None]):
                     id="model-provider",
                     allow_blank=False,
                 )
-                yield Static("Modelo · digite na lista para buscar", markup=False)
-                yield Select([], id="model-id", prompt="Modelo")
+                yield Input(placeholder="Buscar modelo…", id="model-search")
+                yield ModelList(id="model-id")
                 yield Static("", id="model-info", markup=False)
             yield Static("", id="model-error", markup=False)
             with Horizontal(id="model-actions"):
@@ -338,11 +347,9 @@ class ModelPicker(ModalScreen[Settings | None]):
     def populate(self, name):
         models = self.store.models(name)
         compatible = [model for model in models if model["tools"] is not False]
-        self.query_one("#model-id", Select).set_options(
-            [
-                (f"{model['id']} · {model['context_window'] or '?'} tokens", model["id"])
-                for model in compatible
-            ]
+        self.catalogue = compatible
+        self.query_one(ModelList).set_models(
+            compatible, self.query_one("#model-search", Input).value
         )
         self.query_one("#model-error", Static).update(
             f"{len(models) - len(compatible)} modelos sem ferramentas/chat ocultos."
@@ -351,7 +358,22 @@ class ModelPicker(ModalScreen[Settings | None]):
         )
         profile = self.store.profile(name)[1]
         if any(model["id"] == profile["model"] for model in compatible):
-            self.query_one("#model-id", Select).value = profile["model"]
+            if not self.query_one("#model-search", Input).value:
+                self.query_one(ModelList).value = profile["model"]
+
+    def on_input_changed(self, event: Input.Changed):
+        if event.input.id == "model-search":
+            self.query_one(ModelList).set_models(getattr(self, "catalogue", []), event.value)
+            self.update_model(self.query_one(ModelList).value)
+
+    def on_model_list_changed(self, event: ModelList.Changed):
+        try:
+            self.update_model(event.value)
+        except (ValueError, OSError) as exc:
+            self.query_one("#model-error", Static).update(str(exc))
+
+    def on_model_list_chosen(self):
+        self.on_button_pressed(Button.Pressed(self.query_one("#model-use", Button)))
 
     def on_select_changed(self, event: Select.Changed):
         try:
@@ -364,26 +386,25 @@ class ModelPicker(ModalScreen[Settings | None]):
             return
         if event.select.id == "model-provider":
             self.populate(event.value)
-        elif event.select.id == "model-id":
-            name = str(self.query_one("#model-provider", Select).value)
-            model = next(
-                (item for item in self.store.models(name) if item["id"] == event.value), None
-            )
-            if model:
-                profile = self.store.profile(name)[1]
-                settings = self.store.settings_for(name, profile, model)
-                self.query_one("#model-info", Static).update(
-                    f"{model['name']}\nContexto usado: {settings.context_window} · "
-                    f"{settings.context_source}\n"
-                    f"Saída máxima: {model['max_output_tokens'] or 'não informada'} · "
-                    "Ferramentas: "
-                    + (
-                        "confirmadas pela API\n"
-                        if model["tools"] is True
-                        else "não informado; use Testar conexão\n"
-                    )
-                    + "Limites aprendidos após rejeição ajustam o orçamento automaticamente."
-                )
+
+    def update_model(self, value):
+        name = str(self.query_one("#model-provider", Select).value)
+        model = next((item for item in self.store.models(name) if item["id"] == value), None)
+        info = self.query_one("#model-info", Static)
+        self.query_one("#model-use", Button).disabled = self.fetching or model is None
+        if not model:
+            info.update("Nenhum modelo encontrado. Ajuste a busca.")
+            return
+        settings = self.store.settings_for(name, self.store.profile(name)[1], model)
+        capability = (
+            "Ferramentas confirmadas pela API"
+            if model["tools"] is True
+            else "Ferramentas: suporte não informado"
+        )
+        info.update(f"Contexto: {settings.context_window:,} · {capability}")
+        info.tooltip = (
+            settings.context_source + f" · Saída: {model['max_output_tokens'] or 'não informada'}"
+        )
 
     def action_back(self):
         if self.fetching:
@@ -404,9 +425,10 @@ class ModelPicker(ModalScreen[Settings | None]):
 
     def restore_controls(self, focus=None):
         self.fetching = False
-        for control in self.query("Select, Button"):
+        for control in self.query("Select, ModelList, Input, Button"):
             control.disabled = False
         self.query_one("#model-back", Button).label = "Voltar"
+        self.query_one("#model-use", Button).disabled = not bool(self.query_one(ModelList).value)
         (focus or self.query_one("#model-refresh")).focus()
 
     def on_button_pressed(self, event: Button.Pressed):
@@ -420,7 +442,7 @@ class ModelPicker(ModalScreen[Settings | None]):
 
     async def lookup(self, button):
         name = self.query_one("#model-provider", Select).value
-        model = self.query_one("#model-id", Select).value
+        model = self.query_one(ModelList).value
         if not isinstance(name, str):
             self.fetching = False
             return
@@ -428,7 +450,7 @@ class ModelPicker(ModalScreen[Settings | None]):
         self.generation += 1
         generation = self.generation
         self.cancel_event = threading.Event()
-        for control in self.query("Select, Button"):
+        for control in self.query("Select, ModelList, Input, Button"):
             control.disabled = True
         back = self.query_one("#model-back", Button)
         back.disabled, back.label = False, "Cancelar consulta"

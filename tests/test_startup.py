@@ -13,6 +13,7 @@ from codaro.preferences import Preferences, PreferencesStore
 from codaro.repository import Repository
 from codaro.ui.app import CodaroApp
 from codaro.ui.composer import Prompt
+from codaro.ui.model_list import ModelList
 from codaro.ui.preferences import PreferencesDialog
 from codaro.ui.providers import ModelPicker, ProviderSetup
 
@@ -212,7 +213,7 @@ def test_first_start_guides_provider_then_model_without_running_inference(isolat
                 if isinstance(app.screen, ModelPicker):
                     break
             assert isinstance(app.screen, ModelPicker) and app.screen.onboarding
-            app.screen.query_one("#model-id", Select).value = "small"
+            app.screen.query_one("#model-id", ModelList).value = "small"
             await pilot.click("#model-use")
             await pilot.pause()
             assert app.provider_available and not app.setup_required

@@ -7,7 +7,7 @@ import pytest
 from test_tui import StreamingUIModel, UIModel, run_ui, wait_ready
 from textual.command import CommandPalette
 from textual.containers import VerticalScroll
-from textual.widgets import Button, Input, Select, Static, TextArea
+from textual.widgets import Button, Input, Static, TextArea
 
 from codaro.agent import Agent, AgentEvent
 from codaro.provider import ModelError
@@ -15,6 +15,7 @@ from codaro.provider_ui import ModelPicker, ProviderSetup
 from codaro.providers import ProviderStore
 from codaro.repository import Repository
 from codaro.tui import CodaroApp, Prompt, ScopeReview
+from codaro.ui.model_list import ModelList
 from codaro.ux_screens import NewConversation, ProviderManager
 
 
@@ -269,8 +270,8 @@ def test_incompatible_models_hidden_and_unknown_capability_explicit(tmp_path):
             app.push_screen(ModelPicker(store))
             await pilot.pause()
             screen = app.screen
-            with pytest.raises(Exception, match="Illegal select value"):
-                screen.query_one("#model-id", Select).value = "embedding"
+            with pytest.raises(Exception, match="Modelo não disponível"):
+                screen.query_one("#model-id", ModelList).value = "embedding"
             assert "ocultos" in str(screen.query_one("#model-error", Static).render())
             assert "confirmadas" in str(screen.query_one("#model-info", Static).render())
             await pilot.press("escape")

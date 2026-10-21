@@ -1,0 +1,203 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2300" height="880" viewBox="0 0 2300 880"><rect width="2300" height="880" fill="#0b1017" /><text x="24" y="35" fill="#dfe6ef" style="font:20px sans-serif">Protótipo aprovado</text><svg x="24" y="60" width="1110" height="790" viewBox="0 0 1120 760"><title>Plano fixo durante a conversa · maquete de UI</title><g font-family="DejaVu Sans Mono,monospace"><rect x="0" y="0" width="1120" height="760" fill="#111821" rx="0" opacity="1" stroke="none" /><rect x="0" y="0" width="1120" height="32" fill="#141d28" rx="0" opacity="1" stroke="none" /><text x="26" y="22" fill="#8392a6" font-size="10" font-weight="400" text-anchor="start">●  ●  ●</text><text x="560.0" y="22" fill="#8392a6" font-size="11" font-weight="400" text-anchor="middle">Codaro · proposta navegável</text><text x="1096" y="22" fill="#8392a6" font-size="10" font-weight="400" text-anchor="end">protótipo</text><text x="30" y="72" fill="#83d6d7" font-size="23" font-weight="400" text-anchor="start">◈</text><text x="60" y="72" fill="#dfe6ef" font-size="18" font-weight="600" text-anchor="start">Codaro</text><text x="150" y="72" fill="#94a3b6" font-size="15" font-weight="400" text-anchor="start">codaro</text><text x="960" y="70" fill="#94a3b6" font-size="12" font-weight="400" text-anchor="end">qwen3.8:27b</text><rect x="980" y="48" width="110" height="32" fill="#1d2b38" rx="3" opacity="1" stroke="none" /><text x="993" y="69" fill="#dfe6ef" font-size="12" font-weight="400" text-anchor="start">Executar ▾</text><rect x="30" y="98" width="1060" height="1" fill="#223142" rx="0" opacity="1" stroke="none" /><defs><clipPath id="transcript"><rect x="0" y="99" width="1120" height="317" /></clipPath></defs><g clip-path="url(#transcript)"><rect x="30" y="114" width="1060" height="54" fill="#17212d" rx="2" opacity="0.6" stroke="none" /><rect x="30" y="114" width="2" height="54" fill="#2a394b" rx="0" opacity="1" stroke="none" /><text x="43" y="134" fill="#94a3b6" font-size="10" font-weight="400" text-anchor="start">Você</text><text x="43" y="157" fill="#dfe6ef" font-size="15" font-weight="400" text-anchor="start">Como funciona a autenticação?</text><text x="34" y="208" fill="#94a3b6" font-size="11" font-weight="400" text-anchor="start">3 ações · 2 arquivos consultados</text><text x="34" y="241" fill="#83d6d7" font-size="15" font-weight="600" text-anchor="start">Codaro</text><text x="34" y="275" fill="#dfe6ef" font-size="14" font-weight="400" text-anchor="start">O fluxo começa em src/auth.py. Falta tratar usuários ausentes antes de consultar as permissões.</text><rect x="30" y="315" width="1060" height="54" fill="#17212d" rx="2" opacity="0.6" stroke="none" /><rect x="30" y="315" width="2" height="54" fill="#2a394b" rx="0" opacity="1" stroke="none" /><text x="43" y="335" fill="#94a3b6" font-size="10" font-weight="400" text-anchor="start">Você</text><text x="43" y="358" fill="#dfe6ef" font-size="15" font-weight="400" text-anchor="start">Corrija esse caso mantendo o contrato atual.</text><text x="34" y="404" fill="#94a3b6" font-size="12" font-weight="400" text-anchor="start">◌ Corrigindo a validação · plano em andamento abaixo</text></g><rect x="30" y="424" width="1060" height="1" fill="#4b858c" rx="0" opacity="1" stroke="none" /><text x="34" y="445" fill="#94a3b6" font-size="12" font-weight="400" text-anchor="start">▾ Plano · 1/4 concluídas</text><text x="285" y="445" fill="#94a3b6" font-size="12" font-weight="400" text-anchor="start">Corrigir a validação de usuários</text><rect x="956" y="425" width="134" height="32" fill="#1d2b38" rx="3" opacity="1" stroke="none" /><text x="969" y="446" fill="#dfe6ef" font-size="12" font-weight="400" text-anchor="start">Cancelar plano</text><text x="50" y="477" fill="#8bc6a4" font-size="13" font-weight="400" text-anchor="start">✓</text><text x="75" y="477" fill="#94a3b6" font-size="12" font-weight="400" text-anchor="start">Investigar a autenticação</text><text x="50" y="507" fill="#83d6d7" font-size="13" font-weight="400" text-anchor="start">◌</text><text x="75" y="507" fill="#dfe6ef" font-size="12" font-weight="400" text-anchor="start">Corrigir a validação de usuários</text><text x="50" y="537" fill="#8392a6" font-size="13" font-weight="400" text-anchor="start">○</text><text x="75" y="537" fill="#94a3b6" font-size="12" font-weight="400" text-anchor="start">Cobrir os cenários de permissão</text><text x="50" y="567" fill="#8392a6" font-size="13" font-weight="400" text-anchor="start">○</text><text x="75" y="567" fill="#94a3b6" font-size="12" font-weight="400" text-anchor="start">Executar testes e revisar o resultado</text><rect x="30" y="620" width="1060" height="1" fill="#4b858c" rx="0" opacity="1" stroke="none" /><text x="33" y="652" fill="#83d6d7" font-size="20" font-weight="400" text-anchor="start">›</text><text x="58" y="651" fill="#8392a6" font-size="14" font-weight="400" text-anchor="start">Escreva seu próximo pedido enquanto aguarda…</text><text x="30" y="709" fill="#94a3b6" font-size="11" font-weight="400" text-anchor="start">Em execução</text><text x="1090" y="709" fill="#8392a6" font-size="11" font-weight="400" text-anchor="end">Contexto ≈16k/122k · 13%</text><text x="30" y="740" fill="#8392a6" font-size="10" font-weight="400" text-anchor="start">Ctrl+X interromper · rascunho preservado</text><text x="1090" y="740" fill="#8392a6" font-size="10" font-weight="400" text-anchor="end">Ctrl+P menu</text></g></svg><text x="1164" y="35" fill="#dfe6ef" style="font:20px sans-serif">CLI atual · captura real Textual</text><svg x="1164" y="60" width="1110" height="790" viewBox="0 0 1482 904.0"><style>
+
+    @font-face {
+        font-family: "Fira Code";
+        src: local("FiraCode-Regular"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff2/FiraCode-Regular.woff2") format("woff2"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff/FiraCode-Regular.woff") format("woff");
+        font-style: normal;
+        font-weight: 400;
+    }
+    @font-face {
+        font-family: "Fira Code";
+        src: local("FiraCode-Bold"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff2/FiraCode-Bold.woff2") format("woff2"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff/FiraCode-Bold.woff") format("woff");
+        font-style: bold;
+        font-weight: 700;
+    }
+
+    .terminal-3921438836-matrix {
+        font-family: Fira Code, monospace;
+        font-size: 20px;
+        line-height: 24.4px;
+        font-variant-east-asian: full-width;
+    }
+
+    .terminal-3921438836-title {
+        font-size: 18px;
+        font-weight: bold;
+        font-family: arial;
+    }
+
+    .terminal-3921438836-r1 { fill: #c5c8c6 }
+.terminal-3921438836-r2 { fill: #83d6d7;font-weight: bold }
+.terminal-3921438836-r3 { fill: #e0e0e2;font-weight: bold }
+.terminal-3921438836-r4 { fill: #94a3b6 }
+.terminal-3921438836-r5 { fill: #253b47 }
+.terminal-3921438836-r6 { fill: #29404d }
+.terminal-3921438836-r7 { fill: #e0e2e3 }
+.terminal-3921438836-r8 { fill: #dfe6ef }
+.terminal-3921438836-r9 { fill: #89c8a2 }
+.terminal-3921438836-r10 { fill: #83d6d7 }
+.terminal-3921438836-r11 { fill: #3d6473 }
+.terminal-3921438836-r12 { fill: #111821 }
+.terminal-3921438836-r13 { fill: #707479 }
+    </style>
+
+    <defs>
+    <clipPath id="terminal-3921438836-clip-terminal">
+      <rect x="0" y="0" width="1463.0" height="853.0" />
+    </clipPath>
+    <clipPath id="terminal-3921438836-line-0">
+    <rect x="0" y="1.5" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-1">
+    <rect x="0" y="25.9" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-2">
+    <rect x="0" y="50.3" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-3">
+    <rect x="0" y="74.7" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-4">
+    <rect x="0" y="99.1" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-5">
+    <rect x="0" y="123.5" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-6">
+    <rect x="0" y="147.9" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-7">
+    <rect x="0" y="172.3" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-8">
+    <rect x="0" y="196.7" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-9">
+    <rect x="0" y="221.1" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-10">
+    <rect x="0" y="245.5" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-11">
+    <rect x="0" y="269.9" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-12">
+    <rect x="0" y="294.3" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-13">
+    <rect x="0" y="318.7" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-14">
+    <rect x="0" y="343.1" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-15">
+    <rect x="0" y="367.5" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-16">
+    <rect x="0" y="391.9" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-17">
+    <rect x="0" y="416.3" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-18">
+    <rect x="0" y="440.7" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-19">
+    <rect x="0" y="465.1" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-20">
+    <rect x="0" y="489.5" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-21">
+    <rect x="0" y="513.9" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-22">
+    <rect x="0" y="538.3" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-23">
+    <rect x="0" y="562.7" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-24">
+    <rect x="0" y="587.1" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-25">
+    <rect x="0" y="611.5" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-26">
+    <rect x="0" y="635.9" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-27">
+    <rect x="0" y="660.3" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-28">
+    <rect x="0" y="684.7" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-29">
+    <rect x="0" y="709.1" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-30">
+    <rect x="0" y="733.5" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-31">
+    <rect x="0" y="757.9" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-32">
+    <rect x="0" y="782.3" width="1464" height="24.65" />
+            </clipPath>
+<clipPath id="terminal-3921438836-line-33">
+    <rect x="0" y="806.7" width="1464" height="24.65" />
+            </clipPath>
+    </defs>
+
+    <rect fill="#292929" stroke="rgba(255,255,255,0.35)" stroke-width="1" x="1" y="1" width="1480" height="902" rx="8" /><text class="terminal-3921438836-title" fill="#c5c8c6" text-anchor="middle" x="740" y="27">Codaro · explore seu código</text>
+            <g transform="translate(26,22)">
+            <circle cx="0" cy="0" r="7" fill="#ff5f57" />
+            <circle cx="22" cy="0" r="7" fill="#febc2e" />
+            <circle cx="44" cy="0" r="7" fill="#28c840" />
+            </g>
+        
+    <g transform="translate(9, 41)" clip-path="url(#terminal-3921438836-clip-terminal)">
+    <rect fill="#111821" x="0" y="1.5" width="1464" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="25.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="25.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="48.8" y="25.9" width="73.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="122" y="25.9" width="48.8" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="170.8" y="25.9" width="73.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="244" y="25.9" width="805.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1049.2" y="25.9" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1061.4" y="25.9" width="134.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1195.6" y="25.9" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1207.8" y="25.9" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="1220" y="25.9" width="36.6" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="1256.6" y="25.9" width="146.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="1403" y="25.9" width="36.6" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="25.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="50.3" width="1464" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="74.7" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="74.7" width="1415.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="74.7" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="99.1" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="24.4" y="99.1" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="36.6" y="99.1" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="48.8" y="99.1" width="48.8" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="97.6" y="99.1" width="1329.8" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="1427.4" y="99.1" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="99.1" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="123.5" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="24.4" y="123.5" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="36.6" y="123.5" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="48.8" y="123.5" width="353.8" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="402.6" y="123.5" width="1024.8" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="1427.4" y="123.5" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="123.5" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="147.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="147.9" width="1415.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="147.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="172.3" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="172.3" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="36.6" y="172.3" width="73.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="109.8" y="172.3" width="1317.6" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1427.4" y="172.3" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="172.3" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="196.7" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="196.7" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="36.6" y="196.7" width="1159" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1195.6" y="196.7" width="231.8" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1427.4" y="196.7" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="196.7" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="221.1" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="221.1" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="36.6" y="221.1" width="1390.8" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1427.4" y="221.1" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="221.1" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="245.5" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="245.5" width="1415.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="245.5" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="269.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="24.4" y="269.9" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="36.6" y="269.9" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="48.8" y="269.9" width="48.8" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="97.6" y="269.9" width="1329.8" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="1427.4" y="269.9" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="269.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="294.3" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="24.4" y="294.3" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="36.6" y="294.3" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="48.8" y="294.3" width="536.8" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="585.6" y="294.3" width="841.8" height="24.65" shape-rendering="crispEdges" /><rect fill="#17212d" x="1427.4" y="294.3" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="294.3" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="318.7" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="318.7" width="1415.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="318.7" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="343.1" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="343.1" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="36.6" y="343.1" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="48.8" y="343.1" width="451.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="500.2" y="343.1" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="512.4" y="343.1" width="915" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1427.4" y="343.1" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="343.1" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="367.5" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="367.5" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="36.6" y="367.5" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="61" y="367.5" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="85.4" y="367.5" width="353.8" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="439.2" y="367.5" width="988.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1427.4" y="367.5" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="367.5" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="391.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="391.9" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="36.6" y="391.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="61" y="391.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="85.4" y="391.9" width="244" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="329.4" y="391.9" width="1098" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1427.4" y="391.9" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="391.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="416.3" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="416.3" width="1415.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="416.3" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="440.7" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="440.7" width="1415.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="440.7" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="465.1" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="465.1" width="1415.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="465.1" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="489.5" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="489.5" width="1415.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="489.5" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="513.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="513.9" width="1415.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="513.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="538.3" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="538.3" width="1415.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="538.3" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="562.7" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="562.7" width="1415.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="562.7" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="587.1" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="587.1" width="1415.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="587.1" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="611.5" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="611.5" width="719.8" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="744.2" y="611.5" width="500.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1244.4" y="611.5" width="195.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="611.5" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="635.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="635.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="48.8" y="635.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="73.2" y="635.9" width="305" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="378.2" y="635.9" width="1061.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="635.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="660.3" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="660.3" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="48.8" y="660.3" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="73.2" y="660.3" width="390.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="463.6" y="660.3" width="976" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="660.3" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="684.7" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="684.7" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="48.8" y="684.7" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="73.2" y="684.7" width="378.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="451.4" y="684.7" width="988.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="684.7" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="709.1" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="709.1" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="48.8" y="709.1" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="73.2" y="709.1" width="451.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="524.6" y="709.1" width="915" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="709.1" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="733.5" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="733.5" width="1415.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="733.5" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="757.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="757.9" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="36.6" y="757.9" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#dfe6ef" x="48.8" y="757.9" width="12.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="61" y="757.9" width="341.6" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="402.6" y="757.9" width="1037" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="757.9" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="782.3" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="782.3" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="48.8" y="782.3" width="1390.8" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="782.3" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="806.7" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="806.7" width="134.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="158.6" y="806.7" width="878.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1037" y="806.7" width="402.6" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="806.7" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="0" y="831.1" width="24.4" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="24.4" y="831.1" width="744.2" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="768.6" y="831.1" width="671" height="24.65" shape-rendering="crispEdges" /><rect fill="#111821" x="1439.6" y="831.1" width="24.4" height="24.65" shape-rendering="crispEdges" />
+    <g class="terminal-3921438836-matrix">
+    <text class="terminal-3921438836-r1" x="1464" y="20" textLength="12.2" clip-path="url(#terminal-3921438836-line-0)">
+</text><text class="terminal-3921438836-r2" x="24.4" y="44.4" textLength="24.4" clip-path="url(#terminal-3921438836-line-1)">◈ </text><text class="terminal-3921438836-r3" x="48.8" y="44.4" textLength="73.2" clip-path="url(#terminal-3921438836-line-1)">Codaro</text><text class="terminal-3921438836-r4" x="170.8" y="44.4" textLength="73.2" clip-path="url(#terminal-3921438836-line-1)">codaro</text><text class="terminal-3921438836-r4" x="1061.4" y="44.4" textLength="134.2" clip-path="url(#terminal-3921438836-line-1)">qwen3.8:27b</text><text class="terminal-3921438836-r4" x="1256.6" y="44.4" textLength="146.4" clip-path="url(#terminal-3921438836-line-1)"> Executar ▾ </text><text class="terminal-3921438836-r1" x="1464" y="44.4" textLength="12.2" clip-path="url(#terminal-3921438836-line-1)">
+</text><text class="terminal-3921438836-r5" x="0" y="68.8" textLength="1464" clip-path="url(#terminal-3921438836-line-2)">────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────</text><text class="terminal-3921438836-r1" x="1464" y="68.8" textLength="12.2" clip-path="url(#terminal-3921438836-line-2)">
+</text><text class="terminal-3921438836-r1" x="1464" y="93.2" textLength="12.2" clip-path="url(#terminal-3921438836-line-3)">
+</text><text class="terminal-3921438836-r6" x="24.4" y="117.6" textLength="12.2" clip-path="url(#terminal-3921438836-line-4)">│</text><text class="terminal-3921438836-r4" x="48.8" y="117.6" textLength="48.8" clip-path="url(#terminal-3921438836-line-4)">Você</text><text class="terminal-3921438836-r1" x="1464" y="117.6" textLength="12.2" clip-path="url(#terminal-3921438836-line-4)">
+</text><text class="terminal-3921438836-r6" x="24.4" y="142" textLength="12.2" clip-path="url(#terminal-3921438836-line-5)">│</text><text class="terminal-3921438836-r7" x="48.8" y="142" textLength="353.8" clip-path="url(#terminal-3921438836-line-5)">Como funciona a autenticação?</text><text class="terminal-3921438836-r1" x="1464" y="142" textLength="12.2" clip-path="url(#terminal-3921438836-line-5)">
+</text><text class="terminal-3921438836-r1" x="1464" y="166.4" textLength="12.2" clip-path="url(#terminal-3921438836-line-6)">
+</text><text class="terminal-3921438836-r2" x="36.6" y="190.8" textLength="73.2" clip-path="url(#terminal-3921438836-line-7)">Codaro</text><text class="terminal-3921438836-r1" x="1464" y="190.8" textLength="12.2" clip-path="url(#terminal-3921438836-line-7)">
+</text><text class="terminal-3921438836-r8" x="36.6" y="215.2" textLength="1159" clip-path="url(#terminal-3921438836-line-8)">O fluxo começa em src/auth.py. Falta tratar usuários ausentes antes de consultar as permissões.</text><text class="terminal-3921438836-r1" x="1464" y="215.2" textLength="12.2" clip-path="url(#terminal-3921438836-line-8)">
+</text><text class="terminal-3921438836-r1" x="1464" y="239.6" textLength="12.2" clip-path="url(#terminal-3921438836-line-9)">
+</text><text class="terminal-3921438836-r1" x="1464" y="264" textLength="12.2" clip-path="url(#terminal-3921438836-line-10)">
+</text><text class="terminal-3921438836-r6" x="24.4" y="288.4" textLength="12.2" clip-path="url(#terminal-3921438836-line-11)">│</text><text class="terminal-3921438836-r4" x="48.8" y="288.4" textLength="48.8" clip-path="url(#terminal-3921438836-line-11)">Você</text><text class="terminal-3921438836-r1" x="1464" y="288.4" textLength="12.2" clip-path="url(#terminal-3921438836-line-11)">
+</text><text class="terminal-3921438836-r6" x="24.4" y="312.8" textLength="12.2" clip-path="url(#terminal-3921438836-line-12)">│</text><text class="terminal-3921438836-r7" x="48.8" y="312.8" textLength="536.8" clip-path="url(#terminal-3921438836-line-12)">Corrija esse caso mantendo o contrato atual.</text><text class="terminal-3921438836-r1" x="1464" y="312.8" textLength="12.2" clip-path="url(#terminal-3921438836-line-12)">
+</text><text class="terminal-3921438836-r1" x="1464" y="337.2" textLength="12.2" clip-path="url(#terminal-3921438836-line-13)">
+</text><text class="terminal-3921438836-r4" x="48.8" y="361.6" textLength="451.4" clip-path="url(#terminal-3921438836-line-14)">▸ Etapas · 1 ação · 1 leitura · 12 ms</text><text class="terminal-3921438836-r1" x="1464" y="361.6" textLength="12.2" clip-path="url(#terminal-3921438836-line-14)">
+</text><text class="terminal-3921438836-r9" x="61" y="386" textLength="24.4" clip-path="url(#terminal-3921438836-line-15)">✓ </text><text class="terminal-3921438836-r4" x="85.4" y="386" textLength="353.8" clip-path="url(#terminal-3921438836-line-15)">Ler linhas · src/auth.py:1–80</text><text class="terminal-3921438836-r1" x="1464" y="386" textLength="12.2" clip-path="url(#terminal-3921438836-line-15)">
+</text><text class="terminal-3921438836-r10" x="61" y="410.4" textLength="24.4" clip-path="url(#terminal-3921438836-line-16)">◌ </text><text class="terminal-3921438836-r4" x="85.4" y="410.4" textLength="244" clip-path="url(#terminal-3921438836-line-16)">Analisando o projeto</text><text class="terminal-3921438836-r1" x="1464" y="410.4" textLength="12.2" clip-path="url(#terminal-3921438836-line-16)">
+</text><text class="terminal-3921438836-r1" x="1464" y="434.8" textLength="12.2" clip-path="url(#terminal-3921438836-line-17)">
+</text><text class="terminal-3921438836-r1" x="1464" y="459.2" textLength="12.2" clip-path="url(#terminal-3921438836-line-18)">
+</text><text class="terminal-3921438836-r1" x="1464" y="483.6" textLength="12.2" clip-path="url(#terminal-3921438836-line-19)">
+</text><text class="terminal-3921438836-r1" x="1464" y="508" textLength="12.2" clip-path="url(#terminal-3921438836-line-20)">
+</text><text class="terminal-3921438836-r1" x="1464" y="532.4" textLength="12.2" clip-path="url(#terminal-3921438836-line-21)">
+</text><text class="terminal-3921438836-r1" x="1464" y="556.8" textLength="12.2" clip-path="url(#terminal-3921438836-line-22)">
+</text><text class="terminal-3921438836-r1" x="1464" y="581.2" textLength="12.2" clip-path="url(#terminal-3921438836-line-23)">
+</text><text class="terminal-3921438836-r11" x="24.4" y="605.6" textLength="1415.2" clip-path="url(#terminal-3921438836-line-24)">────────────────────────────────────────────────────────────────────────────────────────────────────────────────────</text><text class="terminal-3921438836-r1" x="1464" y="605.6" textLength="12.2" clip-path="url(#terminal-3921438836-line-24)">
+</text><text class="terminal-3921438836-r4" x="24.4" y="630" textLength="719.8" clip-path="url(#terminal-3921438836-line-25)">▾ Plano · 1/4 concluídas · Corrigir a validação de usuários</text><text class="terminal-3921438836-r4" x="1244.4" y="630" textLength="195.2" clip-path="url(#terminal-3921438836-line-25)"> Cancelar plano </text><text class="terminal-3921438836-r1" x="1464" y="630" textLength="12.2" clip-path="url(#terminal-3921438836-line-25)">
+</text><text class="terminal-3921438836-r9" x="48.8" y="654.4" textLength="24.4" clip-path="url(#terminal-3921438836-line-26)">✓ </text><text class="terminal-3921438836-r4" x="73.2" y="654.4" textLength="305" clip-path="url(#terminal-3921438836-line-26)">Investigar a autenticação</text><text class="terminal-3921438836-r1" x="1464" y="654.4" textLength="12.2" clip-path="url(#terminal-3921438836-line-26)">
+</text><text class="terminal-3921438836-r10" x="48.8" y="678.8" textLength="24.4" clip-path="url(#terminal-3921438836-line-27)">◌ </text><text class="terminal-3921438836-r8" x="73.2" y="678.8" textLength="390.4" clip-path="url(#terminal-3921438836-line-27)">Corrigir a validação de usuários</text><text class="terminal-3921438836-r1" x="1464" y="678.8" textLength="12.2" clip-path="url(#terminal-3921438836-line-27)">
+</text><text class="terminal-3921438836-r4" x="48.8" y="703.2" textLength="24.4" clip-path="url(#terminal-3921438836-line-28)">○ </text><text class="terminal-3921438836-r4" x="73.2" y="703.2" textLength="378.2" clip-path="url(#terminal-3921438836-line-28)">Cobrir os cenários de permissão</text><text class="terminal-3921438836-r1" x="1464" y="703.2" textLength="12.2" clip-path="url(#terminal-3921438836-line-28)">
+</text><text class="terminal-3921438836-r4" x="48.8" y="727.6" textLength="24.4" clip-path="url(#terminal-3921438836-line-29)">○ </text><text class="terminal-3921438836-r4" x="73.2" y="727.6" textLength="451.4" clip-path="url(#terminal-3921438836-line-29)">Executar testes e revisar o resultado</text><text class="terminal-3921438836-r1" x="1464" y="727.6" textLength="12.2" clip-path="url(#terminal-3921438836-line-29)">
+</text><text class="terminal-3921438836-r10" x="24.4" y="752" textLength="1415.2" clip-path="url(#terminal-3921438836-line-30)">────────────────────────────────────────────────────────────────────────────────────────────────────────────────────</text><text class="terminal-3921438836-r1" x="1464" y="752" textLength="12.2" clip-path="url(#terminal-3921438836-line-30)">
+</text><text class="terminal-3921438836-r10" x="24.4" y="776.4" textLength="12.2" clip-path="url(#terminal-3921438836-line-31)">›</text><text class="terminal-3921438836-r12" x="48.8" y="776.4" textLength="12.2" clip-path="url(#terminal-3921438836-line-31)">P</text><text class="terminal-3921438836-r13" x="61" y="776.4" textLength="341.6" clip-path="url(#terminal-3921438836-line-31)">ergunte ou peça uma mudança…</text><text class="terminal-3921438836-r1" x="1464" y="776.4" textLength="12.2" clip-path="url(#terminal-3921438836-line-31)">
+</text><text class="terminal-3921438836-r1" x="1464" y="800.8" textLength="12.2" clip-path="url(#terminal-3921438836-line-32)">
+</text><text class="terminal-3921438836-r4" x="24.4" y="825.2" textLength="134.2" clip-path="url(#terminal-3921438836-line-33)">Em execução</text><text class="terminal-3921438836-r4" x="1037" y="825.2" textLength="402.6" clip-path="url(#terminal-3921438836-line-33)">Contexto ≈ 13% · 122.4k · /status</text><text class="terminal-3921438836-r1" x="1464" y="825.2" textLength="12.2" clip-path="url(#terminal-3921438836-line-33)">
+</text><text class="terminal-3921438836-r4" x="24.4" y="849.6" textLength="744.2" clip-path="url(#terminal-3921438836-line-34)">Enter envia · Alt+Enter nova linha · / comandos · Ctrl+P menu</text>
+    </g>
+    </g>
+</svg></svg>

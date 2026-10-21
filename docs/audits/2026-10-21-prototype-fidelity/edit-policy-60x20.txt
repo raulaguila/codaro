@@ -1,0 +1,20 @@
+                                                            
+  ◈ Codaro    codaro       qwen3.8:27b      Executar ▾      
+────────────────────────────────────────────────────────────
+  │╭─────────────────────────────────────────────────────╮  
+  ││  Planejar   Investigar e preparar um plano          │  
+   │  Executar   Implementar e validar · Atual         ▄ │  
+   │  ▼ Edições: pedir autorização                       │  
+   │ ▐●▌ Pedir autorização                               │  
+   │ ▐●▌ Aprovar automaticamente                         │  
+   │ Criar e editar arquivos permitidos nesta conversa.  │  
+  ─│ Remoções e comandos continuam exigindo              │  
+  ▾│ autorização.                                        │  
+   │ ─────────────────────────────────────────────────── │  
+   │                                                     │  
+   │ ↑↓ navegar · Enter aplicar · Esc fechar  Aplicar    │  
+  ─╰─────────────────────────────────────────────────────╯  
+  › Pergunte ou peça uma mudança…                           
+                                                            
+  Pronto                           Contexto ≈ 13% · 122.4…  
+  Enter envia · / comandos · Ctrl+P menu                    

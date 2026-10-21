@@ -1,0 +1,20 @@
+                                                            
+  ◈╭────────────────────────────────────────────────────╮   
+───│  Cadastrar provedor · BYOK                         │───
+  ││  Provedor                                          │   
+  ││  ▊▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▎  │   
+   │  ▊  openai                                   ▼  ▎  │   
+   │  ▊▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▎  │▄  
+   │  API key · opcional para Ollama local              │   
+   │  ▊▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▎  │   
+   │  ▊                                              ▎  │   
+  ─│  ▊▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▎  │─  
+  ▾│   ▶ Avançado · URL, TLS e teste do modelo          │   
+   │  Credencial privada, fora do projeto. Role ou use  │   
+   │  Tab para outros campos.                           │   
+   │                                                    │▆  
+  ─│                                                    │─  
+  ›│  ────────────────────────────────────────────────  │   
+   │   Testar conexão     Cancelar      Cadastrar e     │   
+  P╰────────────────────────────────────────────────────╯…  
+  Enter envia · / comandos · Ctrl+P menu                    
