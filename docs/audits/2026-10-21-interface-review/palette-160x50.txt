@@ -1,0 +1,50 @@
+                                                                                                                                                                
+  ◈ Codaro                                                                                                                                                      
+  …ro-interface-review-0b2a6qg6/layout-160 · qwen3.8:27b · Executar · Aprovação por ação · TLS verificação ativa                                                
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+                                                                                                                                                                
+  🔎 Buscar comandos…                                                                                                                                           
+                                                                                                                                                                
+                                                                                                                                                                
+  Ajuda                                                                                                                                                         
+  /help · Comandos e atalhos                                                                                                                                    
+  Ampliar painel                                                                                                                                                
+  Ampliar elemento atual                                                                                                                                        
+  Atalhos                                                                                                                                                       
+  Mostrar teclas disponíveis                                                                                                                                    
+  Cadastrar MCP ou plugin                                                                                                                                       
+  /integrations · Confiar, testar e cadastrar uma integração                                                                                                    
+  Cadastrar provedor                                                                                                                                            
+  /providers · Cadastrar API key e listar modelos do provedor (BYOK).                                                                                           
+  Capturar tela                                                                                                                                                 
+  Salvar captura SVG                                                                                                                                            
+  Compactar contexto                                                                                                                                            
+  /compact · Reduzir histórico enviado ao modelo                                                                                                                
+  Contexto                                                                                                                                                      
+  /status · Orçamento, origem e contagem                                                                                                                        
+  Desfazer interação                                                                                                                                            
+  /undo-turn · Revisar reversão de todos os arquivos                                                                                                          ▃▃
+  Desfazer limpeza                                                                                                                                              
+  /restore-clear · Restaurar mensagens e contexto                                                                                                               
+  Executar                                                                                                                                                      
+  /execute · Implementar e validar com aprovação                                                                                                                
+  Funcionalidades e integrações                                                                                                                                 
+  /features · Contexto, exploração, MCP, plugins e LSP                                                                                                          
+  Gerenciar provedores                                                                                                                                          
+  /provider-manage · Editar, testar, renomear e remover perfis.                                                                                                 
+  Histórico                                                                                                                                                     
+  /history · Consultar a memória da conversa                                                                                                                    
+  Limpar mensagens                                                                                                                                              
+  /clear · Manter tarefa, escopo e propostas; permite desfazer                                                                                                  
+  Mostrar/ocultar raciocínio                                                                                                                                    
+  /reasoning · Alternar prévias do modelo                                                                                                                       
+  Nova conversa e tarefa                                                                                                                                        
+▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+                                                                                                                                                                
+  Contexto ≈ 13% · 122.4k · /status                                                                                                                             
+  Investigando…                                                                                                                                                 
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+  Pergunte ou peça uma mudança…                                                                                                                                 
+                                                                                                                                                                
+  Enter envia · Alt+Enter nova linha · / comandos · @ arquivo · ↑ histórico                                                                                     
+ Ctrl+X Cancelar  Ctrl+Q Sair  Ctrl+L Mensagens  Ctrl+P Comandos                                                                                                

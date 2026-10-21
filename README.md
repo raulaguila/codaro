@@ -181,6 +181,8 @@ Detalhamento das correções: [UI e UX](docs/UI_UX.md) e [auditoria por interaç
 
 ## Interface e streaming
 
+A nova interface tem uma [proposta consolidada de UI/UX](docs/design/ui-prototype/README.md), com [protótipo navegável](docs/design/ui-prototype/prototype.html) e critérios de adoção. O protótipo é uma referência de implementação; o comportamento disponível na aplicação é descrito abaixo.
+
 - `codaro chat` exibe a resposta final após o agente concluir e validar o turno, em Markdown, com títulos, listas, tabelas e destaque de sintaxe em blocos de código. Durante a geração, a barra de status e as ferramentas mostram o progresso.
 - A abertura prioriza **Configurar provedor** e tem sugestões que preenchem um rascunho sem chamar o modelo. Enter envia; Alt+Enter insere uma nova linha (Shift+Enter também funciona quando reconhecido pelo terminal). A entrada cresce até oito linhas, adaptando-se à altura do terminal, e preserva rascunhos acima de 8.000 caracteres para que você possa reduzi-los antes do envio. O autocompletar limita sua altura para manter a conversa visível, abrevia descrições longas e mantém a dica de Tab/setas. Esc fecha as sugestões sem apagar o texto.
 - Cada pergunta tem um resumo expansível das ações, leituras, buscas e duração. Dentro dele ficam consulta ou arquivo/símbolo, resultados ou linhas e indicação de leitura parcial ou reutilização de conteúdo. Erros abrem os detalhes automaticamente.

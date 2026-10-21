@@ -1,0 +1,1426 @@
+{
+  "screens": [
+    {
+      "id": "welcome",
+      "title": "Início com modelo configurado",
+      "group": "Início",
+      "kind": "welcome"
+    },
+    {
+      "id": "first-run",
+      "title": "Primeiro acesso",
+      "group": "Início",
+      "kind": "first-run"
+    },
+    {
+      "id": "slash",
+      "title": "Menu / com navegação",
+      "group": "Entrada",
+      "kind": "chat"
+    },
+    {
+      "id": "slash-filter",
+      "title": "Comandos filtrados",
+      "group": "Entrada",
+      "kind": "chat"
+    },
+    {
+      "id": "slash-empty",
+      "title": "Comando não encontrado",
+      "group": "Entrada",
+      "kind": "chat"
+    },
+    {
+      "id": "thinking",
+      "title": "Modelo analisando",
+      "group": "Conversa",
+      "kind": "chat"
+    },
+    {
+      "id": "tool-running",
+      "title": "Ferramenta em execução",
+      "group": "Conversa",
+      "kind": "chat"
+    },
+    {
+      "id": "stages-expanded",
+      "title": "Atividade e raciocínio expandidos",
+      "group": "Conversa",
+      "kind": "chat"
+    },
+    {
+      "id": "streaming",
+      "title": "Resposta em streaming",
+      "group": "Conversa",
+      "kind": "chat"
+    },
+    {
+      "id": "answer",
+      "title": "Resposta final",
+      "group": "Conversa",
+      "kind": "chat"
+    },
+    {
+      "id": "conversation",
+      "title": "Conversa com várias mensagens",
+      "group": "Conversa",
+      "kind": "chat"
+    },
+    {
+      "id": "ask-choice",
+      "title": "Pergunta com opções",
+      "group": "Perguntas",
+      "kind": "question"
+    },
+    {
+      "id": "ask-text",
+      "title": "Pergunta com resposta livre",
+      "group": "Perguntas",
+      "kind": "question"
+    },
+    {
+      "id": "ask-followup",
+      "title": "Resposta do usuário e continuação",
+      "group": "Perguntas",
+      "kind": "chat"
+    },
+    {
+      "id": "plan",
+      "title": "Plano para revisar",
+      "group": "Execução",
+      "kind": "chat"
+    },
+    {
+      "id": "plan-collapsed",
+      "title": "Plano de execução recolhido",
+      "group": "Execução",
+      "kind": "chat"
+    },
+    {
+      "id": "plan-expanded",
+      "title": "Plano de execução expandido",
+      "group": "Execução",
+      "kind": "chat"
+    },
+    {
+      "id": "plan-chat",
+      "title": "Plano fixo durante a conversa",
+      "group": "Execução",
+      "kind": "chat"
+    },
+    {
+      "id": "review-diff",
+      "title": "Aprovação de alterações",
+      "group": "Execução",
+      "kind": "review"
+    },
+    {
+      "id": "command-approval",
+      "title": "Aprovação de comando",
+      "group": "Execução",
+      "kind": "command"
+    },
+    {
+      "id": "validating",
+      "title": "Validação em andamento",
+      "group": "Execução",
+      "kind": "chat"
+    },
+    {
+      "id": "done",
+      "title": "Tarefa concluída",
+      "group": "Execução",
+      "kind": "chat"
+    },
+    {
+      "id": "provider",
+      "title": "Cadastro de provedor",
+      "group": "Provedores",
+      "kind": "provider"
+    },
+    {
+      "id": "provider-custom",
+      "title": "OpenAI compatible e TLS",
+      "group": "Provedores",
+      "kind": "provider"
+    },
+    {
+      "id": "provider-ollama",
+      "title": "Ollama local",
+      "group": "Provedores",
+      "kind": "provider"
+    },
+    {
+      "id": "provider-testing",
+      "title": "Teste de conexão em andamento",
+      "group": "Provedores",
+      "kind": "provider"
+    },
+    {
+      "id": "provider-success",
+      "title": "Conexão verificada",
+      "group": "Provedores",
+      "kind": "provider"
+    },
+    {
+      "id": "provider-error",
+      "title": "Erro ao testar conexão",
+      "group": "Provedores",
+      "kind": "provider"
+    },
+    {
+      "id": "models",
+      "title": "Busca e seleção de modelo",
+      "group": "Modelos",
+      "kind": "models"
+    },
+    {
+      "id": "models-loading",
+      "title": "Atualização do catálogo",
+      "group": "Modelos",
+      "kind": "models"
+    },
+    {
+      "id": "models-empty",
+      "title": "Catálogo sem resultados",
+      "group": "Modelos",
+      "kind": "models"
+    },
+    {
+      "id": "model-fallback",
+      "title": "Contexto não informado pela API",
+      "group": "Modelos",
+      "kind": "models"
+    },
+    {
+      "id": "model-tools",
+      "title": "Diagnóstico de ferramentas",
+      "group": "Modelos",
+      "kind": "models"
+    },
+    {
+      "id": "preferences",
+      "title": "Preferências",
+      "group": "Configuração",
+      "kind": "preferences"
+    },
+    {
+      "id": "mode",
+      "title": "Escolha do modo",
+      "group": "Configuração",
+      "kind": "mode"
+    },
+    {
+      "id": "edit-approval",
+      "title": "Aprovação de edições",
+      "group": "Configuração",
+      "kind": "mode"
+    },
+    {
+      "id": "status",
+      "title": "Detalhes da sessão e contexto",
+      "group": "Configuração",
+      "kind": "status"
+    },
+    {
+      "id": "help",
+      "title": "Ajuda e atalhos",
+      "group": "Configuração",
+      "kind": "help"
+    },
+    {
+      "id": "context-compacting",
+      "title": "Reorganização automática do contexto",
+      "group": "Recuperação",
+      "kind": "chat"
+    },
+    {
+      "id": "connection-error",
+      "title": "Conexão interrompida",
+      "group": "Recuperação",
+      "kind": "chat"
+    },
+    {
+      "id": "auth-error",
+      "title": "Credencial inválida",
+      "group": "Recuperação",
+      "kind": "chat"
+    },
+    {
+      "id": "cancelled",
+      "title": "Cancelamento com progresso preservado",
+      "group": "Recuperação",
+      "kind": "chat"
+    },
+    {
+      "id": "resumed",
+      "title": "Retomada da sessão",
+      "group": "Recuperação",
+      "kind": "chat"
+    },
+    {
+      "id": "no-results",
+      "title": "Busca sem resultados",
+      "group": "Recuperação",
+      "kind": "chat"
+    },
+    {
+      "id": "context-scope",
+      "title": "Escolha de escopo para continuar",
+      "group": "Recuperação",
+      "kind": "question"
+    },
+    {
+      "id": "new-session",
+      "title": "Nova conversa sem perder rascunho",
+      "group": "Configuração",
+      "kind": "new-session"
+    }
+  ],
+  "commands": [
+    {
+      "name": "/models",
+      "description": "Selecionar modelo",
+      "target": "models"
+    },
+    {
+      "name": "/mode",
+      "description": "Alterar modo",
+      "target": "mode"
+    },
+    {
+      "name": "/providers",
+      "description": "Gerenciar provedores",
+      "target": "provider"
+    },
+    {
+      "name": "/plan",
+      "description": "Revisar o plano",
+      "target": "plan"
+    },
+    {
+      "name": "/new",
+      "description": "Nova conversa",
+      "target": "new-session"
+    },
+    {
+      "name": "/resume",
+      "description": "Retomar conversa",
+      "target": "resumed"
+    },
+    {
+      "name": "/compact",
+      "description": "Reorganizar contexto",
+      "target": "context-compacting"
+    },
+    {
+      "name": "/settings",
+      "description": "Preferências",
+      "target": "preferences"
+    },
+    {
+      "name": "/status",
+      "description": "Detalhes da sessão",
+      "target": "status"
+    },
+    {
+      "name": "/help",
+      "description": "Ajuda e atalhos",
+      "target": "help"
+    }
+  ],
+  "models": [
+    {
+      "id": "qwen3.8:27b",
+      "context": "128k",
+      "tokens": 131072,
+      "tools": true,
+      "detail": "Contexto informado pela API"
+    },
+    {
+      "id": "qwen2.5-coder:7b",
+      "context": "32k",
+      "tokens": 32768,
+      "tools": true,
+      "detail": "Contexto informado pela API"
+    },
+    {
+      "id": "llama3.1:8b",
+      "context": "128k",
+      "tokens": 131072,
+      "tools": true,
+      "detail": "Contexto informado pela API"
+    },
+    {
+      "id": "modelo-sem-metadados",
+      "context": "Não informado",
+      "tools": null,
+      "detail": "Usaremos um orçamento conservador; ajuste em Avançado."
+    },
+    {
+      "id": "embedding-local",
+      "context": "—",
+      "tools": false,
+      "detail": "Modelo de embeddings; indisponível para conversa."
+    }
+  ],
+  "modes": [
+    {
+      "name": "Perguntar",
+      "description": "Entender e tirar dúvidas",
+      "scope": "Leituras e buscas, sem alterar arquivos ou executar comandos."
+    },
+    {
+      "name": "Planejar",
+      "description": "Investigar e preparar um plano",
+      "scope": "Entrega um plano para revisar antes de iniciar a implementação."
+    },
+    {
+      "name": "Executar",
+      "description": "Implementar e validar",
+      "scope": "Edições e comandos seguem as permissões da sessão."
+    }
+  ],
+  "questions": {
+    "ask-choice": {
+      "title": "Podemos alterar o contrato da autenticação?",
+      "why": "Essa escolha define se a mudança pode exigir ajustes nos clientes.",
+      "choices": [
+        "Preservar o contrato atual",
+        "Pode alterar o contrato",
+        "Preciso de outra abordagem"
+      ],
+      "recommended": 0
+    },
+    "ask-text": {
+      "title": "Há alguma restrição que eu deva respeitar?",
+      "why": "Descreva o contrato ou comportamento que deve ser preservado.",
+      "choices": [],
+      "recommended": null
+    },
+    "context-scope": {
+      "title": "Por onde devemos continuar a análise?",
+      "why": "Vou investigar uma parte por vez para preservar os detalhes relevantes.",
+      "choices": [
+        "Autenticação e permissões",
+        "Configuração dos provedores",
+        "Escolher outros arquivos"
+      ],
+      "recommended": 0
+    }
+  },
+  "plans": {
+    "welcome": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "first-run": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "slash": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "slash-filter": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "slash-empty": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "thinking": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "tool-running": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "stages-expanded": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "streaming": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "answer": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "conversation": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "ask-choice": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "ask-text": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "ask-followup": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "plan": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "done"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "running"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 1,
+      "current": "Corrigir a validação de usuários"
+    },
+    "plan-collapsed": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "done"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "running"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 1,
+      "current": "Corrigir a validação de usuários"
+    },
+    "plan-expanded": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "done"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "running"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 1,
+      "current": "Corrigir a validação de usuários"
+    },
+    "plan-chat": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "done"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "running"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 1,
+      "current": "Corrigir a validação de usuários"
+    },
+    "review-diff": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "done"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "running"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 1,
+      "current": "Corrigir a validação de usuários"
+    },
+    "command-approval": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "done"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "running"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 1,
+      "current": "Corrigir a validação de usuários"
+    },
+    "validating": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "done"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "done"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "done"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "running"
+        }
+      ],
+      "completed": 3,
+      "current": "Executar testes e revisar o resultado"
+    },
+    "done": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "done"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "done"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "done"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "done"
+        }
+      ],
+      "completed": 4,
+      "current": "Concluído"
+    },
+    "provider": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "provider-custom": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "provider-ollama": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "provider-testing": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "provider-success": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "provider-error": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "models": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "models-loading": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "models-empty": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "model-fallback": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "model-tools": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "preferences": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "mode": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "edit-approval": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "status": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "help": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "context-compacting": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "connection-error": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "auth-error": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "cancelled": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "resumed": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "no-results": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "context-scope": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    },
+    "new-session": {
+      "steps": [
+        {
+          "title": "Investigar a autenticação",
+          "status": "pending"
+        },
+        {
+          "title": "Corrigir a validação de usuários",
+          "status": "pending"
+        },
+        {
+          "title": "Cobrir os cenários de permissão",
+          "status": "pending"
+        },
+        {
+          "title": "Executar testes e revisar o resultado",
+          "status": "pending"
+        }
+      ],
+      "completed": 0,
+      "current": "Concluído"
+    }
+  }
+}

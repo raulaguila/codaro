@@ -1,0 +1,20 @@
+                                                            
+  ◈ Codaro                                                  
+  …aro-interface-review-0b2a6qg6/layout-60 · qwen3.8:27b    
+  Executar · Aprovação por ação · TLS verificação ativa     
+                                                            
+   Vamos trabalhar no seu projeto                           
+                    Configurar provedor                     
+   Pergunte sobre o código ou peça uma mudança.             
+   Edições exigem aprovação.                                
+                                                            
+   ╭────────────────╮  Buscar código     Propor mudança     
+                                                            
+                                                            
+  Contexto: aguardando primeira chamada · /status           
+  Pronto                                                    
+ ────────────────────────────────────────────────────────── 
+  Pergunte ou peça uma mudança…                             
+                                                            
+  Enter envia · Alt+Enter linha · / ajuda · @ arquivo       
+ ^Q Sair  ^L Mensagens  ^X Cancelar  ^P Comandos            

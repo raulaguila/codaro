@@ -1,0 +1,50 @@
+                                                                                                                                                                
+  ◈ Codaro                                                                                                                                                      
+  …ro-interface-review-0b2a6qg6/layout-160 · qwen3.8:27b · Executar · Aprovação por ação · TLS verificação ativa                                                
+                                                                                                                                                                
+   Vamos trabalhar no seu projeto                                                                                                                               
+                                Configurar provedor                                                                                                             
+   Escolha um ponto de partida ou escreva sua pergunta.                                                                                                         
+   As respostas usam os arquivos locais; edições exigem sua aprovação.                                                                                          
+                                                                                                                                                                
+            Explorar         ╭────────────────────────╮      Propor mudança                                                                                     
+                             │     Buscar código      │                                                                                                         
+                             ╰────────────────────────╯                                                                                                         
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+  Contexto: aguardando primeira chamada · /status                                                                                                               
+  Pronto                                                                                                                                                        
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+  Pergunte ou peça uma mudança…                                                                                                                                 
+                                                                                                                                                                
+  Enter envia · Alt+Enter nova linha · / comandos · @ arquivo · ↑ histórico                                                                                     
+ Ctrl+X Cancelar  Ctrl+Q Sair  Ctrl+L Mensagens  Ctrl+P Comandos                                                                                                

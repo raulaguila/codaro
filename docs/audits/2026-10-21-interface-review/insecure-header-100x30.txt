@@ -1,0 +1,30 @@
+                                                                                                    
+  ◈ Codaro                                                                                          
+  TLS sem verificação · …-interface-review-0b2a6qg6/conversation · qwen3.8:27b · Perguntar ·        
+  Aprovação por ação                                                                                
+                                                                                                    
+  › Explique a autorização do projeto.                                                              
+                                                                                                    
+   █ ▶ 1 ação · 1 leitura · 8 ms                                                                    
+   ▶ Raciocínio · 1 etapa                                                                           
+                                                                                                    
+   Codaro                                                                                           
+   O projeto possui uma função de autorização em auth.py.                                           
+                                                                                                    
+   Ela consulta user.is_admin para permitir a edição.                                               
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+  Contexto ≈ 4% · 122.4k · /status                                                                  
+  Pronto                                                                                            
+ ────────────────────────────────────────────────────────────────────────────────────────────────── 
+  Meu próximo pedido ainda não enviado                                                              
+                                                                                                    
+  Enter envia · Alt+Enter nova linha · / comandos · @ arquivo · ↑ histórico                         
+ Ctrl+X Cancelar  Ctrl+Q Sair  Ctrl+L Mensagens  Ctrl+P Comandos                                    

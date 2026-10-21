@@ -1,0 +1,24 @@
+                                                                                
+  ◈ Codaro                                                                      
+  …aro-interface-review-0b2a6qg6/layout-80 · qwen3.8:27b                        
+  Executar · Aprovação por ação · TLS verificação ativa                         
+                                                                                
+   Vamos trabalhar no seu projeto                                               
+                              Configurar provedor                               
+   Pergunte sobre o código ou peça uma mudança.                                 
+   Edições exigem aprovação.                                                    
+                                                                                
+           Explorar              Buscar código           Propor mudança         
+  Contexto ≈ 13% · 122.4k · /status                                             
+  Investigando…                                                                 
+  › /settings · Preferências de inicialização e limites avançados               
+    /integrations · Cadastrar MCP ou plugin com teste de conexão                
+    /undo-turn · Revisar e desfazer todos os arquivos de uma interação          
+    /redo · Revisar e refazer a última interação desfeita                       
+    /sessions · Listar sessões independentes                                    
+  Tab completa · ↑↓ escolhem · Esc fecha                                        
+ ────────────────────────────────────────────────────────────────────────────── 
+  /                                                                             
+                                                                                
+  Enter envia · Alt+Enter linha · / ajuda · @ arquivo                           
+ Ctrl+X Cancelar  Ctrl+Q Sair  Ctrl+L Mensagens  Ctrl+P Comandos                

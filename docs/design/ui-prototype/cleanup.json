@@ -1,0 +1,152 @@
+{
+  "date": "2026-10-21",
+  "canonical": "codaro/docs/design/ui-prototype/prototype.html",
+  "removed_proposal_files": 24,
+  "removed": [
+    {
+      "path": "codaro-interface-v2.png",
+      "bytes": 224056,
+      "sha256": "9daa1b58b47b1f12a430f8ca92414a64e7fe15b3cd86f86218e75213bcc917de",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-interface-v2.svg",
+      "bytes": 112302,
+      "sha256": "2aec257c7c990cd497ea7736bba461b706dc69e70aa450b65b1a5da9aab341f1",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-interface.svg",
+      "bytes": 71514,
+      "sha256": "e8c6cdb290713ed746264db3820af2bd0b19358c4562b20205c391d9f4949c7e",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-revisao-diff.png",
+      "bytes": 107741,
+      "sha256": "f2a8410fa6a3589b1c24dcf89a84fae733c119ea0dbf861c8350d70bf50b82a9",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-revisao-diff.svg",
+      "bytes": 55794,
+      "sha256": "ca4bb531095fa95787643f054ff8871804609ea390d4978a6ee41c9967d795e0",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-ui-agente-comandos.png",
+      "bytes": 148559,
+      "sha256": "1d525e1a516532600bbcbecd3efc9f39b5b83f1cb0007cb31a44ad14892d9c76",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-ui-agente-comandos.svg",
+      "bytes": 32279,
+      "sha256": "b734a69dab9f1ea72e10a98d17a9680416021e622e65cf5e33e284f4de063341",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-ui-agente-conversa.png",
+      "bytes": 161292,
+      "sha256": "346a91da663c62ba6d2bada3dba459a0b1949f6f9f943c79c2e35aca070e475a",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-ui-agente-conversa.svg",
+      "bytes": 34367,
+      "sha256": "599a841ce8a1eb016f5a1ede972ba0999fd490d38cf81a91c819da0fd3b5794c",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-ui-agente-inicial.png",
+      "bytes": 101353,
+      "sha256": "54cfb5e3f002a032211a1a7754e268790489f46d9f0b7b810000e58f3adcaaf2",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-ui-agente-inicial.svg",
+      "bytes": 28597,
+      "sha256": "362875bc1e3cfeb992598489833e3aec31ea11530a1fe7519d6226c97e663ff2",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-ui-conversa-sem-lateral.png",
+      "bytes": 130675,
+      "sha256": "dc25a67379b1c3ff6470623b3264d4357ed58faf00d21a6abd1f3d2ef6634fd9",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-ui-conversa-sem-lateral.svg",
+      "bytes": 50034,
+      "sha256": "98286c0642684d9703f7cee3f7950b9d1611bb1b01562d2a4079c09b8be838cb",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-ui-conversa-v3.png",
+      "bytes": 187069,
+      "sha256": "0de00aafcebfe480ad65b966b37fa842109b5d9d1cda748fd4bc1e4e4b4efd8e",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-ui-conversa-v3.svg",
+      "bytes": 87013,
+      "sha256": "a08a7038d3a9c592bc52ef5e92f6bd3750621c5de9071ea6a0f7e5ec77033873",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-ui-inicial-sem-lateral.png",
+      "bytes": 121215,
+      "sha256": "640845781540f3a6aebc9080e4767c61bb1ddb718931f4240a7b75e986ade968",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-ui-inicial-sem-lateral.svg",
+      "bytes": 55728,
+      "sha256": "f03cd9fa7ca123d33f40c1d43d5d7ea8ad8a8f3dc680268d069955fa14687bf4",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-ui-inicial-v3.png",
+      "bytes": 153314,
+      "sha256": "bffc6c3e17bde17a88659cc2db84dfd4654befbcc7ee1ed0ee8d2d76f10112f7",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "codaro-ui-inicial-v3.svg",
+      "bytes": 77861,
+      "sha256": "5d50d82ae4d81c123b98e25b1964527ba223da7a13f0c3af93ba673319b5f081",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "generated_images/exec-8d69c0ab-1bc3-4feb-bc1b-75ebbd8e89f4.png",
+      "bytes": 1357768,
+      "sha256": "84ee438529806f13717fc01f691e7b033fdb84ba2cf40ee3ebdadc90df1d0fc8",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "generated_images/exec-94bf338b-18cf-4bfa-a275-c94e7ee07b21.png",
+      "bytes": 773969,
+      "sha256": "44ce0894f3c6de16e69d9f92b16116b0dcb9a4b2ff8391c3826789bd872aeda4",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "generated_images/exec-9727fcab-f07f-4b96-a3e2-003611bf7c78.png",
+      "bytes": 1376397,
+      "sha256": "0770ee2ccfcc6520be04cf4b6ee9988c854aefe1bde9b6c9989ab1821307ed4a",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "generated_images/exec-b0a089c5-dcff-4341-bfb6-d3c9f32ae91d.png",
+      "bytes": 867114,
+      "sha256": "59b22209c872e14836b85b9dad3fd07d110cc526b7a7c336bea2802797558749",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    },
+    {
+      "path": "generated_images/exec-de8214ed-4c7c-4208-9939-b1e6cb4c255e.png",
+      "bytes": 1483562,
+      "sha256": "c1ffb4489ad90f5cfb5705bdf19b65469c6218026d8a4efea99e6bdde6ebb2c3",
+      "reason": "Proposta visual substituída pela proposta consolidada"
+    }
+  ],
+  "preserved": "Código da aplicação, anexos do usuário e evidências de auditoria"
+}

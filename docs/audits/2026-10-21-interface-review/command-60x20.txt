@@ -1,0 +1,20 @@
+                                                            
+ ╭───────────────────────────────────────────────────────╮  
+ │ Autorizar comando                                     │  
+ │                                                       │  
+ │ Diretório:                                            │  
+ │ /tmp/codaro-interface-review-0b2a6qg6/layout-60       │  
+ │ Timeout: 60s                                          │  
+ │                                                       │  
+ │ python -m pytest -q                                   │  
+ │                                                       │  
+ │ O comando pode alterar arquivos. A aprovação vale só  │  
+ │ para esta execução.                                   │  
+ │                                                       │  
+ │                                                       │  
+ │                                                       │  
+ │ ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔ │  
+ │          Executar                  Rejeitar           │  
+ │ ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁ │  
+ ╰───────────────────────────────────────────────────────╯  
+                                                            

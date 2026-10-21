@@ -1,0 +1,20 @@
+                                                            
+  ◈ Codaro                                                  
+  …aro-interface-review-0b2a6qg6/layout-60 · qwen3.8:27b    
+  Executar · Aprovação por ação · TLS verificação ativa     
+                   Configurar provedor                  ▃▃  
+   Pergunte sobre o código ou peça uma mudança.             
+   Edições exigem aprovação.                            ▇▇  
+                                                            
+  Contexto ≈ 13% · 122.4k · /status                         
+  Investigando…                                             
+  › /settings · Preferências de inicialização e limites a…  
+    /integrations · Cadastrar MCP ou plugin com teste de …  
+    /undo-turn · Revisar e desfazer todos os arquivos de …  
+    /redo · Revisar e refazer a última interação desfeita   
+  Tab completa · ↑↓ escolhem · Esc fecha                    
+ ────────────────────────────────────────────────────────── 
+  /                                                         
+                                                            
+  Enter envia · Alt+Enter linha · / ajuda · @ arquivo       
+ ^X Cancelar  ^Q Sair  ^L Mensagens  ^P Comandos            

@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Codaro · protótipo de UI/UX</title><style>:root{color-scheme:dark;--page:#0b1017;--bg:#111821;--panel:#17212d;--raised:#1d2b38;--text:#dfe6ef;--muted:#94a3b6;--faint:#8392a6;--line:#2a394b;--accent:#83d6d7;--good:#8bc6a4;--warn:#e2bd7c;--bad:#e3959c;font:14px/1.6 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace}
+*{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--text)}button,input,select,textarea{font:inherit}button{cursor:pointer;color:var(--text);background:var(--panel);border:1px solid transparent;border-radius:3px;padding:6px 12px;min-height:36px;transition:background .12s,color .12s}button:hover{background:var(--raised)}button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}button:disabled{opacity:.45;cursor:not-allowed}button.primary{color:#102024;background:var(--accent);font-weight:600}button.primary:hover{background:#a0e1df}button.quiet{background:transparent;color:var(--muted)}button.quiet:hover{color:var(--text);background:var(--panel)}button.danger{color:var(--bad)}button.small{min-height:28px;padding:2px 9px}input,select,textarea{color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:3px;padding:8px 10px;min-width:0}textarea{resize:none}input::placeholder,textarea::placeholder{color:var(--faint)}a{color:var(--accent)}code{color:var(--accent);font:inherit}p{margin:0 0 12px}.muted{color:var(--muted)}.faint{color:var(--faint)}.accent{color:var(--accent)}.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}.caption{font-size:12px;color:var(--muted)}.tag{font-size:11px;padding:1px 6px;border:1px solid var(--line);border-radius:3px;color:var(--muted)}.row{display:flex;align-items:center;gap:10px}.spread{justify-content:space-between}.stack{display:flex;flex-direction:column;gap:12px}.grow{flex:1}.divider{height:1px;background:var(--line);margin:15px 0}
+.guide{max-width:1220px;margin:20px auto 14px;padding:0 24px;font-family:system-ui,sans-serif}.guide h1{font-size:19px;font-weight:600;margin:0}.guide .caption{font-family:system-ui,sans-serif}.toolbar{display:flex;gap:9px;align-items:center;margin:14px 0 6px;flex-wrap:wrap}.toolbar select{flex:1;min-width:250px;font-family:system-ui,sans-serif;font-size:13px}.toolbar button{font-family:system-ui,sans-serif}.guide-note{max-width:1220px;margin:10px auto 28px;padding:0 24px;font:13px/1.5 system-ui,sans-serif;color:var(--muted)}.guide-note p{margin:4px 0}.terminal{position:relative;max-width:1120px;height:780px;max-height:calc(100vh - 180px);min-height:460px;margin:0 auto;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg);display:flex;flex-direction:column;container-type:inline-size}.terminal.compact{max-width:630px;height:610px;min-height:470px}.terminal.laptop{max-width:850px;height:700px}.titlebar{height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 15px;border-bottom:1px solid var(--line);font-size:11px;color:var(--faint);background:#141d28}.dots{display:flex;gap:7px}.dots i{height:8px;width:8px;background:#435369;border-radius:50%}.titlebar em{font-style:normal}.header{padding:16px 26px 13px;display:flex;justify-content:space-between;gap:20px;align-items:center;flex-shrink:0}.brand{font-weight:600;white-space:nowrap}.brand .mark{color:var(--accent);margin-right:7px}.brand .repo{font-weight:400;color:var(--muted);margin-left:10px}.identity{display:flex;gap:10px;align-items:center;font-size:12px;min-width:0}.identity .model{max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}.identity button{min-height:26px;font-size:12px;padding:1px 7px}.chat{flex:1;overflow-y:auto;padding:12px 26px 22px;scrollbar-width:thin;scrollbar-color:var(--line) transparent}.user{color:var(--text);margin:8px 0 22px}.user:before{content:'›';color:var(--accent);margin-right:11px}.assistant{margin-top:24px;max-width:92ch}.speaker{color:var(--accent);font-weight:600;margin-bottom:9px}.assistant ul,.assistant ol{padding-left:23px;margin:8px 0 12px}.assistant li{padding:2px 0}.stages{margin:10px 0;color:var(--muted);max-width:90ch}.stage-toggle{border:none;background:transparent;padding:0;min-height:26px;color:var(--muted);font-size:12px;text-align:left}.stage-toggle:hover{background:transparent;color:var(--text)}.stage-panel{margin:6px 0 10px 5px;padding:8px 0 10px 15px;border-left:1px solid var(--line);font-size:12px}.stage-label{font-size:10px;letter-spacing:.12em;color:var(--faint);margin:10px 0 5px}.stage-entry{padding:3px 0}.reasoning{max-height:110px;overflow-y:auto;color:var(--muted);font-size:12px;line-height:1.7;padding:5px 0}.thought-toggle{background:transparent;padding:0;min-height:25px;font-size:12px;color:var(--muted)}.welcome{max-width:680px;margin:48px 0 0}.welcome h2{font-size:19px;font-weight:500;margin:0 0 10px}.welcome .onboarding{margin-top:22px}.choice-list{display:flex;flex-direction:column;gap:4px;margin:16px 0}.choice{display:flex;align-items:center;gap:10px;border:1px solid transparent;background:transparent;text-align:left;min-height:37px;padding:5px 8px}.choice.selected{background:var(--panel);border-color:var(--line)}.choice .radio{color:var(--faint)}.choice.selected .radio{color:var(--accent)}.submitted-answer{margin:22px 0 14px;border-left:1px solid var(--line);padding-left:14px;font-size:13px}.submitted-answer .caption{margin-bottom:4px}.notice{max-width:680px;border-left:2px solid var(--line);padding:6px 0 6px 15px;margin:20px 0}.notice.error{border-color:var(--bad)}.notice h3{font-size:14px;font-weight:500;margin:0 0 7px}.notice .actions{display:flex;gap:8px;margin:14px 0 2px;flex-wrap:wrap}.notice .actions button{min-height:30px;font-size:12px}.plan{max-width:640px;margin-top:18px}.plan-item{display:flex;gap:12px;padding:7px 0}.plan-item .number{color:var(--faint);width:18px}.plan-item.current .number{color:var(--accent)}.plan-item.current{color:var(--text)}.receipt{margin:16px 0;font-size:12px;color:var(--good)}.composer{position:relative;flex-shrink:0;margin:0 26px 14px;padding-top:10px;border-top:1px solid #4b858c}.entry{display:flex;gap:10px;align-items:flex-start}.entry .chevron{color:var(--accent);padding-top:3px}.entry textarea{width:100%;height:52px;max-height:140px;padding:3px 0;border:0;outline:none;background:transparent;line-height:1.6;font-size:14px}.entry textarea:focus-visible{outline:none}.meta{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--muted);gap:12px;margin-top:5px;min-height:23px}.meta .capacity{white-space:nowrap;color:var(--faint)}.shortcuts{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:10px;color:var(--faint);padding-top:4px;min-height:24px}.shortcuts button{min-height:20px;padding:0;background:none;color:var(--faint);font-size:10px}.shortcuts kbd{font:inherit;color:var(--muted)}.hint{font-size:11px;color:var(--warn);padding:4px 0}.slash-menu{position:absolute;left:0;right:0;bottom:calc(100% + 8px);max-height:260px;overflow-y:auto;background:var(--panel);border:1px solid var(--line);padding:5px;border-radius:4px;z-index:5;box-shadow:0 8px 22px #070d1660;scrollbar-width:thin}.command-option{display:flex;justify-content:space-between;gap:16px;border:0;background:transparent;width:100%;text-align:left;font-size:12px;min-height:33px;padding:5px 10px;white-space:nowrap}.command-option.active{background:var(--raised)}.command-option .cmd{color:var(--text)}.command-option .description{color:var(--muted);overflow:hidden;text-overflow:ellipsis}.command-option.active .cmd{color:var(--accent)}.slash-empty{padding:14px;color:var(--muted);font-size:12px}.cursor:after{content:'▎';color:var(--accent);margin-left:2px}
+.modal-backdrop{position:absolute;inset:32px 0 0;z-index:10;background:#080d14b8;display:flex;align-items:center;justify-content:center;padding:22px}.dialog{width:600px;max-width:100%;max-height:100%;background:var(--panel);border:1px solid var(--line);border-radius:5px;display:flex;flex-direction:column;overflow:hidden}.dialog.wide{width:770px}.dialog-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 10px}.dialog-header h2{font-size:15px;font-weight:500;margin:0}.dialog-header .close{min-height:24px;padding:0 5px;background:transparent;font-size:11px;color:var(--muted)}.dialog-body{padding:5px 20px 18px;overflow-y:auto;scrollbar-width:thin}.dialog-actions{display:flex;justify-content:flex-end;align-items:center;gap:8px;border-top:1px solid var(--line);padding:11px 20px;flex-shrink:0}.dialog-actions button{font-size:12px;min-height:32px;padding:5px 12px}.field{display:flex;flex-direction:column;gap:5px;margin:12px 0}.field label{font-size:12px;color:var(--muted)}.field input,.field select{width:100%;font-size:13px}.field .caption{font-size:11px}.field-error{font-size:11px;color:var(--bad);margin:8px 0}.inline-status{font-size:12px;color:var(--muted);margin-top:12px;min-height:24px}.inline-status.success{color:var(--good)}.inline-status.failure{color:var(--bad)}.advanced-toggle{background:none;font-size:12px;color:var(--muted);min-height:25px;padding:0;margin-top:10px}.advanced{border-left:1px solid var(--line);padding-left:12px;margin-top:8px}.check{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted);margin:10px 0}.check input{accent-color:var(--accent)}.model-search{width:100%;margin:8px 0 10px}.model-list{max-height:230px;overflow-y:auto;scrollbar-width:thin;display:flex;flex-direction:column;gap:3px}.model-row{background:transparent;display:flex;justify-content:space-between;align-items:center;gap:15px;width:100%;text-align:left;min-height:39px;padding:6px 9px;font-size:12px}.model-row.active{border-color:var(--line);background:var(--raised)}.model-row.incompatible{color:var(--faint)}.model-row .ctx{font-size:11px;color:var(--muted);white-space:nowrap}.model-description{font-size:11px;color:var(--muted);padding:9px 0;min-height:38px}.diff{background:var(--bg);border:1px solid var(--line);padding:12px;font-size:12px;white-space:pre-wrap;overflow:auto;line-height:1.7}.diff .add{color:var(--good)}.diff .remove{color:var(--bad)}.permission-command{padding:12px;background:var(--bg);border:1px solid var(--line);margin:12px 0;color:var(--text);font-size:12px;overflow-wrap:anywhere}.kv{display:flex;justify-content:space-between;gap:20px;padding:6px 0;font-size:12px;border-bottom:1px solid #2a394b66}.kv span:first-child{color:var(--muted)}.kv span:last-child{text-align:right;overflow-wrap:anywhere}.help-row{display:flex;justify-content:space-between;gap:15px;font-size:12px;padding:5px 0}.badge-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:7px}.evidence{text-align:center;font:11px/1.6 system-ui,sans-serif;color:var(--faint);max-width:1100px;margin:10px auto}.catalog{max-width:1120px;margin:25px auto 40px;display:none;padding:0 15px}.catalog.open{display:block}.catalog h2{font:16px system-ui,sans-serif;margin-top:24px}.catalog .items{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:7px}.catalog button{text-align:left;min-height:40px;font-size:12px}.catalog button small{display:block;color:var(--faint);font-size:10px}
+@container (max-width:700px){.header{padding:12px 17px;display:block}.identity{margin-top:4px;justify-content:space-between}.chat{padding:9px 17px 16px}.composer{margin:0 17px 10px}.entry textarea{height:34px;font-size:13px}.shortcuts{font-size:9px}.shortcuts .optional{display:none}.slash-menu{max-height:128px}.command-option{min-height:32px;font-size:11px}.welcome{margin-top:26px}.welcome h2{font-size:17px}.dialog-body{padding:3px 14px 12px}.dialog-header{padding:12px 14px 8px}.dialog-actions{padding:9px 14px}.modal-backdrop{padding:14px}.field{margin:9px 0}.dialog-actions button{padding:4px 8px;font-size:11px}.choice{font-size:12px;padding:5px}.tag{font-size:9px}.assistant{font-size:13px}.stage-panel{font-size:11px}.meta{font-size:10px}.model-list{max-height:175px}}
+@media(max-width:700px){.guide{margin:14px auto 10px;padding:0 12px}.guide h1{font-size:16px}.terminal{border-radius:0;border-left:0;border-right:0;max-height:none;height:calc(100dvh - 200px);min-height:520px}.guide-note{padding:0 12px}.toolbar select{min-width:180px}.toolbar .optional{display:none}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+body.capture{background:var(--bg)}body.capture .guide,body.capture .guide-note,body.capture .catalog,body.capture .evidence{display:none!important}body.capture .terminal{margin:0;max-width:none;width:100vw;height:100vh;max-height:none;min-height:0;border:0;border-radius:0}.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.live-steps{font-size:12px;margin:3px 0 12px 17px;color:var(--muted)}
+.workspace{display:flex;flex-direction:column;flex:1;min-height:0}.choice{flex-wrap:wrap}.choice .tag{margin-left:auto}
+.user{background:#17212d66;border-left:2px solid var(--line);padding:8px 12px;border-radius:2px}.user:before{display:none}.user-label{display:block;font-size:10px;color:var(--muted);margin-bottom:3px}.chat-turn+.chat-turn{margin-top:28px;padding-top:22px;border-top:1px solid #2a394b66}.past-activity{font-size:11px;color:var(--muted);margin:6px 0 12px}.chat-turn .assistant{margin-top:15px}.question-dock{border-left:2px solid var(--accent);padding:2px 0 2px 12px;margin:0 0 12px;max-height:215px;overflow-y:auto;scrollbar-width:thin}.question-dock h3{font-size:14px;font-weight:500;margin:3px 0 5px}.question-dock p{margin-bottom:8px}.question-dock .choice-list{gap:2px;margin:8px 0 0}.question-dock .choice{min-height:29px;padding:2px 8px;font-size:12px}.answering .entry{border-top:1px solid var(--line);padding-top:8px}
+@container(max-width:700px){.question-dock{max-height:165px}.question-dock h3{font-size:13px}.question-dock .choice{font-size:11px}.question-dock .caption{font-size:11px}.chat-turn+.chat-turn{margin-top:20px;padding-top:16px}}
+.composer.answering{border-top:0;padding-top:0}.response-card{background:var(--panel);border:1px solid #45616d;border-radius:4px;padding:12px 14px}.response-card:focus-within{border-color:#6cabad}.response-card .question-dock{border:0;padding:0;margin:0 0 10px}.response-card .choice.selected{background:var(--raised)}.response-compose{display:flex;align-items:flex-end;gap:12px}.response-compose .entry{flex:1;min-width:0;border:0;padding:0}.response-compose textarea{font-size:13px}.response-actions{display:flex;gap:5px;padding-bottom:2px;flex-shrink:0}.response-actions button{font-size:11px;min-height:28px;padding:3px 9px}
+@container(max-width:700px){.response-card{padding:10px}.response-compose{gap:5px}.response-actions{gap:2px}.response-actions button{font-size:10px;padding:3px 6px}.response-compose textarea{font-size:12px}.response-card .question-dock{max-height:155px}}
+
+
+.meta,.identity,.dialog-actions{flex-wrap:wrap}.dialog-actions button{max-width:100%}.model-row>span:first-child{min-width:0;overflow-wrap:anywhere}.transport-warning{font-size:10px;color:var(--warn)}.composer:focus-within{border-top-color:var(--accent)}.dialog-header{gap:12px}.dialog-header h2{min-width:0}.dialog-header .close{flex-shrink:0}.dialog-body input{min-height:36px}.guide-note{overflow-wrap:anywhere}
+
+.mode-popover-layer{position:absolute;inset:0;z-index:10;background:transparent}
+.mode-popover{position:absolute;top:90px;right:26px;width:min(560px,calc(100% - 28px));max-height:calc(100% - 48px);overflow:auto;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:4px;box-shadow:0 8px 24px #070d1660;scrollbar-width:thin}
+.mode-popover h2{font-size:13px;font-weight:500;margin:0 0 9px}
+.mode-list{display:flex;flex-direction:column;gap:3px}
+.mode-option{display:grid;grid-template-columns:10px 80px minmax(0,1fr) 34px;gap:8px;align-items:center;width:100%;min-height:34px;margin:0;padding:4px 6px;background:transparent;text-align:left}
+.mode-option.selected{background:var(--raised);border-color:var(--line)}
+.mode-caret{color:var(--accent);font-size:16px}.mode-name{font-size:12px}.mode-description{color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mode-current{font-size:10px;text-align:right;color:var(--muted)}
+.mode-permissions{font-size:11px;color:var(--muted);min-height:27px;margin-top:6px}.edit-policy-toggle{background:transparent;color:var(--muted);padding:1px 5px;font-size:11px;min-height:25px}
+.mode-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--line);margin-top:7px;padding-top:9px}.mode-footer>span{color:var(--faint);font-size:10px}.mode-footer button{min-height:28px;font-size:11px}
+.edit-policy-options{border:0;border-left:1px solid var(--line);margin:8px 0;padding:0 0 0 10px}.edit-policy-options label{display:flex;gap:8px;align-items:center;font-size:12px;margin:7px 0}.edit-policy-options input{accent-color:var(--accent)}.edit-policy-options p{font-size:11px;color:var(--muted);margin:9px 0 0;max-width:60ch}
+.execution-plan{margin-bottom:9px;max-width:100%}.plan-summary{display:flex;align-items:center;gap:9px;width:100%;min-height:29px;padding:2px 0;background:transparent;text-align:left;font-size:11px;color:var(--muted)}.plan-summary:hover{background:transparent;color:var(--text)}.plan-summary strong{font-weight:500;color:var(--text)}.plan-current{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.execution-plan-list{list-style:none;max-height:135px;overflow:auto;padding:4px 0 4px 17px;margin:4px 0 0;border-left:1px solid var(--line);scrollbar-width:thin}.execution-plan-list li{display:flex;align-items:flex-start;gap:9px;padding:4px 0;font-size:12px;color:var(--muted)}.execution-plan-list .running{color:var(--text)}.execution-plan-list .step-status{min-width:12px}.auto-edit-status{color:var(--muted);font-size:10px}
+@container(max-width:500px){.mode-option{grid-template-columns:8px 68px minmax(0,1fr) 29px;gap:5px;padding:4px}.mode-name{font-size:11px}.mode-description{font-size:10px}.mode-footer>span{font-size:9px}.mode-popover{padding:10px}.execution-plan-list{max-height:100px}.execution-plan-list li{font-size:11px}}
+
+.plan-summary>span:not(.plan-current){white-space:nowrap;flex-shrink:0}
+
+/* The composer stays outside the scrolling transcript for the whole active plan. */
+.chat{min-height:0}.plan-heading{display:flex;align-items:center;gap:10px}.plan-summary{flex:1;min-width:0}.cancel-plan{flex-shrink:0;font-size:10px!important;padding:2px 5px!important;min-height:26px!important}.execution-plan-list{max-height:min(120px,16vh)}.has-plan.answering .execution-plan-list{max-height:70px}.has-plan.answering .question-dock{max-height:155px}
+@container(max-width:700px){.has-plan.answering .question-dock{max-height:110px}.has-plan.answering .execution-plan-list{max-height:60px}.cancel-plan{font-size:9px!important}.plan-heading{gap:5px}.plan-summary{gap:6px}}
+</style></head>
+<body>
+<section class="guide"><div class="row spread"><div><h1>Codaro · proposta navegável</h1><div class="caption">Dados fictícios · nenhuma API, arquivo do projeto ou credencial real é acessada</div></div><span class="tag">Planejamento</span></div><div class="toolbar"><button id="previous" title="Estado anterior">←</button><select id="screen-select" aria-label="Escolher estado da interface"></select><button id="next" title="Próximo estado">→</button><select id="viewport" aria-label="Tamanho da apresentação" style="flex:0;min-width:130px"><option value="desktop">Amplo</option><option value="laptop">Notebook</option><option value="compact">Compacto</option></select><button id="catalog-toggle">Todos os estados</button></div></section>
+<div class="terminal" id="terminal"></div>
+<div class="guide-note"><div class="row spread"><strong id="screen-title"></strong><span id="screen-count"></span></div><p>Experimente: digite /, use ↑↓ e Enter. Nas perguntas, escolha uma opção e confirme ou escreva uma resposta.</p><p>A barra acima é um guia de validação e não faz parte da CLI. Os testes de conexão e os resultados exibidos são simulações.</p></div>
+<section class="catalog" id="catalog" aria-label="Catálogo de estados"></section>
+<script id="prototype-core">/* Standalone interaction model. Fictional data; no API or filesystem access. */
+(() => {
+  const screens = [
+    ["welcome", "Início com modelo configurado", "Início", "welcome"],
+    ["first-run", "Primeiro acesso", "Início", "first-run"],
+    ["slash", "Menu / com navegação", "Entrada", "chat"],
+    ["slash-filter", "Comandos filtrados", "Entrada", "chat"],
+    ["slash-empty", "Comando não encontrado", "Entrada", "chat"],
+    ["thinking", "Modelo analisando", "Conversa", "chat"],
+    ["tool-running", "Ferramenta em execução", "Conversa", "chat"],
+    ["stages-expanded", "Atividade e raciocínio expandidos", "Conversa", "chat"],
+    ["streaming", "Resposta em streaming", "Conversa", "chat"],
+    ["answer", "Resposta final", "Conversa", "chat"],
+    ["conversation", "Conversa com várias mensagens", "Conversa", "chat"],
+    ["ask-choice", "Pergunta com opções", "Perguntas", "question"],
+    ["ask-text", "Pergunta com resposta livre", "Perguntas", "question"],
+    ["ask-followup", "Resposta do usuário e continuação", "Perguntas", "chat"],
+    ["plan", "Plano para revisar", "Execução", "chat"],
+    ["plan-collapsed", "Plano de execução recolhido", "Execução", "chat"],
+    ["plan-expanded", "Plano de execução expandido", "Execução", "chat"],
+    ["plan-chat", "Plano fixo durante a conversa", "Execução", "chat"],
+    ["review-diff", "Aprovação de alterações", "Execução", "review"],
+    ["command-approval", "Aprovação de comando", "Execução", "command"],
+    ["validating", "Validação em andamento", "Execução", "chat"],
+    ["done", "Tarefa concluída", "Execução", "chat"],
+    ["provider", "Cadastro de provedor", "Provedores", "provider"],
+    ["provider-custom", "OpenAI compatible e TLS", "Provedores", "provider"],
+    ["provider-ollama", "Ollama local", "Provedores", "provider"],
+    ["provider-testing", "Teste de conexão em andamento", "Provedores", "provider"],
+    ["provider-success", "Conexão verificada", "Provedores", "provider"],
+    ["provider-error", "Erro ao testar conexão", "Provedores", "provider"],
+    ["models", "Busca e seleção de modelo", "Modelos", "models"],
+    ["models-loading", "Atualização do catálogo", "Modelos", "models"],
+    ["models-empty", "Catálogo sem resultados", "Modelos", "models"],
+    ["model-fallback", "Contexto não informado pela API", "Modelos", "models"],
+    ["model-tools", "Diagnóstico de ferramentas", "Modelos", "models"],
+    ["preferences", "Preferências", "Configuração", "preferences"],
+    ["mode", "Escolha do modo", "Configuração", "mode"],
+    ["edit-approval", "Aprovação de edições", "Configuração", "mode"],
+    ["status", "Detalhes da sessão e contexto", "Configuração", "status"],
+    ["help", "Ajuda e atalhos", "Configuração", "help"],
+    ["context-compacting", "Reorganização automática do contexto", "Recuperação", "chat"],
+    ["connection-error", "Conexão interrompida", "Recuperação", "chat"],
+    ["auth-error", "Credencial inválida", "Recuperação", "chat"],
+    ["cancelled", "Cancelamento com progresso preservado", "Recuperação", "chat"],
+    ["resumed", "Retomada da sessão", "Recuperação", "chat"],
+    ["no-results", "Busca sem resultados", "Recuperação", "chat"],
+    ["context-scope", "Escolha de escopo para continuar", "Recuperação", "question"],
+    ["new-session", "Nova conversa sem perder rascunho", "Configuração", "new-session"],
+  ].map(([id, title, group, kind]) => ({ id, title, group, kind }));
+
+  const commands = [
+    ["/models", "Selecionar modelo", "models"],
+    ["/mode", "Alterar modo", "mode"],
+    ["/providers", "Gerenciar provedores", "provider"],
+    ["/plan", "Revisar o plano", "plan"],
+    ["/new", "Nova conversa", "new-session"],
+    ["/resume", "Retomar conversa", "resumed"],
+    ["/compact", "Reorganizar contexto", "context-compacting"],
+    ["/settings", "Preferências", "preferences"],
+    ["/status", "Detalhes da sessão", "status"],
+    ["/help", "Ajuda e atalhos", "help"],
+  ].map(([name, description, target]) => ({ name, description, target }));
+
+  const models = [
+    { id: "qwen3.8:27b", context: "128k", tokens: 131072, tools: true, detail: "Contexto informado pela API" },
+    { id: "qwen2.5-coder:7b", context: "32k", tokens: 32768, tools: true, detail: "Contexto informado pela API" },
+    { id: "llama3.1:8b", context: "128k", tokens: 131072, tools: true, detail: "Contexto informado pela API" },
+    { id: "modelo-sem-metadados", context: "Não informado", tools: null, detail: "Usaremos um orçamento conservador; ajuste em Avançado." },
+    { id: "embedding-local", context: "—", tools: false, detail: "Modelo de embeddings; indisponível para conversa." },
+  ];
+
+  const modes = [
+    { name: "Perguntar", description: "Entender e tirar dúvidas", scope: "Leituras e buscas, sem alterar arquivos ou executar comandos." },
+    { name: "Planejar", description: "Investigar e preparar um plano", scope: "Entrega um plano para revisar antes de iniciar a implementação." },
+    { name: "Executar", description: "Implementar e validar", scope: "Edições e comandos seguem as permissões da sessão." },
+  ];
+  const busy = new Set(["thinking", "tool-running", "stages-expanded", "streaming", "validating", "context-compacting", "plan-collapsed", "plan-expanded"]);
+  const dialogKinds = new Set(["provider", "models", "mode", "preferences", "status", "help", "new-session", "review", "command"]);
+  const questions = {
+    "ask-choice": { title: "Podemos alterar o contrato da autenticação?", why: "Essa escolha define se a mudança pode exigir ajustes nos clientes.", choices: ["Preservar o contrato atual", "Pode alterar o contrato", "Preciso de outra abordagem"], recommended: 0 },
+    "ask-text": { title: "Há alguma restrição que eu deva respeitar?", why: "Descreva o contrato ou comportamento que deve ser preservado.", choices: [], recommended: null },
+    "context-scope": { title: "Por onde devemos continuar a análise?", why: "Vou investigar uma parte por vez para preservar os detalhes relevantes.", choices: ["Autenticação e permissões", "Configuração dos provedores", "Escolher outros arquivos"], recommended: 0 },
+  };
+
+  function screen(id) { return screens.find(x => x.id === id) || screens[0]; }
+  function initial(id = "welcome", previous = {}) {
+    const selected = screen(id);
+    return {
+      route: selected.id, draft: ({ slash: "/", "slash-filter": "/mo", "slash-empty": "/xyz" })[id] || "",
+      question: "Analise a autenticação e proponha melhorias.", model: previous.model || "qwen3.8:27b",
+      mode: previous.mode || "Executar", modeIndex: id === "edit-approval" ? 2 : Math.max(0, modes.findIndex(x => x.name === (previous.mode || "Executar"))), dialogOrigin: null, menuIndex: 0, menuDismissed: false,
+      editApproval: previous.editApproval || "ask", editPolicyDraft: id === "edit-approval" ? "auto" : previous.editApproval || "ask", editPolicyExpanded: id === "edit-approval",
+      planState: ["plan", "plan-collapsed", "plan-expanded", "plan-chat", "review-diff", "command-approval", "validating", "done"].includes(id) ? { status: id === "done" ? "completed" : "active", completed: id === "done" ? 4 : id === "validating" ? 3 : 1 } : null,
+      planVisible: ["plan", "plan-collapsed", "plan-expanded", "plan-chat", "review-diff", "command-approval", "validating"].includes(id),
+      planExpanded: id !== "plan-collapsed",
+      choice: 0, modelIndex: id === "model-fallback" ? 3 : Math.max(0, models.findIndex(x => x.id === previous.model)), modelQuery: "",
+      expanded: id === "stages-expanded", reasoningExpanded: id === "stages-expanded", details: false,
+      lastDraft: previous.lastDraft || previous.draft || "", lastAnswer: previous.lastAnswer || "", lastQuestion: previous.lastQuestion || "", questionCommand: false,
+      tls: id === "provider-custom", providerKind: id === "provider-ollama" ? "ollama" : id === "provider-custom" ? "openai-compatible" : "openai",
+      providerName: previous.providerName || "Meu provedor", providerKey: previous.providerKey || "", providerUrl: previous.providerUrl || "", advanced: id === "provider-custom", pauseQuestion: false,
+      liveSummary: previous.liveSummary ?? true, defaultMode: previous.defaultMode || "Executar", resumeSession: previous.resumeSession ?? true,
+      preferenceOriginal: { liveSummary: previous.liveSummary ?? true, defaultMode: previous.defaultMode || "Executar", resumeSession: previous.resumeSession ?? true },
+      toast: "", hint: "", approved: false, actionRejected: false, freeQuestion: "",
+    };
+  }
+  function matches(state) {
+    const query = state.draft.trim().toLowerCase();
+    return commands.filter(x => x.name.startsWith(query));
+  }
+  function hasMenu(state) {
+    return !state.menuDismissed && /^\/[^\s]*$/.test(state.draft) && (!questions[state.route] || state.questionCommand);
+  }
+  function filteredModels(state) {
+    return models.filter(x => x.id.toLowerCase().includes(state.modelQuery.toLowerCase()));
+  }
+  function go(state, target, preserve = true) {
+    const next = initial(target, state);
+    if (preserve) next.lastDraft = state.draft.startsWith("/") ? state.lastDraft : state.draft || state.lastDraft;
+    if (target === "welcome") next.draft = next.lastDraft;
+    if (state.planState) {
+      next.planState = { ...state.planState };
+      next.planExpanded = state.planExpanded;
+    }
+    if (target === "validating" && next.planState?.status === "active") next.planState = { ...next.planState, completed: 3 };
+    if (target === "done" && next.planState?.status === "active") next.planState = { status: "completed", completed: 4 };
+    next.planVisible = next.planState?.status === "active";
+    if (dialogKinds.has(screen(target).kind)) {
+      next.dialogOrigin = state.dialogOrigin || (dialogKinds.has(screen(state.route).kind) ? null : { ...state, route: state.route.startsWith("slash") ? "welcome" : state.route, draft: state.questionCommand || state.draft.startsWith("/") && !questions[state.route] ? state.lastDraft : state.draft, menuDismissed: true, questionCommand: false });
+      next.providerKind = state.providerKind;
+      next.tls = state.tls;
+    }
+    if (["provider-testing", "provider-success", "provider-error"].includes(target)) {
+      next.providerKind = state.providerKind;
+      next.tls = state.tls;
+      next.advanced = state.advanced;
+    }
+    return next;
+  }
+  function finishDialog(state, changes = {}) {
+    const next = { ...(state.dialogOrigin || { ...initial("welcome", state), draft: state.lastDraft, planState: state.planState, planVisible: state.planVisible, planExpanded: state.planExpanded }), ...changes, dialogOrigin: null };
+    if (state.planState) {
+      next.planState = state.planState;
+      next.planVisible = state.planState.status === "active";
+      next.planExpanded = state.planExpanded;
+    }
+    if (next.route === "first-run" && changes.model) next.route = "welcome";
+    return next;
+  }
+  function modelDetails(id) {
+    const model = models.find(x => x.id === id);
+    const total = model?.tokens || 8192;
+    const reserve = total > 32768 ? 8192 : 2048;
+    const margin = 512;
+    const budget = total - reserve - margin;
+    const used = Math.min(16000, Math.round(budget * .75));
+    return { total, reserve, margin, budget, used, percent: Math.round(used / budget * 100), reported: !!model?.tokens, source: model?.tokens ? "API: contexto do modelo" : "Estimativa conservadora", tools: model?.tools };
+  }
+  function executionPlan(state) {
+    const completed = state.planState?.completed ?? 0;
+    const active = state.planState?.status === "active";
+    const steps = ["Investigar a autenticação", "Corrigir a validação de usuários", "Cobrir os cenários de permissão", "Executar testes e revisar o resultado"].map((title, index) => ({ title, status: index < completed ? "done" : active && index === completed ? "running" : "pending" }));
+    return { steps, completed, current: steps.find(step => step.status === "running")?.title || (state.planState?.status === "cancelled" ? "Cancelado" : "Concluído") };
+  }
+  function confirmAnswer(state) {
+    const q = questions[state.route];
+    const answer = state.draft.trim() || q?.choices[state.choice];
+    if (!answer) return { ...state, hint: "Escreva sua resposta antes de continuar." };
+    if (!state.draft.trim() && state.choice === 2 && state.route !== "ask-text") {
+      return { ...go(state, "ask-text"), freeQuestion: state.route === "context-scope" ? "Quais arquivos ou módulos você quer priorizar?" : "Qual abordagem você prefere para a autenticação?" };
+    }
+    return { ...go(state, "ask-followup", false), lastAnswer: answer, lastQuestion: state.freeQuestion || q.title, draft: "", lastDraft: state.lastDraft };
+  }
+  function reduce(state, event) {
+    let next = { ...state, hint: "" };
+    switch (event.type) {
+      case "SCREEN": return initial(event.id, state);
+      case "DRAFT": return { ...next, draft: event.value, menuIndex: 0, menuDismissed: false };
+      case "PALETTE": return { ...next, lastDraft: state.questionCommand || state.draft.startsWith("/") && !questions[state.route] ? state.lastDraft : state.draft || state.lastDraft, draft: "/", questionCommand: true, menuDismissed: false, menuIndex: 0 };
+      case "TOGGLE_DETAILS": return { ...next, expanded: !state.expanded };
+      case "TOGGLE_PLAN": return { ...next, planExpanded: !state.planExpanded };
+      case "START_PLAN": return { ...go(next, "review-diff"), planState: { status: "active", completed: 1 }, planVisible: true, planExpanded: true };
+      case "CANCEL_PLAN": return state.planState?.status === "active" ? { ...go(next, "cancelled", false), draft: state.draft, planState: { ...state.planState, status: "cancelled" }, planVisible: false } : next;
+      case "PLAN_PROGRESS": {
+        if (state.planState?.status !== "active" || !Number.isInteger(event.completed) || event.completed < state.planState.completed || event.completed > 4) return next;
+        return { ...next, planState: { status: event.completed === 4 ? "completed" : "active", completed: event.completed }, planVisible: event.completed < 4 };
+      }
+      case "TOGGLE_REASONING": return { ...next, reasoningExpanded: !state.reasoningExpanded };
+      case "TOGGLE_ADVANCED": return { ...next, advanced: !state.advanced };
+      case "TOGGLE_SUMMARY": return { ...next, liveSummary: !state.liveSummary };
+      case "TLS": return { ...next, tls: event.value };
+      case "CHOICE": return { ...next, choice: event.index };
+      case "ANSWER": return confirmAnswer(next);
+      case "PAUSE_QUESTION": return { ...next, pauseQuestion: true, hint: "A tarefa ficará pausada até você responder." };
+      case "MODEL_QUERY": return { ...next, modelQuery: event.value, modelIndex: 0 };
+      case "MODEL_SELECT": return { ...next, modelIndex: event.index };
+      case "MODEL_USE": {
+        const model = filteredModels(state)[state.modelIndex];
+        if (!model || model.tools === false) return { ...next, hint: "Selecione um modelo disponível para conversa." };
+        return finishDialog(next, { model: model.id, providerKind: state.providerKind, providerName: state.providerName, providerKey: state.providerKey, providerUrl: state.providerUrl, tls: state.tls, toast: "Modelo selecionado" });
+      }
+      case "PROVIDER_KIND": return { ...next, providerKind: event.value, providerUrl: "", tls: false, route: "provider" };
+      case "PROVIDER_FIELD": return ["providerName", "providerKey", "providerUrl"].includes(event.name) ? { ...next, [event.name]: event.value, route: ["provider-success", "provider-error"].includes(state.route) ? "provider" : state.route } : next;
+      case "PROVIDER_TEST": return go(next, "provider-testing");
+      case "PROVIDER_OK": return go(next, "provider-success");
+      case "PROVIDER_CANCEL_TEST": return go(next, "provider");
+      case "APPROVE": return { ...go(next, "validating"), draft: state.dialogOrigin?.draft || state.lastDraft, approved: true };
+      case "REJECT": return { ...go(next, "cancelled"), actionRejected: true, toast: "Solicitação rejeitada · ação não executada" };
+      case "MODE_SELECT": return Number.isInteger(event.index) && modes[event.index] ? { ...next, modeIndex: event.index, editPolicyExpanded: false } : next;
+      case "EDIT_POLICY_TOGGLE": return { ...next, editPolicyExpanded: !state.editPolicyExpanded };
+      case "EDIT_POLICY_SELECT": return ["ask", "auto"].includes(event.value) ? { ...next, editPolicyDraft: event.value } : next;
+      case "MODE_USE": return finishDialog(next, { mode: modes[state.modeIndex].name, editApproval: state.modeIndex === 2 ? state.editPolicyDraft : state.editApproval, toast: `Modo de trabalho: ${modes[state.modeIndex].name}` });
+      case "PREFERENCE": return ["defaultMode", "resumeSession", "liveSummary"].includes(event.name) ? { ...next, [event.name]: event.value } : next;
+      case "PREFERENCES_SAVE": return finishDialog(next, { defaultMode: state.defaultMode, resumeSession: state.resumeSession, liveSummary: state.liveSummary, toast: "Preferências salvas nesta simulação" });
+      case "NEW_SESSION": return { ...initial("welcome", state), mode: state.defaultMode, editApproval: "ask", editPolicyDraft: "ask", draft: "", lastDraft: "", lastAnswer: "", lastQuestion: "", toast: "Nova conversa · histórico anterior preservado" };
+      case "BACK": return finishDialog(next, state.route === "preferences" ? state.preferenceOriginal : {});
+      case "CANCEL": return { ...go(next, "cancelled", false), draft: state.draft };
+      case "GO": return go(next, event.target);
+      case "KEY": {
+        const key = event.key;
+        if (hasMenu(state)) {
+          const options = matches(state);
+          if (key === "ArrowDown" || key === "ArrowUp") {
+            const delta = key === "ArrowDown" ? 1 : -1;
+            return { ...next, menuIndex: options.length ? (state.menuIndex + delta + options.length) % options.length : 0 };
+          }
+          if (key === "Escape") return { ...next, draft: state.questionCommand ? state.lastDraft : state.draft, questionCommand: false, menuDismissed: true };
+          if (key === "Tab" && options.length) return { ...next, draft: options[state.menuIndex % options.length].name + " ", menuDismissed: true };
+          if (key === "Enter") {
+            if (!options.length) return { ...next, hint: "Nenhum comando corresponde ao texto. Esc fecha a lista." };
+            return go(next, options[state.menuIndex % options.length].target);
+          }
+        }
+        if (questions[state.route]) {
+          const q = questions[state.route];
+          if ((key === "ArrowDown" || key === "ArrowUp") && !state.draft && q.choices.length) {
+            return { ...next, choice: (state.choice + (key === "ArrowDown" ? 1 : -1) + q.choices.length) % q.choices.length };
+          }
+          if (key === "Enter") return confirmAnswer(next);
+          if (key === "Escape") return { ...next, pauseQuestion: true };
+        }
+        if (key === "Escape" && screen(state.route).kind !== "chat" && !["welcome", "first-run"].includes(state.route)) return reduce(next, { type: "BACK" });
+        if (key === "Enter" && state.draft.trim() && !busy.has(state.route)) {
+          return { ...go(next, "thinking", false), question: state.draft.trim(), draft: "" };
+        }
+        return next;
+      }
+      default: return next;
+    }
+  }
+  globalThis.CodaroPrototype = { screens, commands, models, modes, busy, questions, screen, initial, matches, hasMenu, filteredModels, modelDetails, executionPlan, reduce };
+})();
+</script><script id="prototype-ui">/* View layer for the review artifact. This is not Codaro's production UI. */
+(() => {
+  const C = globalThis.CodaroPrototype;
+  const byId = id => document.getElementById(id);
+  const escape = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const params = new URLSearchParams(location.search);
+  let state = C.initial(location.hash.slice(1) || params.get("screen") || "welcome");
+  let autoTimer;
+  let lastRoute = state.route;
+  let viewport = params.get("size") || "desktop";
+  const scrollCache = new Map();
+  if (params.has("capture")) document.body.classList.add("capture");
+  const go = (target, label, cls = "", disabled = false) => `<button class="${cls}" data-go="${target}" ${disabled ? "disabled" : ""}>${label}</button>`;
+  const action = (name, label, cls = "", extra = "") => `<button class="${cls}" data-action="${name}" ${extra}>${label}</button>`;
+  const number = n => Number(n).toLocaleString("pt-BR");
+  const compact = n => n >= 1000 ? Math.round(n / 1000) + "k" : number(n);
+  function dispatch(event, options = {}) {
+    const old = state;
+    state = C.reduce(state, event);
+    render({ preserveFocus: options.preserveFocus });
+    if (old.route !== state.route) {
+      history.replaceState(null, "", "#" + state.route);
+      lastRoute = state.route;
+      schedule();
+    }
+  }
+  function schedule() {
+    clearTimeout(autoTimer);
+    if (state.route === "provider-testing") autoTimer = setTimeout(() => dispatch({ type: "PROVIDER_OK" }), 1400);
+    if (state.route === "models-loading") autoTimer = setTimeout(() => dispatch({ type: "GO", target: "models" }), 1400);
+  }
+  function user(text = state.question) { return `<div class="user"><span class="user-label">Você</span>${escape(text)}</div>`; }
+  function stages() {
+    const live = C.busy.has(state.route);
+    let content = `<section class="stages">${action("TOGGLE_DETAILS", `${state.expanded ? "▾" : "▸"} Etapas · ${live ? "3 ações" : "4 ações"}${state.expanded ? "" : " · detalhes"}`, "stage-toggle", `aria-expanded="${state.expanded}"`)}`;
+    if (live && state.liveSummary && !state.expanded) {
+      content += `<div class="live-steps"><div class="stage-entry"><span class="good">✓</span> Leu src/auth.py</div><div class="stage-entry"><span class="accent">◌</span> ${state.route === "validating" ? "Executando os testes de permissões" : state.route === "tool-running" ? "Buscando testes relacionados" : "Conferindo as regras de acesso"}</div></div>`;
+    }
+    if (state.expanded) {
+      content += `<div class="stage-panel"><div class="stage-label">ATIVIDADE</div><div class="stage-entry"><span class="good">✓</span> Leu src/auth.py <span class="faint">· 1–80</span></div><div class="stage-entry"><span class="good">✓</span> Buscou can_edit nos testes</div><div class="stage-entry"><span class="${live ? "accent" : "good"}">${live ? "◌" : "✓"}</span> ${live ? "Conferindo" : "Conferiu"} o comportamento esperado</div><div class="stage-label">RACIOCÍNIO DO MODELO</div>${action("TOGGLE_REASONING", `${state.reasoningExpanded ? "▾" : "▸"} Conteúdo recebido do modelo`, "thought-toggle", `aria-expanded="${state.reasoningExpanded}"`)}${state.reasoningExpanded ? '<div class="reasoning">Exemplo de conteúdo enviado pelo modelo: vou comparar a regra atual com os testes de autorização e verificar se usuários ausentes são tratados antes de acessar suas permissões.</div>' : ""}<div class="caption">Detalhes de ferramenta e raciocínio são registros distintos.</div></div>`;
+    }
+    return content + "</section>";
+  }
+  function answer(content, stream = false) { return `<section class="assistant"><div class="speaker">Codaro</div><div ${stream ? 'class="cursor"' : ""}>${content}</div></section>`; }
+  function questionDock() {
+    const q = { ...C.questions[state.route] };
+    if (state.freeQuestion) q.title = state.freeQuestion;
+    const custom = !!state.draft.trim();
+    return `<section class="question-dock" aria-labelledby="pending-question"><div class="caption">${state.pauseQuestion ? "Pergunta pendente · tarefa pausada" : "? Pergunta"}</div><h3 id="pending-question">${escape(q.title)}</h3><p class="caption">${escape(q.why)}</p>${q.choices.length ? `<div class="choice-list" role="radiogroup" aria-label="${escape(q.title)}">${q.choices.map((x, i) => `<button class="choice ${state.choice === i && !custom ? "selected" : ""}" role="radio" aria-checked="${state.choice === i && !custom}" data-choice="${i}"><span class="radio">${state.choice === i && !custom ? "◉" : "○"}</span><span>${escape(x)}</span>${i === q.recommended ? '<span class="tag">recomendado</span>' : ""}</button>`).join("")}</div>` : ""}</section>`;
+  }
+  function recovery(title, description, buttons, severity = "") {
+    return user() + stages() + `<section class="notice ${severity}"><h3>${title}</h3><p class="caption">${description}</p><div class="actions">${buttons}</div>${action("TOGGLE_ADVANCED", `${state.advanced ? "▾" : "▸"} Detalhes`, "advanced-toggle")}${state.advanced ? '<div class="caption" style="margin-top:10px">Registro ilustrativo: nenhum arquivo foi perdido. Diagnóstico técnico disponível em /status. Credenciais e conteúdo sensível não aparecem na mensagem principal.</div>' : ""}</section>`;
+  }
+  function mainContent() {
+    const r = state.route;
+    if (r === "welcome") return "";
+    if (r === "first-run") return `<section class="welcome"><h2>Vamos conectar seu primeiro modelo.</h2><p class="muted">Use sua própria chave ou um modelo local.</p><div class="onboarding">${go("provider", "Conectar provedor", "primary")}</div><p class="caption" style="margin-top:17px">A chave é configurada fora da conversa.</p></section>`;
+    if (C.questions[r]) return user() + stages();
+    if (r.startsWith("slash")) return "";
+    if (["thinking", "tool-running", "stages-expanded", "plan-collapsed", "plan-expanded"].includes(r)) return user() + stages();
+    if (r === "streaming") return user() + stages() + answer('A autenticação começa em <code>src/auth.py</code>. Estou organizando as melhorias com base nos arquivos consultados.', true);
+    if (r === "answer") return user() + stages() + answer('<p>A autenticação começa em <code>src/auth.py</code> e verifica as permissões do usuário antes de permitir edições.</p><p>Encontrei duas melhorias:</p><ol><li>Tratar usuários ausentes antes de acessar permissões.</li><li>Cobrir acesso permitido e negado nos testes.</li></ol>');
+    if (r === "ask-followup") return user() + stages() + answer(`<p>${escape(state.lastQuestion || C.questions["ask-choice"].title)}</p>`) + `<div class="submitted-answer"><div class="caption">Você · decisão</div>${escape(state.lastAnswer || "Preservar o contrato atual")}</div>` + answer(`<p>${state.lastAnswer.includes("Pode alterar") ? "Vou considerar mudanças no contrato e destacar os impactos de compatibilidade no plano." : "Vou respeitar essa decisão ao organizar a implementação e os testes."}</p>`);
+    if (["conversation", "plan-chat"].includes(r)) return `<article class="chat-turn">${user("Como funciona a autenticação?")}<div class="past-activity">3 ações · 2 arquivos consultados</div>${answer('<p>O fluxo começa em <code>src/auth.py</code>. Antes de liberar uma edição, a função <code>can_edit</code> confere as permissões do usuário.</p><p>Falta tratar o caso de usuário ausente antes de consultar <code>is_admin</code>.</p>')}</article><article class="chat-turn">${user("Corrija esse caso mantendo o contrato atual.")}<div class="past-activity">${r === "plan-chat" ? "Etapa atual · validação de usuários" : "4 ações · implementação e testes"}</div>${answer(r === "plan-chat" ? '<p>Vou corrigir a validação e conferir os testes. O plano continua junto ao input enquanto você acompanha a conversa.</p>' : '<p>Adicionei a verificação de usuário ausente e mantive a assinatura da função.</p><p class="receipt">✓ 24 testes passaram · 2 arquivos alterados</p>')}</article>`;
+    if (r === "plan") return user() + answer(`<p>${state.lastAnswer.includes("Pode alterar") ? "Vou destacar os impactos de compatibilidade no plano." : "Vou preservar o contrato atual da autenticação."}</p><div class="plan"><div class="plan-item current"><span class="number">1</span><span>Validar usuários ausentes em auth.py</span></div><div class="plan-item"><span class="number">2</span><span>Adicionar testes de permissões</span></div><div class="plan-item"><span class="number">3</span><span>Executar testes e conferir o resultado</span></div></div><div class="caption" style="margin-top:14px">Planejar não aplica mudanças. A execução seguirá as aprovações configuradas.</div><div class="row" style="margin-top:18px">` + action("START_PLAN", "Executar com revisão", "primary small") + go("ask-text", "Ajustar o plano", "quiet small") + "</div>");
+    if (r === "validating") return user() + stages() + answer('<p>As alterações foram aplicadas. Estou verificando os testes relacionados antes de concluir.</p>');
+    if (r === "done") return user() + stages() + answer('<p>Corrigi a validação de usuários ausentes e ampliei os testes de autorização.</p><div class="receipt">✓ 24 testes passaram · 2 arquivos alterados</div><p class="caption">Resultado ilustrativo do protótipo.</p><div class="row">' + go("review-diff", "Ver alterações", "quiet small") + go("new-session", "Nova conversa", "quiet small") + "</div>");
+    if (r === "context-compacting") return user() + `<div class="stages"><span class="accent">◌</span> Preservando decisões e resultados importantes.</div>` + answer('<p>Vou reorganizar o contexto para continuar a análise.</p><p class="caption">O histórico permanece disponível para recuperação.</p><div class="row">' + go("thinking", "Continuar demonstração", "quiet small") + "</div>");
+    if (r === "connection-error") return recovery("A conexão com o provedor foi interrompida.", "Seu progresso e rascunho foram preservados. Podemos tentar novamente.", go("thinking", "Tentar novamente", "primary") + go("models", "Trocar modelo", "quiet"), "error");
+    if (r === "auth-error") return recovery("Não foi possível autenticar no provedor.", "Confira a chave cadastrada para continuar.", go("provider", "Configurar provedor", "primary"), "error");
+    if (r === "cancelled" && state.planState?.status === "cancelled") return user() + answer(`<p>Plano cancelado · ${C.executionPlan(state).completed}/4 etapas concluídas.</p><p class="caption">Alterações já aplicadas foram preservadas. Você pode enviar um novo pedido pelo campo abaixo.</p>`);
+    if (r === "cancelled") return recovery(state.actionRejected ? "Solicitação rejeitada." : "Execução interrompida.", state.actionRejected ? "Esta ação não foi executada. O progresso das etapas anteriores foi preservado." : "Alterações já aplicadas permanecem no projeto. Você pode retomar ou cancelar o plano pelo painel abaixo.", go("resumed", "Revisar e retomar", "primary") + go("review-diff", "Ver alterações", "quiet"));
+    if (r === "resumed") return `<div class="caption" style="margin-bottom:20px">Conversa anterior retomada</div>` + user() + stages() + answer('<p>O plano e as decisões anteriores foram recuperados. Vou conferir o estado atual dos arquivos antes de continuar.</p><div class="row">' + go("thinking", "Continuar", "primary small") + go("plan", "Ver plano", "quiet small") + "</div>");
+    if (r === "no-results") return user("Encontre a configuração de autenticação.") + stages() + answer('<p>Não encontrei correspondências para essa busca.</p><p>Posso procurar pelo fluxo de login ou você pode indicar um arquivo.</p><div class="row">' + go("thinking", "Buscar pelo fluxo de login", "quiet small") + go("ask-text", "Indicar arquivo", "quiet small") + "</div>");
+    return `<section class="welcome"><h2>O projeto está pronto para trabalhar.</h2><p class="muted">Conversa e rascunho ficam preservados durante a configuração.</p></section>`;
+  }
+  function phase() {
+    if (state.pauseQuestion) return "Tarefa pausada";
+    if (state.toast) return state.toast;
+    if (["plan-collapsed", "plan-expanded"].includes(state.route)) return "Em execução";
+    return ({ thinking: "Analisando · 8s", "tool-running": "Consultando arquivos · 8s", "stages-expanded": "Analisando · 8s", streaming: "Respondendo · 12s", validating: "Validando · 18s", "context-compacting": "Reorganizando contexto", "ask-choice": "Aguardando sua resposta", "ask-text": "Aguardando sua resposta", "context-scope": "Aguardando sua escolha", "ask-followup": "Decisão recebida", "connection-error": "Conexão interrompida", "auth-error": "Configuração necessária", cancelled: "Execução interrompida", done: "Concluído", "first-run": "Selecione um provedor" })[state.route] || "Pronto";
+  }
+  function menuHtml() {
+    if (!C.hasMenu(state)) return "";
+    const commands = C.matches(state);
+    return `<div class="slash-menu" role="listbox" aria-label="Comandos">${commands.length ? commands.map((x, i) => `<button class="command-option ${i === state.menuIndex % commands.length ? "active" : ""}" role="option" aria-selected="${i === state.menuIndex % commands.length}" data-command="${i}"><span class="cmd">${escape(x.name)}</span><span class="description">${escape(x.description)}</span></button>`).join("") : '<div class="slash-empty">Nenhum comando encontrado. Esc fecha a lista.</div>'}</div>`;
+  }
+  function planPanel() {
+    if (state.planState?.status !== "active") return "";
+    const plan = C.executionPlan(state);
+    const statuses = { done: "Concluída", running: "Em andamento", pending: "Pendente" };
+    return `<section class="execution-plan" aria-label="Plano de execução ativo"><div class="plan-heading">${action("TOGGLE_PLAN", `<span>${state.planExpanded ? "▾" : "▸"}</span><strong>Plano</strong><span>${plan.completed}/${plan.steps.length} concluídas</span><span class="plan-current">${escape(plan.current)}</span>`, "plan-summary", `aria-expanded="${state.planExpanded}" ${state.planExpanded ? 'aria-controls="execution-plan-details"' : ""}`)}${action("CANCEL_PLAN", "Cancelar plano", "quiet small cancel-plan", 'title="Encerra o plano e preserva alterações já aplicadas"')}</div>${state.planExpanded ? `<ol id="execution-plan-details" class="execution-plan-list">${plan.steps.map(step => `<li class="${step.status}"><span class="step-status ${step.status === "done" ? "good" : step.status === "running" ? "accent" : "faint"}" aria-label="${statuses[step.status]}">${step.status === "done" ? "✓" : step.status === "running" ? "◌" : "○"}</span><span>${escape(step.title)}</span></li>`).join("")}</ol>` : ""}</section>`;
+  }
+  function composer() {
+    const hasMenu = C.hasMenu(state), question = !!C.questions[state.route];
+    const used = !["welcome", "first-run", "slash", "slash-filter", "slash-empty"].includes(state.route);
+    const placeholder = question ? "Escreva sua resposta…" : C.busy.has(state.route) ? "Escreva seu próximo pedido enquanto aguarda…" : "Pergunte ou peça uma mudança…";
+    const questionHelp = state.draft.trim() ? '<kbd>Enter</kbd> enviar seu texto · <kbd>Esc</kbd> pausar' : C.questions[state.route]?.choices.length ? '<kbd>↑↓</kbd> escolher · <kbd>Enter</kbd> confirmar <span class="optional">· ou digite sua resposta · Esc pausar</span>' : '<kbd>Enter</kbd> enviar resposta · <kbd>Esc</kbd> pausar';
+    const capacity = C.modelDetails(state.model);
+    const entry = `<div class="entry"><span class="chevron">›</span><textarea id="draft" aria-label="${question ? "Resposta ao modelo" : "Mensagem para o Codaro"}" ${question ? 'aria-describedby="pending-question"' : ""} placeholder="${placeholder}" spellcheck="false">${escape(state.draft)}</textarea></div>`;
+    const response = question ? `<div class="response-card" role="group" aria-labelledby="pending-question">${questionDock()}<div class="response-compose">${entry}<div class="response-actions">${action("PAUSE_QUESTION", "Pausar", "quiet small")}${action("ANSWER", "Enviar ↵", "primary small", !state.draft.trim() && !C.questions[state.route].choices.length ? "disabled" : "")}</div></div></div>` : entry;
+    return `<section class="composer ${question ? "answering" : ""}${state.planState?.status === "active" ? " has-plan" : ""}">${menuHtml()}${planPanel()}${response}${state.hint ? `<div class="hint" role="status">${escape(state.hint)}</div>` : ""}<div class="meta" aria-live="polite"><span>${escape(phase())}${state.mode === "Executar" && state.editApproval === "auto" ? ' <span class="auto-edit-status">· Edições automáticas</span>' : ""}</span><span class="capacity" title="Janela: ${number(capacity.total)} · reserva: ${number(capacity.reserve)} · margem: ${number(capacity.margin)} · entrada: ${number(capacity.budget)}. ${capacity.source}. Valores ilustrativos.">${used ? `Contexto ≈${compact(capacity.used)}/${compact(capacity.budget)} · ${capacity.percent}%` : ""}</span></div><div class="shortcuts"><span>${hasMenu ? '<kbd>↑↓</kbd> navegar · <kbd>Enter</kbd> selecionar · <kbd>Esc</kbd> fechar' : question ? questionHelp : C.busy.has(state.route) ? '<kbd>Ctrl+X</kbd> interromper <span class="optional">· rascunho preservado</span>' : '<kbd>Enter</kbd> enviar · <kbd>/</kbd> comandos <span class="optional">· Alt+Enter nova linha</span>'}</span><button data-action="PALETTE">Ctrl+P menu</button></div></section>`;
+  }
+  function dialog(title, body, actions, wide = false) {
+    return `<div class="modal-backdrop"><section class="dialog ${wide ? "wide" : ""}" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div class="dialog-header"><h2 id="dialog-title">${title}</h2>${action("BACK", "Esc voltar", "close")}</div><div class="dialog-body">${body}</div><div class="dialog-actions">${actions}</div></section></div>`;
+  }
+  function providerDialog() {
+    const kind = state.providerKind;
+    const custom = ["openai-compatible", "ollama"].includes(kind);
+    const testing = state.route === "provider-testing", success = state.route === "provider-success", failure = state.route === "provider-error";
+    const options = ["openai", "anthropic", "gemini", "groq", "ollama", "openai-compatible"];
+    const url = ({ ollama: "http://localhost:11434", "openai-compatible": "https://meu-servidor/v1", openai: "https://api.openai.com/v1", anthropic: "https://api.anthropic.com/v1", gemini: "https://generativelanguage.googleapis.com/v1beta", groq: "https://api.groq.com/openai/v1" })[kind];
+    let body = `<p class="caption">Conecte um provedor com sua chave ou use um modelo local.</p><div class="field"><label for="provider-kind">Provedor</label><select id="provider-kind" ${testing ? "disabled" : ""}>${options.map(x => `<option ${x === kind ? "selected" : ""}>${x}</option>`).join("")}</select></div>`;
+    if (kind !== "ollama") body += `<div class="field"><label for="demo-key">API key</label><input id="demo-key" type="password" value="${escape(state.providerKey)}" placeholder="Use apenas uma chave fictícia neste protótipo" autocomplete="off" ${testing ? "disabled" : ""}><span class="caption">A credencial fica fora da conversa.</span></div>`;
+    if (custom) body += `<div class="field"><label for="provider-url">URL do provedor</label><input id="provider-url" value="${escape(state.providerUrl || url)}" spellcheck="false" ${testing ? "disabled" : ""}></div>`;
+    body += action("TOGGLE_ADVANCED", `${state.advanced ? "▾" : "▸"} Avançado`, "advanced-toggle");
+    if (state.advanced) body += `<div class="advanced"><div class="field"><label for="provider-name">Nome do perfil</label><input id="provider-name" value="${escape(state.providerName)}" ${testing ? "disabled" : ""}></div>${!custom ? `<div class="field"><label for="provider-url">URL da API</label><input id="provider-url" value="${escape(state.providerUrl || url)}" ${testing ? "disabled" : ""}></div>` : ""}<label class="check"><input id="tls-option" type="checkbox" ${state.tls ? "checked" : ""} ${testing ? "disabled" : ""}> TLS Insecure · ignorar verificação de certificado</label>${state.tls ? '<p class="caption warn">A conexão não verificará a identidade do servidor.</p>' : ""}</div>`;
+    body += `<div class="inline-status ${success ? "success" : failure ? "failure" : ""}" role="status">${testing ? "◌ Consultando o catálogo…" : success ? "✓ Conexão verificada · catálogo disponível" : failure ? "Não foi possível conectar. Confira a URL e a credencial." : "O teste de conexão consulta o catálogo, sem inferência."}</div>`;
+    return dialog("Conectar provedor", body, action(testing ? "PROVIDER_CANCEL_TEST" : "PROVIDER_TEST", testing ? "Cancelar teste" : "Testar conexão", "quiet") + go("models", "Salvar e escolher modelo", "primary", testing || failure));
+  }
+  function modelsDialog() {
+    const loading = state.route === "models-loading", empty = state.route === "models-empty";
+    const filtered = C.filteredModels(state);
+    const selected = filtered[state.modelIndex];
+    let body = `<div class="row spread caption"><span>Provedor: ${escape(state.providerName)}</span>${go("provider", "Trocar provedor", "quiet small")}</div><input id="model-query" class="model-search" placeholder="Buscar modelo…" value="${escape(state.modelQuery)}" aria-label="Buscar modelo"><div class="model-list" role="listbox" aria-label="Modelos">${loading ? '<div class="muted" style="padding:25px 4px">◌ Atualizando catálogo…</div>' : empty || !filtered.length ? '<div class="muted" style="padding:25px 4px">Nenhum modelo encontrado.</div>' : filtered.map((x, i) => `<button class="model-row ${i === state.modelIndex ? "active" : ""} ${x.tools === false ? "incompatible" : ""}" data-model="${i}" role="option" aria-selected="${i === state.modelIndex}"><span>${escape(x.id)}</span><span class="ctx">${x.tools === false ? "sem conversa" : x.context}</span></button>`).join("")}</div><div class="model-description">${loading ? "A seleção atual será preservada." : empty ? "Atualize o catálogo ou confira o provedor." : escape(selected?.detail || "Refine a busca.")}</div>`;
+    if (state.route === "model-fallback") body += '<p class="caption warn">A API não informa a janela. O orçamento será conservador até obtermos um limite confiável.</p>';
+    if (state.route === "model-tools") body += '<div class="notice"><h3>Teste completo do modelo</h3><p class="caption">Faz duas chamadas curtas para verificar ferramentas e resposta. Pode consumir créditos.</p><div class="receipt">✓ Chamada, resultado da ferramenta e resposta final verificados</div><p class="caption">Resultado fictício para avaliar a apresentação.</p></div>';
+    body += action("TOGGLE_ADVANCED", `${state.advanced ? "▾" : "▸"} Detalhes do modelo`, "advanced-toggle");
+    if (state.advanced && selected) {
+      const info = C.modelDetails(selected.id);
+      body += `<div class="advanced"><div class="kv"><span>Janela total</span><span>${info.reported ? number(info.total) + " tokens" : "Não informada"}</span></div><div class="kv"><span>Origem</span><span>${escape(info.source)}</span></div><div class="kv"><span>Ferramentas</span><span>${selected.tools == null ? "Não informado" : selected.tools ? "Informado pela API" : "Sem suporte"}</span></div>` + go("model-tools", "Testar ferramentas e resposta", "quiet small", selected.tools === false) + '</div>';
+    }
+    return dialog("Escolher modelo", body, go("models-loading", "Atualizar catálogo", "quiet") + action("MODEL_USE", "Usar modelo", "primary", loading || empty || selected?.tools === false || !selected ? "disabled" : ""));
+  }
+  function modePopover() {
+    return `<div class="mode-popover-layer"><section id="mode-popover" class="mode-popover" role="dialog" aria-modal="true" aria-labelledby="mode-title"><h2 id="mode-title">Modo de trabalho</h2><div class="mode-list" role="radiogroup" aria-label="Modo de trabalho">${C.modes.map((mode, index) => `<button class="mode-option ${state.modeIndex === index ? "selected" : ""}" data-mode="${index}" role="radio" aria-checked="${state.modeIndex === index}" title="${escape(mode.scope)}"><span class="mode-caret" aria-hidden="true">${state.modeIndex === index ? "›" : ""}</span><span class="mode-name">${mode.name}</span><span class="mode-description">${mode.description}</span><span class="mode-current">${state.mode === mode.name ? "Atual" : ""}</span></button>`).join("")}</div><div class="mode-permissions">${state.modeIndex === 2 ? action("EDIT_POLICY_TOGGLE", `Edições: ${state.editPolicyDraft === "auto" ? "aprovar automaticamente" : "pedir autorização"} ${state.editPolicyExpanded ? "▴" : "▾"}`, "edit-policy-toggle", `aria-expanded="${state.editPolicyExpanded}"`) : ""}${state.modeIndex === 2 && state.editPolicyExpanded ? `<fieldset class="edit-policy-options"><legend class="visually-hidden">Aprovação de edições</legend>${[["ask", "Pedir autorização"], ["auto", "Aprovar automaticamente"]].map(([value, label]) => `<label><input id="edit-policy-${value}" name="edit-policy" type="radio" value="${value}" ${state.editPolicyDraft === value ? "checked" : ""}>${label}</label>`).join("")}<p>Vale para criar e editar arquivos do projeto nesta conversa. Comandos e ações destrutivas continuam com confirmação.</p></fieldset>` : ""}</div><div class="mode-footer"><span>↑↓ navegar · Enter aplicar · Esc fechar</span>${action("MODE_USE", "Aplicar", "primary small")}</div></section></div>`;
+  }
+  function modal() {
+    const kind = C.screen(state.route).kind;
+    if (kind === "provider") return providerDialog();
+    if (kind === "models") return modelsDialog();
+    if (kind === "review") return dialog("Revisar alterações · 2 arquivos", '<p class="caption">Aplicar permitirá que o agente continue para a validação.</p><div class="row spread caption" style="margin:15px 0 8px"><span>src/auth.py</span><span class="good">+3 <span class="bad">−1</span></span></div><div class="diff"><span class="muted">@@ can_edit(user)</span>\n<span class="remove">− return user.is_admin</span>\n<span class="add">+ if user is None:\n+     return False\n+ return user.is_admin</span></div><div class="caption" style="margin-top:15px">tests/test_auth.py · cenários de usuário ausente e acesso negado</div><p class="caption" style="margin-top:13px">Revise o conjunto antes de autorizar. Nenhuma mudança é aplicada automaticamente.</p>', action("REJECT", "Rejeitar", "quiet danger") + action("BACK", "Voltar", "quiet") + action("APPROVE", "Aplicar e continuar", "primary"), true);
+    if (kind === "command") return dialog("Autorizar comando", '<p>Executar os testes relacionados à autenticação.</p><div class="permission-command">python -m pytest tests/test_auth.py -q</div><div class="caption">Diretório: ~/projetos/codaro<br>Limite: 60 segundos</div><p class="caption" style="margin-top:15px">Esta autorização vale somente para o comando exibido.</p>', action("REJECT", "Rejeitar", "quiet") + action("APPROVE", "Executar", "primary"));
+    if (kind === "mode") return modePopover();
+    if (kind === "preferences") return dialog("Preferências", `<div class="field"><label for="default-mode">Modo ao iniciar uma conversa</label><select id="default-mode">${C.modes.map(mode => `<option ${state.defaultMode === mode.name ? "selected" : ""}>${mode.name}</option>`).join("")}</select></div><label class="check"><input id="resume-option" type="checkbox" ${state.resumeSession ? "checked" : ""}> Oferecer retomada da última conversa</label><label class="check"><input id="summary-option" type="checkbox" ${state.liveSummary ? "checked" : ""}> Mostrar resumos curtos das etapas</label><p class="caption">Raciocínio completo e dados técnicos ficam nos detalhes.</p>`, action("BACK", "Cancelar", "quiet") + action("PREFERENCES_SAVE", "Salvar preferências", "primary"));
+    if (kind === "status") {
+      const info = C.modelDetails(state.model);
+      const fields = [["Projeto", "~/projetos/codaro"], ["Modelo", state.providerName + " / " + state.model], ["Modo", state.mode], ["Janela total", info.reported ? number(info.total) + " tokens" : "Não informada pela API"], ["Reserva de saída", number(info.reserve) + " tokens"], ["Margem", number(info.margin) + " tokens"], ["Orçamento de entrada", number(info.budget) + " tokens"], ["Entrada estimada", number(info.used) + " tokens"], ["Origem do limite", info.source], ["Edições", state.editApproval === "auto" ? "Automáticas nesta conversa" : "Pedir autorização"], ["Comandos", "Pedir autorização"], ["Diagnóstico local", ".codaro/prompt.json"]];
+      return dialog("Detalhes da sessão", fields.map(([key, value]) => `<div class="kv"><span>${escape(key)}</span><span>${escape(value)}</span></div>`).join("") + '<p class="caption" style="margin-top:13px">Dados ilustrativos do protótipo.</p>', action("BACK", "Fechar", "quiet"));
+    }
+    if (kind === "help") return dialog("Comandos e atalhos", '<p class="caption">A ajuda do rodapé muda conforme a interação.</p>' + [ ["Abrir comandos", "/ ou Ctrl+P"], ["Selecionar comando", "↑↓ e Enter"], ["Completar sem executar", "Tab"], ["Fechar lista ou modal", "Esc"], ["Enviar mensagem", "Enter"], ["Nova linha", "Alt+Enter"], ["Interromper execução", "Ctrl+X"], ["Detalhes da sessão", "/status"] ].map(([a, b]) => `<div class="help-row"><span>${a}</span><code>${b}</code></div>`).join("") + '<p class="caption" style="margin-top:14px">No macOS, exibir ⌘ quando recebido pelo terminal e manter Ctrl como alternativa. A validação nativa faz parte da próxima etapa.</p>', action("BACK", "Fechar", "quiet"));
+    if (kind === "new-session") return dialog("Começar outra conversa?", `<p>A conversa atual continuará disponível para retomada.</p><p class="caption">Seu rascunho será preservado ao voltar.</p>${state.planState?.status === "active" ? '<p class="caption">Começar outra conversa encerra o plano atual. Arquivos já alterados são mantidos.</p>' : ""}`, action("BACK", "Continuar aqui", "quiet") + action("NEW_SESSION", "Nova conversa", "primary"));
+    return "";
+  }
+  function workspaceHtml() {
+    const selection = state;
+    // The prototype keeps the originating conversation visible while selecting a mode.
+    // Rendering is synchronous; restore the interaction state before handling any event.
+    const modeOpen = C.screen(selection.route).kind === "mode";
+    if (modeOpen) state = selection.dialogOrigin || { ...selection, route: "welcome", draft: selection.lastDraft };
+    try {
+      return `<header class="header"><div class="brand"><span class="mark">◈</span>Codaro<span class="repo">codaro</span></div><div class="identity"><button class="quiet model" data-go="${state.route === "first-run" ? "provider" : "models"}" title="Selecionar provedor e modelo">${state.route === "first-run" ? "Conectar modelo" : escape(state.model)}</button><span class="faint">·</span><button id="mode-trigger" class="mode-trigger" data-go="mode" aria-haspopup="dialog" aria-expanded="${modeOpen}" ${modeOpen ? 'aria-controls="mode-popover"' : ""} title="${escape(C.modes.find(x => x.name === state.mode)?.scope)}">${escape(state.mode)} ▾</button>${state.tls ? '<span class="transport-warning" title="A identidade do servidor não será verificada">TLS sem verificação</span>' : ""}</div></header><main class="chat" id="chat">${mainContent()}</main>${composer()}`;
+    } finally {
+      state = selection;
+    }
+  }
+  function render(options = {}) {
+    const sameScene = lastRoute === state.route;
+    const chatScroll = byId("chat")?.scrollTop || 0;
+    const scrollAreas = [".dialog-body", ".question-dock", ".model-list", ".execution-plan-list"].map(selector => [selector, byId("terminal").querySelector(selector)?.scrollTop || 0]);
+    scrollCache.set(lastRoute + ":chat", chatScroll);
+    for (const [selector, top] of scrollAreas) scrollCache.set(C.screen(lastRoute).kind + selector, top);
+    const activeAction = document.activeElement?.dataset?.action;
+    const activeChoice = document.activeElement?.dataset?.choice;
+    const activeMode = document.activeElement?.dataset?.mode;
+    const previousFocus = document.activeElement?.id;
+    const start = document.activeElement?.selectionStart;
+    const end = document.activeElement?.selectionEnd;
+    const terminal = byId("terminal");
+    terminal.className = "terminal " + (viewport === "desktop" ? "" : viewport);
+    const modalContent = modal();
+    terminal.innerHTML = `<div class="titlebar"><span class="dots"><i></i><i></i><i></i></span><em>Codaro · proposta de UI</em><span>protótipo</span></div><div class="workspace" ${modalContent ? "inert" : ""}>${workspaceHtml()}</div>${modalContent}`;
+    byId("screen-select").value = state.route;
+    byId("screen-title").textContent = C.screen(state.route).title;
+    byId("screen-count").textContent = `${C.screens.findIndex(x => x.id === state.route) + 1} / ${C.screens.length}`;
+    if (options.preserveFocus && previousFocus && byId(previousFocus)) {
+      const element = byId(previousFocus); element.focus({ preventScroll: true });
+      if (typeof start === "number" && typeof element.setSelectionRange === "function") element.setSelectionRange(start, end);
+    } else if (sameScene && activeAction && terminal.querySelector(`[data-action="${activeAction}"]`)) terminal.querySelector(`[data-action="${activeAction}"]`).focus({ preventScroll: true });
+    else if (sameScene && activeChoice != null && terminal.querySelector(`[data-choice="${state.choice}"]`)) terminal.querySelector(`[data-choice="${state.choice}"]`).focus({ preventScroll: true });
+    else if (sameScene && activeMode != null && terminal.querySelector('.mode-option.selected')) terminal.querySelector('.mode-option.selected').focus({ preventScroll: true });
+    else if (!modalContent) byId("draft").focus({ preventScroll: true });
+    else (terminal.querySelector('.mode-popover .mode-option.selected') || terminal.querySelector('.dialog input:not(:disabled), .dialog select:not(:disabled)') || terminal.querySelector('.dialog button:not(:disabled)'))?.focus({ preventScroll: true });
+    const active = terminal.querySelector(".command-option.active");
+    if (active) active.parentElement.scrollTop = Math.max(0, active.offsetTop - active.parentElement.clientHeight / 2);
+    const draft = byId("draft");
+    if (draft) draft.style.height = Math.min(140, Math.max(viewport === "compact" ? 34 : 52, draft.scrollHeight || 0)) + "px";
+    const viewRoute = C.screen(state.route).kind === "mode" ? state.dialogOrigin?.route || "welcome" : state.route;
+    byId("chat").scrollTop = scrollCache.get(viewRoute + ":chat") || 0;
+    const popover = terminal.querySelector('.mode-popover'), anchor = terminal.querySelector('.mode-trigger');
+    if (popover && anchor && typeof anchor.getBoundingClientRect === "function") {
+      const frame = terminal.getBoundingClientRect(), trigger = anchor.getBoundingClientRect();
+      popover.style.left = Math.max(12, Math.min(trigger.right - frame.left - popover.offsetWidth, frame.width - popover.offsetWidth - 12)) + "px";
+      popover.style.top = Math.max(36, Math.min(trigger.bottom - frame.top + 8, frame.height - popover.offsetHeight - 12)) + "px";
+      popover.style.right = "auto";
+    }
+    for (const [selector, previousScroll] of scrollAreas) {
+      const area = terminal.querySelector(selector);
+      if (!area) continue;
+      area.scrollTop = scrollCache.get(C.screen(state.route).kind + selector) || 0;
+      const selected = area.querySelector('.choice.selected, .model-row.active');
+      if (!selected || typeof selected.getBoundingClientRect !== "function") continue;
+      const row = selected.getBoundingClientRect(), panel = area.getBoundingClientRect();
+      if (row.bottom > panel.bottom) area.scrollTop += row.bottom - panel.bottom;
+      else if (row.top < panel.top) area.scrollTop -= panel.top - row.top;
+    }
+  }
+  byId("terminal").addEventListener("click", event => {
+    if (C.screen(state.route).kind === "mode" && event.target.matches?.('.mode-popover-layer')) return dispatch({ type: "BACK" });
+    const button = event.target.closest("button"); if (!button || button.disabled) return;
+    if (button.dataset.go) return dispatch({ type: "GO", target: button.dataset.go });
+    if (button.dataset.command != null) { state = { ...state, menuIndex: Number(button.dataset.command) }; return dispatch({ type: "KEY", key: "Enter" }); }
+    if (button.dataset.choice != null) return dispatch({ type: "CHOICE", index: Number(button.dataset.choice) });
+    if (button.dataset.model != null) return dispatch({ type: "MODEL_SELECT", index: Number(button.dataset.model) });
+    if (button.dataset.mode != null) return dispatch({ type: "MODE_SELECT", index: Number(button.dataset.mode) });
+    if (button.dataset.action) dispatch({ type: button.dataset.action });
+  });
+  byId("terminal").addEventListener("input", event => {
+    if (event.target.id === "draft") dispatch({ type: "DRAFT", value: event.target.value }, { preserveFocus: true });
+    if (event.target.id === "model-query") dispatch({ type: "MODEL_QUERY", value: event.target.value }, { preserveFocus: true });
+    const field = { "demo-key": "providerKey", "provider-url": "providerUrl", "provider-name": "providerName" }[event.target.id];
+    if (field) dispatch({ type: "PROVIDER_FIELD", name: field, value: event.target.value }, { preserveFocus: true });
+  });
+  byId("terminal").addEventListener("change", event => {
+    if (event.target.name === "edit-policy") dispatch({ type: "EDIT_POLICY_SELECT", value: event.target.value }, { preserveFocus: true });
+    if (event.target.id === "provider-kind") dispatch({ type: "PROVIDER_KIND", value: event.target.value });
+    if (event.target.id === "tls-option") dispatch({ type: "TLS", value: event.target.checked });
+    if (event.target.id === "default-mode") dispatch({ type: "PREFERENCE", name: "defaultMode", value: event.target.value }, { preserveFocus: true });
+    if (event.target.id === "resume-option") dispatch({ type: "PREFERENCE", name: "resumeSession", value: event.target.checked }, { preserveFocus: true });
+    if (event.target.id === "summary-option") dispatch({ type: "PREFERENCE", name: "liveSummary", value: event.target.checked }, { preserveFocus: true });
+  });
+  document.addEventListener("keydown", event => {
+    if (event.isComposing) return;
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "p") { event.preventDefault(); if (!modal()) dispatch({ type: "PALETTE" }); return; }
+    if (event.key === "Tab" && modal()) {
+      const controls = [...byId("terminal").querySelectorAll('.dialog button:not(:disabled), .dialog input:not(:disabled), .dialog select:not(:disabled), .mode-popover button:not(:disabled), .mode-popover input:not(:disabled)')];
+      const index = controls.indexOf(document.activeElement);
+      if (controls.length && (index < 0 || !event.shiftKey && index === controls.length - 1 || event.shiftKey && index === 0)) { event.preventDefault(); controls[event.shiftKey ? controls.length - 1 : 0].focus(); }
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "x" && C.busy.has(state.route)) { event.preventDefault(); dispatch({ type: "CANCEL" }); return; }
+    if (event.key === "Escape") { event.preventDefault(); dispatch({ type: "KEY", key: "Escape" }); return; }
+    const target = event.target;
+    if (C.screen(state.route).kind === "mode" && target.closest?.(".mode-list") && ["ArrowDown", "ArrowUp", "Enter"].includes(event.key)) {
+      event.preventDefault();
+      if (event.key === "Enter") dispatch({ type: "MODE_USE" });
+      else dispatch({ type: "MODE_SELECT", index: (state.modeIndex + (event.key === "ArrowDown" ? 1 : -1) + C.modes.length) % C.modes.length });
+      return;
+    }
+    if (C.screen(state.route).kind === "models" && (target.id === "model-query" || target.closest?.(".model-list")) && ["ArrowDown", "ArrowUp", "Enter"].includes(event.key)) {
+      event.preventDefault();
+      const count = C.filteredModels(state).length;
+      if (event.key === "Enter") dispatch({ type: "MODEL_USE" });
+      else dispatch({ type: "MODEL_SELECT", index: count ? (state.modelIndex + (event.key === "ArrowDown" ? 1 : -1) + count) % count : 0 });
+      return;
+    }
+    if (target.id !== "draft") {
+      if (C.questions[state.route] && target.closest?.(".choice-list") && ["ArrowDown", "ArrowUp", "Enter"].includes(event.key)) { event.preventDefault(); if (event.key === "Enter" && target.dataset.choice != null) state = C.reduce(state, { type: "CHOICE", index: Number(target.dataset.choice) }); dispatch({ type: "KEY", key: event.key }); }
+      return;
+    }
+    if (event.key === "Enter" && (event.altKey || event.shiftKey)) { event.preventDefault(); target.setRangeText("\n", target.selectionStart, target.selectionEnd, "end"); dispatch({ type: "DRAFT", value: target.value }, { preserveFocus: true }); return; }
+    if (["Enter", "ArrowDown", "ArrowUp", "Tab"].includes(event.key) && !(event.key === "Tab" && !C.matches(state).length) && (event.key === "Enter" || C.hasMenu(state) || C.questions[state.route] && !state.draft)) {
+      event.preventDefault(); dispatch({ type: "KEY", key: event.key });
+    }
+  });
+  const select = byId("screen-select");
+  for (const group of [...new Set(C.screens.map(x => x.group))]) {
+    const optgroup = document.createElement("optgroup"); optgroup.label = group;
+    C.screens.filter(x => x.group === group).forEach(x => { const option = document.createElement("option"); option.value = x.id; option.textContent = x.title; optgroup.appendChild(option); });
+    select.appendChild(optgroup);
+  }
+  select.addEventListener("change", event => dispatch({ type: "SCREEN", id: event.target.value }));
+  byId("previous").onclick = () => dispatch({ type: "SCREEN", id: C.screens[(C.screens.findIndex(x => x.id === state.route) - 1 + C.screens.length) % C.screens.length].id });
+  byId("next").onclick = () => dispatch({ type: "SCREEN", id: C.screens[(C.screens.findIndex(x => x.id === state.route) + 1) % C.screens.length].id });
+  byId("viewport").onchange = event => { viewport = event.target.value; render(); };
+  byId("viewport").value = viewport;
+  byId("catalog-toggle").onclick = () => byId("catalog").classList.toggle("open");
+  byId("catalog").innerHTML = [...new Set(C.screens.map(x => x.group))].map(group => `<h2>${escape(group)}</h2><div class="items">${C.screens.filter(x => x.group === group).map(x => `<button data-screen="${x.id}">${escape(x.title)}<small>${x.id}</small></button>`).join("")}</div>`).join("");
+  byId("catalog").onclick = event => { const button = event.target.closest("button[data-screen]"); if (button) { dispatch({ type: "SCREEN", id: button.dataset.screen }); byId("terminal").scrollIntoView({ behavior: "smooth", block: "start" }); } };
+  window.addEventListener("hashchange", () => { const id = location.hash.slice(1); if (id !== state.route) dispatch({ type: "SCREEN", id }); });
+  render(); schedule();
+  globalThis.CodaroPrototypeUI = { getState: () => ({ ...state }), dispatch };
+})();
+</script>
+</body></html>

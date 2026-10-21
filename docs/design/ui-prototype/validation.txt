@@ -1,0 +1,39 @@
+✓ Setas e Enter abrem o comando destacado
+✓ Filtrar comandos mantém navegação e seleção
+✓ Tab completa sem executar; Esc preserva o texto
+✓ Comando desconhecido não vira mensagem ao modelo
+✓ Modelo selecionado restaura rascunho anterior à configuração
+✓ Escolher opção não confirma nem autoriza alterações
+✓ Resposta livre prevalece sobre a opção destacada
+✓ Resposta que começa com / é enviada como resposta à pergunta
+✓ Pergunta obrigatória pode pausar; não continua sem resposta
+✓ Outra abordagem abre resposta livre específica
+✓ Modelo sem conversa não pode ser ativado
+✓ Teste do provedor preserva formulário e TLS
+✓ Aprovação é explícita e rejeição não a concede
+✓ Detalhes recolhidos não reabrem ao editar o rascunho
+✓ Modo só muda após confirmação e preserva conversa e rascunho
+✓ Trocar modelo mantém o turno e atualiza o orçamento de contexto
+✓ Fluxo de provedor e modelos preserva a pergunta pendente
+✓ Preferências só são aplicadas ao salvar
+✓ Cancelar o teste de conexão retorna ao formulário preenchido
+✓ Comandos durante execução e Esc preservam o rascunho
+✓ Cancelar seleção do modo preserva pergunta pendente e modo atual
+✓ Aprovação automática de edições exige aplicar e não autoriza comandos
+✓ Plano mantém recolhimento manual e representa progresso até a conclusão
+✓ Plano ativo permanece no input até concluir ou cancelar explicitamente
+✓ Conclusão remove o plano do input e preserva seu resultado
+✓ Durante execução Enter preserva o próximo rascunho
+✓ Bindings reais: /, setas, Enter abrem o seletor correto
+✓ Bindings reais: setas destacam modo e Enter confirma
+✓ Menu de modos preserva conversa visível e concentra a confirmação em Aplicar
+✓ Bindings reais: Ctrl+P preserva rascunho ao escolher modelo
+✓ Bindings reais: Alt+Enter insere linha, sem enviar
+✓ Composição de texto não envia a mensagem antes da confirmação
+✓ Cancelar teste remove o resultado pendente do provedor
+✓ Texto livre é escapado antes de entrar no HTML
+✓ Pergunta e único input compartilham componente; resposta entra no histórico
+✓ Conversa e pergunta compartilham input com plano fixo e recolhível
+✓ Todos os estados renderizam com os bindings reais
+
+37 verificações passaram; 46 estados renderizados. Validação visual nativa pendente.

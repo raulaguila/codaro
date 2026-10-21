@@ -1,0 +1,35 @@
+                                                                                                                        
+  ◈ Codaro                                                                                                              
+  …ro-interface-review-0b2a6qg6/layout-120 · qwen3.8:27b · Executar · Aprovação por ação · TLS verificação ativa        
+                                                                                                                        
+   Vamos trabalhar no seu projeto                                                                                       
+                                Configurar provedor                                                                     
+   Escolha um ponto de partida ou escreva sua pergunta.                                                                 
+   As respostas usam os arquivos locais; edições exigem sua aprovação.                                                  
+                                                                                                                        
+            Explorar               Buscar código             Propor mudança                                             
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+   Modelo selecionado: local / qwen3.8:27b                                                                              
+   Contexto: 131072 tokens · API: max_model_len                                                                         
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+  Contexto ≈ 13% · 122.4k · /status                                                                                     
+  Investigando…                                                                                                         
+  › /settings · Preferências de inicialização e limites avançados                                                       
+    /integrations · Cadastrar MCP ou plugin com teste de conexão                                                        
+    /undo-turn · Revisar e desfazer todos os arquivos de uma interação                                                  
+    /redo · Revisar e refazer a última interação desfeita                                                               
+    /sessions · Listar sessões independentes                                                                            
+  Tab completa · ↑↓ escolhem · Esc fecha                                                                                
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+  /                                                                                                                     
+                                                                                                                        
+  Enter envia · Alt+Enter nova linha · / comandos · @ arquivo · ↑ histórico                                             
+ Ctrl+X Cancelar  Ctrl+Q Sair  Ctrl+L Mensagens  Ctrl+P Comandos                                                        
