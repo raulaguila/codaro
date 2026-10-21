@@ -8,12 +8,13 @@ import sqlite3
 import time
 from pathlib import Path
 
-from codaro.agent import Agent, cites_observed_lines, serialize
+from codaro.agent import Agent, cites_observed_lines
 from codaro.index import CodeIndex
 from codaro.llm import ModelError
 from codaro.repository import Repository
 from codaro.storage import private_json
 from codaro.trace import timestamp
+from codaro.trace_metrics import evaluation_metrics
 
 
 def load_cases(path: Path):
@@ -134,44 +135,14 @@ def evaluate(path: Path, *, provider=None, mode="retrieval"):
                 flow = private_json(repository.root / ".codaro/prompt.json", 16_000_000)
                 evidence = [
                     (item["path"], item["start_line"], item["end_line"])
-                    for item in flow["turns"][-1].get("evidence", [])
+                    for item in (flow.get("turns") or [{}])[-1].get("evidence", [])
                 ]
                 result.update(
                     answer_metrics(
                         answer, evidence, case["expected_paths"], case.get("answer_contains", [])
                     )
                 )
-                seen = set()
-                repeated = 0
-                estimates, actual_input, actual_output, usage_calls, output_calls = 0, 0, 0, 0, 0
-                for turn in flow["turns"]:
-                    estimates += turn["budget"].get("input_tokens_estimate", 0)
-                    for action in turn["tool_results"]:
-                        key = serialize(
-                            [action["message"].get("name"), action["normalized_arguments"]]
-                        )
-                        repeated += key in seen
-                        seen.add(key)
-                    for attempt in turn["http_attempts"]:
-                        usage = attempt.get("usage")
-                        if isinstance(usage, dict) and type(usage.get("prompt_tokens")) is int:
-                            actual_input += usage["prompt_tokens"]
-                            usage_calls += 1
-                        if isinstance(usage, dict) and type(usage.get("completion_tokens")) is int:
-                            actual_output += usage["completion_tokens"]
-                            output_calls += 1
-                result.update(
-                    answer=answer,
-                    model_requests=len(flow["turns"]),
-                    tool_calls=sum(len(item["tool_results"]) for item in flow["turns"]),
-                    repeated_calls=repeated,
-                    compactions=len(flow.get("compactions", [])),
-                    estimated_input_tokens=estimates,
-                    reported_input_tokens=actual_input if usage_calls else None,
-                    reported_output_tokens=actual_output if output_calls else None,
-                    usage_requests_covered=usage_calls,
-                    output_usage_requests_covered=output_calls,
-                )
+                result.update(answer=answer, **evaluation_metrics(flow))
             result["status"] = "success"
         except (ValueError, OSError, ModelError, sqlite3.Error) as exc:
             result["error"] = str(exc)

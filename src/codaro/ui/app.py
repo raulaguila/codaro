@@ -21,7 +21,6 @@ from codaro.agent import Agent, AgentEvent, InvestigationCancelled
 from codaro.index import CodeIndex, safe_preview
 from codaro.interaction import COMMANDS, InputHistory, completions
 from codaro.llm import (
-    MAX_MESSAGE_CHARS,
     ContextCapacityError,
     ModelError,
     Settings,
@@ -29,6 +28,7 @@ from codaro.llm import (
 )
 from codaro.policies import Mode
 from codaro.storage import private_lock
+from codaro.ui import streaming as stream_ui
 from codaro.ui.composer import Prompt
 from codaro.ui.formatting import short_path
 from codaro.ui.palette import system_commands
@@ -1059,64 +1059,7 @@ class CodaroApp(App):
         self.deliver(self.finish, answer, successful)
 
     def activity(self, event: AgentEvent):
-        if event.kind == "model_start":
-            self.query_one("#context-meter", Static).update(
-                f"Contexto ≈ {event.context_tokens or 0:,}/"
-                f"{event.context_limit or self.agent.adaptive_input_limit:,} · "
-                f"{self.agent.provider.settings.context_source} · /status"
-            )
-        elif event.kind == "compaction" or event.title in {
-            "Contexto liberado",
-            "Contexto reduzido",
-        }:
-            self.query_one("#context-meter", Static).update(
-                "Contexto compactado automaticamente · /status"
-            )
-        if event.kind == "plan":
-            self.show_plan()
-        elif event.kind == "model_start":
-            self.update_session_header()
-            self.finish_preview("retry")
-            if self.answer_preview is not None:
-                self.answer_preview.finish("retry")
-                self.answer_preview = None
-            self.context_chars = event.context_chars or 0
-            self.context_tokens = event.context_tokens or 0
-            self.reported_tokens = None
-            self.context_limit = event.context_limit or self.agent.adaptive_input_limit
-            self.query_one("#status", Static).update(
-                f"Consultando modelo… · contexto ≈ {self.context_tokens:,} / "
-                f"{self.context_limit:,} tokens"
-            )
-
-        elif event.reported_tokens is not None:
-            self.reported_tokens = event.reported_tokens
-            self.query_one("#status", Static).update(safe_preview(event.detail))
-        elif event.kind == "model_end":
-            self.finish_preview(
-                event.state,
-                " · ".join(filter(None, (event.title, event.detail)))
-                if event.state == "retry"
-                else "",
-            )
-            if event.state == "retry" and self.answer_preview is not None:
-                self.answer_preview.finish("retry", event.title)
-                self.answer_preview = None
-        elif event.kind == "tool_start":
-            self.query_one("#status", Static).update(
-                safe_preview(f"{event.title}… · {event.detail}".rstrip(" ·"))
-            )
-        elif event.kind == "tool_end":
-            duration = f"{event.elapsed_ms:.0f} ms" if event.elapsed_ms is not None else ""
-            if self.activity_group is None:
-                self.activity_group = ActivityGroup()
-                self.mount_message(self.activity_group)
-            self.activity_group.add(event)
-            self.query_one("#status", Static).update(f"{event.title} · {duration}")
-        else:
-            self.query_one("#status", Static).update(
-                safe_preview(f"{event.title} · {event.detail}".rstrip(" ·"))
-            )
+        return stream_ui.activity(self, event)
 
     def show_plan(self):
         task = self.agent.tasks.current()
@@ -1137,85 +1080,22 @@ class CodaroApp(App):
             self.plan_card.query_one(Static).update(safe_preview(text))
 
     def append_delta(self, delta: str):
-        # A content delta may precede native tool_calls in the same message.
-        # Only finish() can commit an answer to the conversation.
-        self.draft_text = (self.draft_text + safe_preview(delta))[:MAX_MESSAGE_CHARS]
-        self.query_one("#status", Static).update(
-            f"Gerando resposta… · {self.shortcut_display('x')} para cancelar"
-        )
-        # Render the first fragment immediately; subsequent fragments are coalesced by the timer.
-        if self.generation_preview is None:
-            self.flush_preview()
+        return stream_ui.append_delta(self, delta)
 
     def append_reasoning(self, delta: str):
-        if self.reasoning_preview is None:
-            self.reasoning_preview = GenerationPreview(reasoning=True)
-            self.reasoning_preview.collapsed = False
-            if self.reasoning_group is None:
-                self.reasoning_group = ReasoningGroup(
-                    self.reasoning_preview, collapsed=not self.show_reasoning
-                )
-                self.mount_message(self.reasoning_group)
-            else:
-                self.reasoning_group.add_preview(self.reasoning_preview)
-        self.reasoning_preview.update_text(
-            (self.reasoning_preview.text + safe_preview(delta))[:4001]
-        )
-        self.query_one("#status", Static).update("Modelo raciocinando…")
+        return stream_ui.append_reasoning(self, delta)
 
     def flush_preview(self):
-        if not self.draft_text or self.draft_text == self.draft_rendered:
-            return
-        conversation = self.query_one("#conversation", VerticalScroll)
-        follow = conversation.is_vertical_scroll_end
-        if self.generation_preview is None:
-            self.generation_preview = GenerationPreview()
-            if self.activity_group is None:
-                self.activity_group = ActivityGroup()
-                self.mount_message(self.activity_group)
-            self.activity_group.add_preview(self.generation_preview)
-            self.mount_message(self.generation_preview)
-        self.generation_preview.update_text(self.draft_text)
-        self.draft_rendered = self.draft_text
-        if follow:
-            self.call_after_refresh(conversation.scroll_end, animate=False)
+        return stream_ui.flush_preview(self)
 
     def finish_preview(self, state: str, reason: str = ""):
-        self.flush_preview()
-        if self.generation_preview is not None:
-            self.generation_preview.finish(state, reason)
-            if state == "answer":
-                self.answer_preview = self.generation_preview
-        if self.reasoning_preview is not None:
-            self.reasoning_preview.finish(state)
-            self.reasoning_preview = None
-        self.draft_text = self.draft_rendered = ""
-        self.generation_preview = None
+        return stream_ui.finish_preview(self, state, reason)
 
     def flush_response(self):
-        if not self.response_text or self.response_text == self.rendered_text:
-            return
-        conversation = self.query_one("#conversation", VerticalScroll)
-        follow = conversation.is_vertical_scroll_end
-        if self.reply is None:
-            self.speaker = Static("Codaro", classes="speaker", markup=False)
-            self.mount_message(self.speaker)
-            self.reply = Markdown(self.response_text, classes="assistant", open_links=False)
-            self.mount_message(self.reply)
-        else:
-            self.reply.update(self.response_text)
-        self.rendered_text = self.response_text
-        if follow:
-            self.call_after_refresh(conversation.scroll_end, animate=False)
+        return stream_ui.flush_response(self)
 
     def discard_response(self):
-        self.response_text = self.rendered_text = ""
-        if self.reply is not None:
-            self.reply.remove()
-            self.reply = None
-        if self.speaker is not None:
-            self.speaker.remove()
-            self.speaker = None
+        return stream_ui.discard_response(self)
 
     def finish(self, answer: str, successful: bool = True):
         self.finish_preview("answer" if successful else "cancelled")

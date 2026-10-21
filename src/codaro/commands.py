@@ -10,6 +10,8 @@ import threading
 import time
 from pathlib import Path
 
+from codaro.command_environment import command_environment, mask_command_secrets
+from codaro.command_sandbox import sandbox_command
 from codaro.index import safe_preview
 from codaro.llm import RequestCancelled
 from codaro.runtime import remaining_seconds, request_artifacts
@@ -42,6 +44,8 @@ def run_command(root: Path, argv: list[str], timeout=60, cancelled=None) -> dict
     if remaining is not None:
         timeout = min(timeout, remaining)
     started = time.monotonic()
+    environment = command_environment(os.environ)
+    command, sandbox = sandbox_command(root, argv, environment)
     # A pipe drained by a reader thread avoids unbounded disk writes and pipe deadlocks.
     captured = bytearray()
     store = request_artifacts.get()
@@ -57,12 +61,12 @@ def run_command(root: Path, argv: list[str], timeout=60, cancelled=None) -> dict
 
     with tempfile.TemporaryFile() as empty_input:
         process = subprocess.Popen(
-            argv,
+            command,
             cwd=root,
             stdin=empty_input,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            env={key: value for key, value in os.environ.items() if key != "CODARO_API_KEY"},
+            env=environment,
             start_new_session=os.name == "posix",
         )
     reader = threading.Thread(target=consume, args=(process.stdout,), daemon=True)
@@ -90,7 +94,9 @@ def run_command(root: Path, argv: list[str], timeout=60, cancelled=None) -> dict
     if store and total > 8000:
         try:
             artifact = store.save(
-                bytes(captured).decode("utf-8", errors="replace"),
+                mask_command_secrets(
+                    bytes(captured).decode("utf-8", errors="replace"), environment
+                ),
                 source="run_command",
                 complete=total <= capture_limit,
             )
@@ -104,10 +110,13 @@ def run_command(root: Path, argv: list[str], timeout=60, cancelled=None) -> dict
             else {}
         ),
         "argv": argv,
+        "sandbox": sandbox,
         "cwd": str(root),
         "exit_code": process.returncode,
         "timed_out": timed_out,
-        "output": safe_preview(bytes(captured).decode("utf-8", errors="replace"))[:8000],
+        "output": safe_preview(
+            mask_command_secrets(bytes(captured).decode("utf-8", errors="replace"), environment)
+        )[:8000],
         "truncated": total > 8000,
         "duration_ms": round((time.monotonic() - started) * 1000),
     }

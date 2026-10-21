@@ -24,6 +24,7 @@ from codaro.diagnostics import (
     observe_stream,
     source_fingerprint,
 )
+from codaro.trace_metrics import count_usage, initial_totals, settings_snapshot
 
 MAX_TRACE_BYTES = 2_000_000
 MAX_EVENT_BYTES = 8_000_000
@@ -36,9 +37,12 @@ current_flow: ContextVar[PromptFlow | None] = ContextVar("codaro_prompt_flow", d
 class AuxiliaryTrace:
     """Capture another model request without moving the main tool-loop iteration."""
 
-    def __init__(self, parent, request, kind):
+    def __init__(self, parent, request, kind, estimated_tokens=0):
         self.parent, self.kind = parent, kind
         self.turn = {"request": snapshot(request), "http_attempts": []}
+        parent.data["totals"]["auxiliary_model_requests"] += 1
+        parent.data["totals"]["model_requests"] += 1
+        parent.data["totals"]["estimated_input_tokens"] += estimated_tokens
         parent.data.setdefault("auxiliary_requests", []).append(self.turn)
         self.turn["kind"] = kind
         parent.append_event(kind + "_request", request)
@@ -102,17 +106,10 @@ class PromptFlow:
                 "python_version": platform.python_version(),
                 "platform": platform.system(),
             },
-            "effective_settings": {
-                name: getattr(settings, name, None)
-                for name in (
-                    "timeout",
-                    "token_encoding",
-                    "context_window",
-                    "max_output_tokens",
-                    "api_style",
-                    "include_stream_usage",
-                )
-            },
+            "effective_settings": settings_snapshot(settings),
+            "initial_settings": settings_snapshot(settings),
+            "initial_limits": snapshot(limits),
+            "totals": initial_totals(),
             "decisions": [],
             "diagnosis": {
                 "empty_response_attempts": 0,
@@ -140,6 +137,7 @@ class PromptFlow:
             "turns": [],
             "events": [],
         }
+        self._tool_fingerprints = set()
         self._last_request_fingerprint = None
         self.actions = []
         self.event_bytes = 0
@@ -212,6 +210,7 @@ class PromptFlow:
         owner = getattr(self, "parent", self)
         elapsed_ms = round((time.monotonic() - owner.started) * 1000, 3)
         if kind == "http_request":
+            owner.data["totals"]["http_attempts"] += 1
             attempt["request_started_ms"] = elapsed_ms
             attempt["payload_fingerprint"] = fingerprint(owner.redact(owner._redact(value)))
         try:
@@ -223,6 +222,8 @@ class PromptFlow:
             )
         except (ValueError, TypeError, KeyError, RecursionError) as exc:
             attempt["metrics_error"] = type(exc).__name__
+        if kind == "usage":
+            count_usage(owner.data["totals"], attempt, value)
         if kind in {"finish_reason", "usage", "status_code"}:
             attempt["elapsed_ms"] = round(
                 elapsed_ms - attempt.get("request_started_ms", elapsed_ms), 3
@@ -288,8 +289,15 @@ class PromptFlow:
             self.data["diagnosis"]["context_rejections"] += 1
         self.append_event("decision", record)
 
+    def update_settings(self, settings, limits=None):
+        self.data["effective_settings"] = settings_snapshot(settings)
+        if limits is not None:
+            self.data["effective_limits"] = snapshot(limits)
+
     def add_turn(self, request: dict, budget: dict):
         self.turn_sequence += 1
+        self.data["totals"]["model_requests"] += 1
+        self.data["totals"]["estimated_input_tokens"] += budget.get("input_tokens_estimate", 0)
         digest = fingerprint(self.redact(self._redact(request)))
         repeated = digest == self._last_request_fingerprint
         self._last_request_fingerprint = digest
@@ -304,6 +312,10 @@ class PromptFlow:
                 "kind": "stream" if request.get("stream") else "chat",
                 "started_at": timestamp(),
                 "request": snapshot(request),
+                "effective_settings": snapshot(self.data["effective_settings"]),
+                "effective_limits": snapshot(
+                    self.data.get("effective_limits", self.data["limits"])
+                ),
                 "budget": budget,
                 "http_attempts": [],
                 "tool_results": [],
@@ -322,6 +334,15 @@ class PromptFlow:
     def tool_result(self, message: dict, arguments, result: dict, elapsed_ms: float, original=None):
         diagnosis = self.data["diagnosis"]
         diagnosis["tool_results"] += 1
+        if message.get("role") != "local_retrieval":
+            key = fingerprint([message.get("name"), arguments])
+            totals = self.data["totals"]
+            totals["tool_calls"] += 1
+            totals["repeated_calls"] += key in self._tool_fingerprints
+            if len(self._tool_fingerprints) < 4096:
+                self._tool_fingerprints.add(key)
+            else:
+                totals["complete"] = False
         diagnosis["truncated_results"] += bool(result.get("truncated"))
         sent_chars = len(message.get("content") or "")
         diagnosis["tool_result_chars"] += sent_chars
@@ -406,7 +427,12 @@ class PromptFlow:
         paths = diagnosis["read_files"]
         diagnosis["implementation_files_read"] = sum(implementation_path(path) for path in paths)
         diagnosis["implementation_classification"] = "path_based"
-        if error and diagnosis["empty_response_attempts"]:
+        from codaro.llm.errors import EmptyResponseError
+
+        empty_terminal = isinstance(error, EmptyResponseError) or isinstance(
+            getattr(error, "__cause__", None), EmptyResponseError
+        )
+        if empty_terminal:
             attempts = self.turn.get("http_attempts", []) if self.turn else []
             summary = attempts[-1].get("stream_summary", {}) if attempts else {}
             diagnosis["reason"] = (
@@ -421,6 +447,7 @@ class PromptFlow:
         )
         diagnosis["context_overflow_detected"] = diagnosis["context_rejections"] > 0
         diagnosis["termination"] = type(error).__name__ if error else status
+        self.data["totals"]["compactions"] = len(self.data.get("compactions", []))
         self.append_event(
             "finish",
             {

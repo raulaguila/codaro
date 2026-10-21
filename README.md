@@ -17,12 +17,18 @@ interação**, **Refazer interação** e **Funcionalidades e integrações**.
 
 Requisitos: Python 3.11+ e [ripgrep](https://github.com/BurntSushi/ripgrep).
 
+O projeto está em estágio **alpha**, com licença [MIT](LICENSE). Para uso sem
+dependências de desenvolvimento, clone este repositório e execute `pipx install .`
+na raiz. Para instalar um wheel baixado de uma release, use
+`pipx install ./codaro-0.1.1-py3-none-any.whl`. O pacote ainda não tem publicação
+automática no PyPI. As instruções abaixo são para desenvolvimento:
+
 ```bash
 # Ubuntu/Debian
 sudo apt install ripgrep
 # macOS: brew install ripgrep
 
-git clone https://github.com/raulaguila/codaro.git
+git clone --branch develop https://github.com/raulaguila/codaro.git
 cd codaro
 
 python -m venv .venv
@@ -384,6 +390,19 @@ Cada tentativa HTTP possui `stream_summary`, incluindo caracteres de resposta/ra
 
 `diagnosis` agrega respostas vazias, requisições consecutivas idênticas, rejeições de contexto, arquivos lidos/releituras e participação das auditorias históricas no volume de resultados observado. A classificação de implementação é baseada em caminhos/extensões, excluindo testes e auditorias; não prova análise semântica. A lista de arquivos tem teto de 100 e informa quando excedido. Não atribuímos causas internas ao servidor/gateway sem evidência. Os agregados permanecem mesmo quando turnos antigos saem do snapshot.
 
+`initial_settings` e `initial_limits` preservam a configuração inicial. `effective_settings`
+e `effective_limits` acompanham os ajustes de janela/reserva e ficam registrados por
+requisição. O motivo de encerramento identifica a falha terminal; incidentes anteriores,
+como respostas vazias já recuperadas, permanecem no histórico sem substituir essa causa.
+
+`totals` mantém contadores independentes da retenção de `turns`: requisições lógicas
+principais e auxiliares, tentativas HTTP, ferramentas, repetições, compactações,
+estimativas e usage real quando disponível. Usage cumulativo de uma mesma tentativa
+é atualizado por diferença, evitando duplicações. Os totais abrangem o fluxo atual e
+suas sínteses auxiliares; explorações delegadas possuem outro `run_id` e diagnóstico.
+Os avaliadores usam esses totais. Para snapshots antigos incompletos, informam
+`metrics_complete: false`; ausência de usage continua sendo `null`.
+
 O snapshot tem cota de **2 MB**. Cada execução mantém também `.codaro/run-<run_id>.jsonl`, com eventos incrementais e cota de **8 MB**, inclusive em falhas/cancelamentos. A retenção automática, aplicada ao iniciar/finalizar execuções, mantém até **20 arquivos e 32 MB**; durante uma execução o arquivo ativo pode acrescentar até 8 MB antes da próxima rotação. Prévias SSE/NDJSON no snapshot são limitadas; `events_in_archive`, `older_turns_in_archive` e `snapshot_limited` indicam conteúdo movido. `archive.complete=false` e `omitted_events`/`error` indicam perda por cota ou falha de gravação. Esses arquivos são diagnósticos sujeitos a retenção, não um backup permanente.
 
 Falhas e cancelamentos entram na memória como tentativas não concluídas. `read_conversation` recupera páginas dos resultados de ferramentas do arquivo por ID enquanto ele existir; raciocínio e eventos brutos não entram nessa recuperação. Resultados antigos não autorizam edições nem comprovam o estado atual do código.
@@ -437,7 +456,7 @@ A busca inicial é textual e estrutural. Embeddings, reranking e LSP serão adic
 
 ## Limites de contexto e arquivos
 
-Uma chamada encerrada sem texto nem ferramentas válidas recebe até duas tentativas automáticas de síntese, sem ferramentas e com os resultados já obtidos. A síntese usa mensagens textuais novas, sem histórico de `tool_calls`/`tool`, com o pedido atual, orientações obrigatórias e evidências limitadas. Prioriza recibos de operações e código atual; trechos recortados são identificados como parciais. As recuperações reduzem o pacote de evidências e reforçam a conclusão breve. Raciocínio não é convertido em resposta final. A recuperação respeita os limites globais de tempo e requisições; se o provedor continuar sem responder, a atividade termina com diagnóstico e progresso preservados. O debug registra `empty_response_recovery`.
+Uma chamada encerrada sem texto nem ferramentas válidas recebe até duas tentativas automáticas de síntese, sem ferramentas e com os resultados já obtidos. A síntese usa mensagens textuais novas, sem histórico de `tool_calls`/`tool`, com o pedido atual, orientações obrigatórias e evidências limitadas. Preserva referências de até dois turnos recentes e o resumo de continuidade como histórico, sem tratá-los como prova do código atual. Prioriza recibos de operações e código atual; trechos recortados atualizam o intervalo de linhas, truncamento e continuação. Saídas de comandos preservam início e fim para manter erros finais. Buscas grandes são reduzidas por item em vez de descartar todas as ocorrências. As recuperações reduzem o pacote de evidências e reforçam a conclusão breve. Raciocínio não é convertido em resposta final. A recuperação respeita os limites globais de tempo e requisições; se o provedor continuar sem responder, a atividade termina com diagnóstico e progresso preservados. O debug registra `empty_response_recovery`.
 
 O orçamento acumulado de resultados é separado do contexto ativo: compactar libera a requisição, mas não zera o volume investigado. O agente antecipa a síntese reservando espaço antes desse limite; chamadas em lote compartilham o espaço restante. Buscas reduzidas priorizam caminhos e pequenos trechos. Quando todos os itens encontrados precisam ser omitidos, `omitted_results` e um aviso distinguem essa situação de uma busca sem ocorrências, quando os metadados cabem no orçamento. O debug inclui `active_tool_chars`, `tool_chars_used`, `tool_volume_limit` e `context_char_limit`.
 
@@ -516,7 +535,31 @@ ruff check .
 ruff format --check .
 ```
 
-Os testes verificam recuperação, atualização e migração do índice, rollback, restrições de arquivos, limites do agente, contratos HTTP, CLI, propostas de edição, conflitos, aplicação atômica e interação real com a interface Textual em modo headless. Os modelos e respostas HTTP são simulados; não há chamadas pagas ou acesso externo nos testes. O CI está configurado para Python 3.11, 3.12 e 3.13 em Linux. A auditoria local foi executada em Python 3.12.
+Os testes verificam recuperação, atualização e migração do índice, rollback, restrições de arquivos, limites do agente, contratos HTTP, CLI, propostas de edição, conflitos, aplicação atômica e interação real com a interface Textual em modo headless. Os modelos e respostas HTTP são simulados; não há chamadas pagas ou acesso externo nos testes. O CI executa a suíte em Python 3.11, 3.12 e 3.13 no Linux. Em Linux, macOS e Windows, também constrói e instala o wheel e verifica imports, CLI, estilos, agente, diagnóstico e UI fora do checkout. Esses smoke tests não equivalem à suíte completa nos três sistemas. A auditoria local usa Python 3.12/Linux.
+
+## Comandos, ambiente e isolamento
+
+Por padrão, comandos aprovados deixam de herdar variáveis com nomes indicativos de
+chaves, tokens, senhas ou credenciais, além de URLs com senha embutida. Para uma
+necessidade explícita de testes, use por exemplo `CODARO_COMMAND_ENV=DATABASE_URL`.
+`CODARO_API_KEY` permanece bloqueada. Valores sensíveis liberados são mascarados na
+saída capturada, mas continuam acessíveis ao programa autorizado e seus processos.
+
+`CODARO_SANDBOX=required codaro .` exige Linux com Bubblewrap (`sudo apt install
+bubblewrap`). O comando recebe rede/processos isolados, runtimes somente para
+leitura, o projeto selecionado para escrita e temporários próprios. A inicialização
+depende das permissões de namespaces do kernel. Se falhar, não há fallback fora da
+sandbox. `CODARO_SANDBOX=off` é o padrão compatível, sem isolamento de SO.
+macOS/Windows, MCP, plugins e LSP ainda não recebem esse isolamento. Consulte
+[SECURITY.md](SECURITY.md) para limites e relato de vulnerabilidades.
+
+## Preparação de releases
+
+Versões do `pyproject.toml` e `codaro.__version__` devem coincidir. O workflow
+`release` constrói wheel e sdist, executa `twine check`, gera `SHA256SUMS` e valida
+o pacote instalado nos três sistemas. Uma execução manual gera artefatos para
+revisão. Uma tag `v0.1.1`, criada no commit revisado e enviada ao GitHub, publica
+uma **pré-release** apenas depois dessas verificações. Não publica no PyPI.
 
 Veja os achados e as limitações em [AUDIT.md](AUDIT.md).
 
@@ -527,7 +570,7 @@ Veja os achados e as limitações em [AUDIT.md](AUDIT.md).
 - Reranking quando houver ganho medido.
 - Definições e referências via LSP, com novos parsers Tree-sitter.
 - Interrupção imediata de conexões que estejam sem enviar fragmentos.
-- Transações de edição envolvendo vários arquivos e execução opcional em sandbox.
+- Transações de edição envolvendo vários arquivos e adaptadores de sandbox para outros sistemas.
 
 
 ## Diagnóstico e recuperação
@@ -553,5 +596,18 @@ codaro evaluate evaluations/cases.json --agent --output .codaro/evaluation-agent
 ```
 
 O modo local mede precisão dos até seis resultados, recall dos caminhos esperados e duração. `--agent` mede conclusão, correspondência das expectativas textuais, recall de arquivos efetivamente lidos, precisão das citações quando presentes, chamadas ao modelo/ferramentas, chamadas repetidas, compactações, estimativas e usage disponível. Uma resposta sem citações pode passar quando as fontes esperadas foram lidas e as expectativas textuais foram satisfeitas; referências inventadas, quando presentes, falham. O relatório informa quantas chamadas possuem consumo real; ausência de usage não é apresentada como consumo zero. Casos com erro não interrompem os seguintes; o comando retorna código 1 se alguma expectativa falhar.
+
+Há um benchmark de correção em `evaluations/workflows.json`, executado em cópia
+temporária, com uma implementação propositalmente incompleta e testes existentes:
+
+```bash
+codaro evaluate-workflows evaluations/workflows.json --allow-execution --output .codaro/workflow-benchmark.json
+python scripts/benchmark_session.py --repo . --rounds 2 --allow-model-calls --output .codaro/session-benchmark.json
+```
+
+O segundo comando mantém até 30 interações em uma conversa somente leitura e salva
+métricas por turno, inclusive falhas. Ambos usam o provedor configurado e podem
+consumir créditos/enviar código. Revise semanticamente as respostas e compare os
+mesmos casos entre provedores/modelos; conclusão técnica não significa correção.
 
 Avaliações do agente não permitem edição/comandos e usam memória efêmera, preservando a memória das conversas do projeto. Atualizam o índice e o último JSON de debug. Os casos iniciais são testes de fumaça; métricas objetivas e correspondências textuais não substituem revisão humana da qualidade semântica. Compare relatórios ao mudar modelo, prompts, recuperação ou limites de contexto.

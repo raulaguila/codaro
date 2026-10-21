@@ -3,7 +3,7 @@ from __future__ import annotations
 from codaro.agent.messages import serialize
 
 
-def fit_result(result: dict, budget: int) -> dict:
+def _fit_result(result: dict, budget: int) -> dict:
     if len(serialize(result)) <= budget:
         return result
     if "content" in result:
@@ -129,3 +129,17 @@ def fit_result(result: dict, budget: int) -> dict:
                 return receipt
         return {"error": "Resultado excede o orçamento. Solicite um intervalo menor."}
     return result
+
+
+class ResultBudgetError(ValueError):
+    """The budget cannot hold even a minimal valid result receipt."""
+
+
+def fit_result(result: dict, budget: int) -> dict:
+    fitted = _fit_result(result, budget)
+    if len(serialize(fitted)) <= budget:
+        return fitted
+    minimal = {"error": "budget"}
+    if len(serialize(minimal)) <= budget:
+        return minimal
+    raise ResultBudgetError("Orçamento insuficiente para um recibo de ferramenta.")

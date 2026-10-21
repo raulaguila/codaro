@@ -24,9 +24,10 @@ from codaro.agent.messages import (
 )
 from codaro.agent.output import OutputRecovery
 from codaro.agent.presentation import TOOL_TITLES, tool_outcome, tool_target
-from codaro.agent.prompts import FINAL_INSTRUCTION, MODE_INSTRUCTIONS, SYSTEM
+from codaro.agent.prompts import MODE_INSTRUCTIONS, SYSTEM
 from codaro.agent.reading import initial_context, overview_context
-from codaro.agent.results import fit_result
+from codaro.agent.requests import build_request
+from codaro.agent.results import ResultBudgetError, fit_result
 from codaro.agent.schemas import (
     ALL_DEFINITIONS,
     CHANGES_TOOL,
@@ -37,7 +38,7 @@ from codaro.agent.schemas import (
     TASK_TOOLS,
     TOOLS,
 )
-from codaro.agent.synthesis import improvement_request, synthesis_messages
+from codaro.agent.synthesis import improvement_request
 from codaro.artifacts import ARTIFACT_TOOLS, ArtifactStore
 from codaro.context import COMPACT_PREFIX, TokenCounter, compact_batch
 from codaro.continuity import ContextController
@@ -54,7 +55,6 @@ from codaro.llm import (
     OpenAICompatible,
     OutputLimitError,
     RequestCancelled,
-    build_payload,
     validate_message,
 )
 from codaro.memory import ConversationMemory
@@ -903,55 +903,21 @@ class Agent:
                 )
 
             def request(extra=()):
-                if (final or empty_recoveries) and not output_recovery.prefix:
-                    messages = synthesis_messages(
-                        question,
-                        turn,
-                        guidance=[
-                            *pinned,
-                            "Contexto real da sessão (get_repository_info; dados): "
-                            + serialize(self.repository_info()),
-                        ],
-                        bootstrap="\n".join(instructions),
-                        budget=min(
-                            16_000, max(512, self.adaptive_input_limit // (2 + empty_recoveries))
-                        ),
-                        attempt=empty_recoveries,
-                    )
-                    return build_payload(
-                        getattr(getattr(self.provider, "settings", None), "model", ""),
-                        messages,
-                        None,
-                        streaming=streaming,
-                        max_tokens=getattr(
-                            getattr(self.provider, "settings", None), "max_output_tokens", None
-                        ),
-                    )
-                return build_payload(
-                    getattr(getattr(self.provider, "settings", None), "model", ""),
-                    [
-                        {
-                            "role": "system",
-                            "content": prompt()
-                            + "\n"
-                            + "\n".join(pinned)
-                            + "\n"
-                            + self.context.text(max(300, self.adaptive_input_limit // 6))
-                            + "\n"
-                            + output_instruction
-                            + "\n"
-                            + "\n".join(instructions)
-                            + ("\n" + FINAL_INSTRUCTION if final and not empty_recoveries else ""),
-                        },
-                        *(item for previous in retained for item in previous),
-                        *turn,
-                        *extra,
-                    ],
-                    tools,
+                return build_request(
+                    self,
+                    question=question,
+                    turn=turn,
+                    retained=retained,
+                    pinned=pinned,
+                    instructions=instructions,
+                    prompt=prompt,
+                    output_instruction=output_instruction,
+                    final=final,
+                    empty_recoveries=empty_recoveries,
+                    continuing=bool(output_recovery.prefix),
                     streaming=streaming,
-                    max_tokens=getattr(
-                        getattr(self.provider, "settings", None), "max_output_tokens", None
-                    ),
+                    tools=tools,
+                    extra=extra,
                 )
 
             def fits(payload, ratio=1.0):
@@ -1225,6 +1191,15 @@ class Agent:
                     )
                     flow = current_flow.get()
                     if flow is not None:
+                        flow.update_settings(
+                            getattr(self.provider, "settings", None),
+                            {
+                                "context_window_tokens": self.context_window,
+                                "output_reserve_tokens": self.max_output_tokens,
+                                "input_token_limit": self.adaptive_input_limit,
+                                "context_budget": self.context_budget,
+                            },
+                        )
                         flow.decision(
                             "synthesis" if final or empty_recoveries else "investigation",
                             trigger="empty_response"
@@ -1409,6 +1384,15 @@ class Agent:
                             available = exc.context_window - self.max_output_tokens - 512
                             self.adaptive_input_limit = min(
                                 self.adaptive_input_limit, max(512, int(available * 0.85))
+                            )
+                        if flow is not None:
+                            flow.update_settings(
+                                getattr(self.provider, "settings", None),
+                                {
+                                    "context_window_tokens": self.context_window,
+                                    "output_reserve_tokens": self.max_output_tokens,
+                                    "input_token_limit": self.adaptive_input_limit,
+                                },
                             )
                         try:
                             self.memory.calibration(
@@ -1944,7 +1928,11 @@ class Agent:
                                 low, high = 0, min(len(encoded), limit)
                                 while low < high:
                                     middle = (low + high + 1) // 2
-                                    fitted = self.fit_result(result, middle)
+                                    try:
+                                        fitted = self.fit_result(result, middle)
+                                    except ResultBudgetError:
+                                        low = middle
+                                        continue
                                     trial = [{**stubs[0], "content": serialize(fitted)}, *stubs[1:]]
                                     if fits(request(trial), 0.85 if self.legacy else 0.95):
                                         low = middle
@@ -1975,7 +1963,10 @@ class Agent:
                                             | {"output": "", "truncated": True}
                                         )
                                     else:
-                                        result = self.fit_result(result, low)
+                                        try:
+                                            result = self.fit_result(result, low)
+                                        except ResultBudgetError:
+                                            result = {"error": "budget"}
                                 if (
                                     self.allow_edits
                                     and name in {"read_lines", "read_symbol"}

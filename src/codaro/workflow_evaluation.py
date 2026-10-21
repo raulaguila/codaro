@@ -10,6 +10,7 @@ from codaro.commands import run_command, validate_command
 from codaro.features import DEFAULTS
 from codaro.repository import Repository
 from codaro.storage import private_read
+from codaro.trace_metrics import evaluation_metrics
 
 
 def load_workflows(path):
@@ -108,6 +109,7 @@ def evaluate_workflows(path, provider, *, allow_execution=False):
                 validations = [run_command(root, argv, 60) for argv in case["validation_commands"]]
                 trace = json.loads(private_read(root / ".codaro/prompt.json", 2_000_000))
                 iterations = trace.get("turns", [])
+                totals = evaluation_metrics(trace)
                 record.update(
                     status="completed",
                     file_expectations=matched,
@@ -118,18 +120,18 @@ def evaluate_workflows(path, provider, *, allow_execution=False):
                         }
                         for result in validations
                     ],
-                    model_calls=len(iterations),
-                    input_tokens_estimate=sum(
-                        item.get("budget", {}).get("input_tokens_estimate", 0)
-                        for item in iterations
-                    ),
-                    compactions=len(trace.get("compactions", [])),
+                    model_calls=totals["model_requests"],
+                    metrics_complete=totals["metrics_complete"],
+                    aggregate_usage=totals,
+                    input_tokens_estimate=totals["estimated_input_tokens"],
+                    compactions=totals["compactions"],
                     reported_usage=[
                         attempt["usage"]
                         for item in iterations
                         for attempt in item.get("http_attempts", [])
                         if isinstance(attempt.get("usage"), dict)
                     ],
+                    reported_usage_snapshot_only=True,
                     cost=None,
                     expectations_passed=all(matched.values())
                     and all(

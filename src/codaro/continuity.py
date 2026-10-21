@@ -120,7 +120,11 @@ class ContextController:
                     return None
                 # Provider capture assumes the active main iteration. A summary must
                 # never become that iteration or absorb its tool results.
-                trace = AuxiliaryTrace(flow, converted, "continuity") if flow else None
+                trace = (
+                    AuxiliaryTrace(flow, converted, "continuity", self.counter.count(converted))
+                    if flow
+                    else None
+                )
                 trace_token = current_flow.set(trace)
                 try:
                     if budget := request_budget.get():

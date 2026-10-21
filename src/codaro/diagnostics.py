@@ -24,6 +24,9 @@ def source_fingerprint():
             "trace.py",
             "diagnostics.py",
             "agent/controller.py",
+            "agent/requests.py",
+            "agent/excerpts.py",
+            "trace_metrics.py",
             "agent/synthesis.py",
             "agent/prompts.py",
         ):

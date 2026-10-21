@@ -1,11 +1,14 @@
 [build-system]
-requires = ["hatchling>=1.26"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
 name = "codaro"
-version = "0.1.0"
-description = "A source-grounded terminal assistant for exploring local repositories."
+version = "0.1.1"
+description = "A terminal development agent with BYOK, bounded context and reviewed changes."
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "Raul del Aguila"}]
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -24,8 +27,15 @@ tokenizer = ["tiktoken>=0.8,<1"]
 [project.scripts]
 codaro = "codaro.cli:app"
 
+[project.urls]
+Repository = "https://github.com/raulaguila/codaro"
+Issues = "https://github.com/raulaguila/codaro/issues"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/codaro"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/tests", "/scripts", "/evaluations", "/docs/*.md", "/examples/demo/auth.py", "/examples/plugins/math.py", "/README.md", "/SECURITY.md", "/LICENSE", "/pyproject.toml", "/requirements-dev.lock"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

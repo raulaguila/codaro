@@ -10,6 +10,8 @@ src/codaro/
 ├── cli_commands/          # Grupos de provedores, modelos e integrações
 ├── agent/
 │   ├── controller.py      # Estado da sessão, permissões e loop com o modelo
+│   ├── requests.py        # Payload canônico para orçamento, trace e transporte
+│   ├── excerpts.py        # Recortes explícitos com linhas e fim de logs
 │   ├── prompts.py         # Instruções compartilhadas e dos modos
 │   ├── schemas.py         # Contratos das ferramentas internas
 │   ├── arguments.py       # Validação de argumentos
@@ -36,6 +38,7 @@ src/codaro/
     ├── app.py             # Ciclo de vida e coordenação da interface
     ├── composer.py        # Campo de entrada e atalhos de edição
     ├── widgets.py         # Geração, atividades e propostas
+    ├── streaming.py       # Renderização de eventos e streaming do chat
     ├── reviews.py         # Revisão de alterações e aprovações
     ├── providers.py       # Cadastro, teste e seleção de provedores
     ├── integrations.py    # Cadastro de MCP e plugins
@@ -50,6 +53,11 @@ Os serviços de domínio continuam em módulos próprios na raiz: `repository.py
 `commands.py`, `policies.py`, `sessions.py`, `trace.py` e as integrações existentes.
 Eles são compartilhados pela CLI, pelo agente e pela interface; não precisam conhecer
 os componentes visuais.
+
+`trace_metrics.py` mantém agregados independentes da retenção de snapshots e adapta
+os relatórios dos avaliadores. `command_environment.py` controla variáveis herdadas;
+`command_sandbox.py` constrói a execução isolada opcional, com falha fechada no modo
+obrigatório. `scripts/package_smoke.py` valida a distribuição fora do código-fonte.
 
 ## Fluxo e dependências
 

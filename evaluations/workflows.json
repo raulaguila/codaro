@@ -1,0 +1,9 @@
+[
+  {
+    "id": "authorization-null-and-editor",
+    "repo": "fixtures/authorization",
+    "query": "Corrija can_edit em auth.py: usuários ausentes ou sem papel devem retornar False; admin e editor podem editar; outros papéis não podem. Preserve os testes existentes e valide com python -m unittest discover -s tests -v.",
+    "expected_files": {"auth.py": []},
+    "validation_commands": [["python", "-m", "unittest", "discover", "-s", "tests", "-v"]]
+  }
+]
