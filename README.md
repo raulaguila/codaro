@@ -186,7 +186,7 @@ A nova interface segue a [proposta consolidada de UI/UX](docs/design/ui-prototyp
 - `codaro chat` exibe a resposta final após o agente concluir e validar o turno, em Markdown, com títulos, listas, tabelas e destaque de sintaxe em blocos de código. Durante a geração, a barra de status e as ferramentas mostram o progresso.
 - A abertura fica limpa quando já existe um modelo configurado. Sem provedor, o cadastro guiado continua disponível. Enter envia; Alt+Enter insere uma nova linha (Shift+Enter também funciona quando reconhecido pelo terminal). A entrada cresce até oito linhas, adaptando-se à altura do terminal, e preserva rascunhos acima de 8.000 caracteres. Ao digitar `/`, setas navegam e Enter abre o comando destacado; Tab completa sem executar e Esc fecha a lista. A lista limita sua altura para preservar espaço para o chat.
 - O plano ativo fica fixo junto ao input, aberto inicialmente, com progresso e rolagem própria. Recolher mantém o resumo visível; atualizações não reabrem a lista. Mensagens, configurações, falhas e interrupções da geração preservam o plano. **Cancelar plano** encerra a tarefa e revoga permissões, preservando arquivos já alterados. Concluir a tarefa remove o plano do composer; `/task` mantém os detalhes disponíveis. `Ctrl+X` interrompe a geração e deixa a tarefa bloqueada para retomada, sem cancelar seu plano.
-- Clique no modo do cabeçalho ou use `/mode` / **Ctrl+P → Modo de trabalho**. Setas destacam; Enter ou Aplicar confirma; Esc cancela. Durante a execução, a seleção vale para o próximo pedido. **Edições → Aprovar automaticamente** permite criar/editar arquivos autorizados nesta conversa; ações destrutivas e comandos exigem confirmação. O estado aparece junto ao input e é revogado em nova conversa ou troca efetiva de modo/sessão/provedor.
+- Clique no modo do cabeçalho ou use `/mode` / **Ctrl+P → Modo de trabalho**. Setas destacam; Enter ou Aplicar confirma; Esc cancela. Durante a execução, a seleção vale para o próximo pedido. **Edições → Aprovar automaticamente** permite criar/editar arquivos autorizados nesta conversa; ações destrutivas e comandos exigem confirmação. O cabeçalho identifica **Executar · Auto**; a autorização é revogada em nova conversa ou troca efetiva de modo/sessão/provedor.
 - Quando precisar de uma decisão, o agente pode chamar `ask_user_question`. Pergunta, sugestões verticais e resposta livre compartilham o mesmo input. Setas e Enter escolhem; digitar substitui a sugestão, incluindo texto iniciado com `/`. Pausar/Esc mantém a pergunta pendente. A resposta real volta ao modelo como resultado da ferramenta, sem conceder aprovação de edição/comandos.
 - Cada turno tem uma seção **Etapas** com ações, leituras e buscas. Os detalhes mostram consulta, arquivo, resultados e leitura parcial. Novos eventos e erros respeitam a escolha de manter o grupo recolhido.
 - As atividades aparecem uma única vez na conversa. A barra de status informa o arquivo ou consulta durante a execução.
@@ -196,6 +196,32 @@ A nova interface segue a [proposta consolidada de UI/UX](docs/design/ui-prototyp
 - `codaro ask`, `plan` e `execute` mostram progresso no terminal e enviam atividade para stderr; o texto final aparece após o retorno do agente. O conteúdo provisório fica no JSON de diagnóstico.
 - O provedor solicita SSE da API OpenAI-compatible e entrega fragmentos conforme chegam. Se o servidor responder com JSON comum ou acumular o conteúdo antes de enviar, a resposta chega de uma vez; a interface não simula streaming. Confira os eventos SSE e o corpo da resposta em `.codaro/prompt.json` para distinguir esse caso.
 - Uma resposta interrompida ou cancelada não é salva como resposta final. O chat conserva a prévia recolhida naquela tela. Decisões já enviadas pelo usuário são salvas imediatamente e restauradas, mesmo que a geração seja interrompida depois. Essa apresentação fica separada das mensagens do protocolo de ferramentas.
+
+Durante o streaming, a barra junto ao input mostra a velocidade: **≈20 t/s** é
+uma estimativa do texto recebido entre fragmentos, usando o tokenizer local quando
+configurado ou bytes UTF-8/4. Exclui a espera pelo primeiro fragmento e não conta
+raciocínio separado. No Ollama, `eval_count / eval_duration` substitui a estimativa
+pela métrica do servidor ao terminar a chamada. Quando a API informa somente o
+consumo, **20 t/s méd.** representa a média da requisição inteira, incluindo espera
+e processamento da entrada. Essas métricas podem incluir raciocínio e argumentos
+de ferramentas. Não há velocidade estimada quando a resposta chega inteira de uma
+vez; sem dados suficientes, o indicador fica oculto. `/status` detalha sua origem.
+
+Perguntas longas mantêm as três opções visíveis; **Detalhes** abre a pergunta,
+explicação e sugestões completas sem responder por você. O plano acompanha a etapa
+ativa. Uma rolagem manual suspende esse acompanhamento; **Etapa atual** o retoma.
+Etapas concluídas mostram o tempo total do turno; milissegundos das ferramentas
+ficam nos detalhes.
+
+**Ctrl+O** (Command no macOS, quando reconhecido) ou clique direito em uma resposta
+abre ações para copiar texto/código e visualizar arquivos citados. A leitura local
+respeita os arquivos permitidos e mascara credenciais reconhecidas, sem enviar uma
+nova solicitação ao modelo nem autorizar edições. Copiar depende do suporte do
+terminal à área de transferência via OSC52. `/sessions` abre a lista pesquisável de
+conversas do projeto, com última atividade, retomada, arquivamento e restauração.
+**Testar catálogo** verifica a listagem do provedor; **Testar modelo** verifica
+geração e ferramentas e pode consumir créditos. O ID completo e os metadados do
+modelo ficam nos detalhes; a lista mostra uma linha por modelo, com contexto à direita.
 
 O chat detecta o sistema onde o processo está rodando. No macOS, o rodapé e `/help` mostram Command (`⌘`) com a alternativa Ctrl, e Option (`⌥`) nas dicas da entrada. Linux e Windows mantêm Ctrl/Alt. Em SSH, a detecção corresponde ao servidor.
 

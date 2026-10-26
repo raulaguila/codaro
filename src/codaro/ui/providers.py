@@ -130,7 +130,7 @@ class ProviderSetup(ModalScreen[str | None]):
                 "O teste consulta o catálogo, sem inferência.", id="provider-error", markup=False
             )
             with Horizontal(id="provider-actions"):
-                yield Button("Testar conexão", id="provider-test")
+                yield Button("Testar catálogo", id="provider-test")
                 yield Button("Cancelar", id="provider-back")
                 yield Button(
                     "Salvar e escolher",
@@ -156,6 +156,13 @@ class ProviderSetup(ModalScreen[str | None]):
         ).value
         self.query_one("#provider-test-inference", Button).disabled = self.saving or not isinstance(
             self.query_one("#provider-test-model", Select).value, str
+        )
+        self.query_one("#provider-form").styles.height = (
+            30
+            if not advanced.collapsed
+            else 16
+            + 3 * int(self.query_one("#provider-url-field").display)
+            + 2 * int(self.query_one("#provider-key-field").display)
         )
 
     def on_collapsible_expanded(self):
@@ -224,7 +231,8 @@ class ProviderSetup(ModalScreen[str | None]):
             status.update(
                 "✓ Ferramentas e resposta verificadas. Nenhum perfil salvo."
                 if isinstance(model, str)
-                else f"✓ Conexão verificada · {len(models)} modelos disponíveis."
+                else f"✓ Conexão verificada · catálogo com {len(models)} modelos. "
+                "Geração ainda não testada."
             )
             status.set_class(False, "error")
             status.set_class(True, "success")
@@ -397,12 +405,11 @@ class ModelPicker(ModalScreen[Settings | None]):
                         id="model-context-override",
                         compact=True,
                     )
-                    yield Static(
-                        "Duas chamadas curtas. Pode consumir créditos.",
-                        classes="muted",
-                        markup=False,
-                    )
-                    yield Button("Testar ferramentas e resposta", id="model-test")
+            yield Static(
+                "Testar modelo: duas chamadas; pode consumir créditos.",
+                classes="muted",
+                markup=False,
+            )
             yield Static("", id="model-error", markup=False)
             with Horizontal(id="model-actions"):
                 yield Button(
@@ -410,7 +417,8 @@ class ModelPicker(ModalScreen[Settings | None]):
                     id="model-use",
                     variant="primary",
                 )
-                yield Button("Atualizar catálogo", id="model-refresh")
+                yield Button("Testar modelo", id="model-test")
+                yield Button("Atualizar", id="model-refresh")
                 yield Button("Voltar", id="model-back")
 
     def populate(self, name):
@@ -486,7 +494,7 @@ class ModelPicker(ModalScreen[Settings | None]):
             else f"Contexto: {compact_tokens(settings.context_window)} · {capability}"
         )
         self.query_one("#model-metadata", Static).update(
-            f"Origem: {settings.context_source}\n{capability}\n"
+            f"Modelo: {model['id']}\nOrigem: {settings.context_source}\n{capability}\n"
             f"Saída máxima informada: {model['max_output_tokens'] or 'Não informada'}"
         )
         info.tooltip = (

@@ -1,5 +1,34 @@
 # Correções da auditoria de UI e UX do Codaro
 
+## Ajustes de 26 de outubro
+
+- Perguntas reservam uma linha por opção, mesmo com textos longos. Título limitado
+  a duas linhas e botão Detalhes para conteúdo completo. A resposta enviada conserva
+  o texto original da opção; a prévia abreviada não altera a decisão.
+- O plano acompanha a etapa ativa; rolagem manual e recolhimento são preservados.
+  Etapa atual reativa o acompanhamento. Em terminais baixos, a pergunta tem prioridade
+  e o plano mantém a etapa atual sem ocupar todo o chat.
+- Etapas mostram resumos durante o trabalho e tempo total ao concluir. Duração de
+  ferramenta fica nos detalhes. Resposta e raciocínio mantêm áreas distintas;
+  parágrafos de listas usam espaçamento compacto.
+- Status, velocidade e contexto têm posições próprias. A dica de cancelamento
+  aparece uma vez. Velocidade distingue estimativa, tempo nativo do provedor e média
+  da chamada; pergunta pendente e cancelamento ocultam o indicador.
+- Respostas têm ações de copiar texto/código e prévia local de arquivos citados,
+  acessíveis por Ctrl+O ou clique direito, sem consumir contexto ou conceder permissões.
+- Conversas têm pesquisa, última atividade, retomada, arquivamento e restauração.
+  Navegação preserva o rascunho e a ativação mantém a revogação de permissões.
+- Lista de modelos usa uma linha por ID e contexto alinhado. ID completo nos
+  detalhes. Testar modelo fica acessível no rodapé, separado de Testar catálogo;
+  formulário do provedor usa a altura dos campos visíveis.
+- Revisão de diff reduz o título em terminais baixos para priorizar as alterações.
+  Voltar continua sendo o foco inicial: Enter não aprova uma edição por acidente.
+- Aprovação automática aparece como Executar · Auto no cabeçalho.
+
+O script `scripts/capture_ui.py` reproduz 17 estados em três tamanhos de terminal,
+com dados sintéticos e sem inferência. Os testes de interação e métricas ficam em
+`tests/test_ui_experience.py` e `tests/test_ui_generation_rate.py`.
+
 A adoção da nova proposta começou com a [primeira etapa nativa](audits/2026-10-21-native-ui/README.md):
 início limpo, composer, plano persistente e seletor compacto de modo com aprovação de edições.
 As evidências históricas abaixo descrevem a interface anterior; a documentação da nova etapa

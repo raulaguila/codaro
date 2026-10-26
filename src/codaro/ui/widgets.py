@@ -13,6 +13,7 @@ from codaro.index import safe_preview
 from codaro.llm import (
     MAX_MESSAGE_CHARS,
 )
+from codaro.ui.messages import AssistantMessage
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -90,7 +91,7 @@ class GenerationPreview(Collapsible):
         self.state = "accepted"
         self.title = "Codaro · resposta final"
         self.collapsed = False
-        reply = Markdown(answer, classes="assistant", open_links=False)
+        reply = AssistantMessage(answer)
 
         async def mount_answer():
             parent = self.parent
@@ -197,11 +198,7 @@ class ActivityGroup(Collapsible):
             parts.append(f"{searches} {'busca' if searches == 1 else 'buscas'}")
         if errors:
             parts.append(f"{errors} {'erro' if errors == 1 else 'erros'}")
-        self.title = (
-            "Etapas · "
-            + " · ".join(parts)
-            + f" · {sum(item.elapsed_ms or 0 for item in self.events):.0f} ms"
-        )
+        self.title = "Etapas · " + " · ".join(parts)
         self.set_class(bool(errors), "error")
         self.set_class(not errors, "success")
         text = safe_preview(

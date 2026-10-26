@@ -86,6 +86,18 @@ class SessionCatalog:
             value["active"] = identifier
             atomic_write(self.path, json.dumps(value, ensure_ascii=False).encode())
 
+    def rename(self, identifier, title):
+        validate_id(identifier)
+        if not isinstance(title, str) or not 1 <= len(title.strip()) <= 100:
+            raise ValueError("Nome deve ter de 1 a 100 caracteres.")
+        with private_lock(self.path.with_suffix(".lock")):
+            value = self.load()
+            item = next((item for item in value["items"] if item["id"] == identifier), None)
+            if item is None:
+                raise ValueError("Sessão não encontrada.")
+            item["title"] = title.strip()
+            atomic_write(self.path, json.dumps(value, ensure_ascii=False).encode())
+
     def archive(self, identifier, *, archived=True):
         validate_id(identifier)
         with private_lock(self.path.with_suffix(".lock")):

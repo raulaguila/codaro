@@ -4,13 +4,13 @@ import copy
 
 from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Markdown, Static
+from textual.widgets import Static
 
 from codaro.index import safe_preview
 from codaro.interaction import InputHistory
 from codaro.llm import ModelError
 from codaro.ui.composer import Prompt
-from codaro.ui.messages import UserMessage
+from codaro.ui.messages import AssistantMessage, UserMessage
 from codaro.ui.widgets import ProposalCard
 
 
@@ -49,6 +49,8 @@ async def restore_session(self):
     self.session_decisions = copy.deepcopy(self.session.decisions)
     self.current_decisions = copy.deepcopy(self.session.pending_decisions)
     self.agent.turns = list(turns)
+    self.generation_rate.reset()
+    self.update_generation_status()
     self.agent.conversation.index_decisions(self.agent.memory, self.agent.provider.settings.model)
     self.history = InputHistory(turn[0]["content"] for turn in turns)
     self.reply = self.speaker = None
@@ -62,9 +64,7 @@ async def restore_session(self):
         for decision in self.session_decisions[index]:
             self.mount_decision(decision)
         self.mount_message(Static("Codaro", classes="speaker", markup=False))
-        self.mount_message(
-            Markdown(safe_preview(turn[-1]["content"]), classes="assistant", open_links=False)
-        )
+        self.mount_message(AssistantMessage(safe_preview(turn[-1]["content"])))
     for decision in self.current_decisions:
         self.mount_decision(decision)
     self.mount_message(
@@ -90,6 +90,8 @@ async def action_clear_chat(self):
     self.session_turns.clear()
     self.session_decisions = []
     self.current_decisions = []
+    self.generation_rate.reset()
+    self.update_generation_status()
     self.response_text = self.rendered_text = ""
     self.reply = self.speaker = None
     self.activity_group = None

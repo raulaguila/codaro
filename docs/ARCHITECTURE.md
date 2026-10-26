@@ -111,6 +111,9 @@ antigos de compatibilidade não devem virar novas dependências internas.
 | Hierarquia de mensagens e etapas | `ui/messages.py`, `ui/stages.py` |
 | Perguntas interativas e espera por resposta real | `agent/questions.py`, `ui/questions.py` |
 | Lista pesquisável de modelos | `ui/model_list.py` |
+| Velocidade estimada e métricas de geração | `ui/generation.py`, `agent/events.py` |
+| Ações de resposta e prévia local de arquivos | `ui/message_actions.py` |
+| Pesquisa, retomada e arquivamento na UI | `ui/sessions.py` |
 | Componente ou tela | `ui/widgets.py`, `reviews.py` ou módulo da tela |
 | Aparência | `ui/styles.tcss` |
 | Novo grupo de comandos CLI | `cli_commands`, com registro explícito em `cli.py` |

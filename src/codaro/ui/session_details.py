@@ -15,6 +15,7 @@ def session_dialog(app):
     rows = [
         ("Projeto", str(agent.repository.root)),
         ("Modelo", settings.model),
+        ("Velocidade", app.generation_rate.display()[0] or "Não disponível"),
         ("Modo", agent.mode.label),
         (
             "Janela total",
@@ -36,6 +37,7 @@ def session_dialog(app):
         ("Diagnóstico local", ".codaro/prompt.json"),
     ]
     advanced = (
+        app.generation_rate.display()[1] + "\n"
         f"Contagem: {agent.counter.method}\n"
         "Tokens informados pelo servidor: "
         f"{app.reported_tokens if app.reported_tokens is not None else 'Não informados'}\n"
@@ -56,6 +58,7 @@ def help_dialog(app):
         ("Interromper execução", app.shortcut_display("x")),
         ("Referenciar arquivo", '@src/main.py ou @"pasta com espaços/main.py"'),
         ("Detalhes da sessão", "/status"),
+        ("Ações da resposta", app.shortcut_display("o") + " ou botão direito na resposta"),
     ]
     advanced = "\n".join(f"{command} · {description}" for command, description in COMMANDS.items())
     if app.is_macos:

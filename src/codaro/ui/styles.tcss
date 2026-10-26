@@ -22,10 +22,13 @@ ModePicker { background: transparent; }
 #response-card { height: auto; }
 #question-dock, #question-pause, #question-send { display: none; }
 #question-dock { height: auto; max-height: 9; overflow-y: auto; }
+#question-heading { height: auto; }
+#question-details { height: 1; min-height: 1; width: 10; min-width: 10; border: none;
+    padding: 0; background: $panel; color: $text-muted; }
 #question-dock Static { height: auto; }
 .question-label { color: $text-muted; }
-#question-title { margin-top: 1; color: $text; }
-#question-why { color: $text-muted; }
+#question-title { width: 1fr; max-height: 2; margin: 0; color: $text; }
+#question-why { display: none; }
 #question-options { height: auto; border: none; padding: 0; background: $panel; }
 #question-options > .option-list--option-highlighted { background: $primary 15%;
     text-style: none; color: $text; }
@@ -40,7 +43,7 @@ ModePicker { background: transparent; }
     margin-left: 1; text-style: none; background: $panel; color: $text-muted; }
 .answering #question-send { background: $accent; color: $background; text-style: bold; }
 .answering #question-send:hover { background: $accent-lighten-1; color: $background; }
-.short-terminal #question-dock { max-height: 4; }
+.short-terminal #question-dock { max-height: 6; }
 .short-terminal #question-title { margin-top: 0; }
 .short-terminal .question-label, .short-terminal #question-why { display: none; }
 .short-terminal .paused .question-label { display: block; }
@@ -55,6 +58,7 @@ ModePicker { background: transparent; }
 #composer-meta { height: 1; }
 #context-meter { height: 1; width: auto; max-width: 42%; color: $text-muted;
     text-wrap: nowrap; text-overflow: ellipsis; text-align: right; }
+#generation-rate { height: 1; width: auto; margin: 0 2; color: $text-muted; }
 #new-messages { display: none; height: 1; min-height: 1; border: none; margin: 0 2; }
 #status { height: 1; width: 1fr; color: $text-muted;
     text-wrap: nowrap; text-overflow: ellipsis; }
@@ -67,6 +71,23 @@ ModePicker { background: transparent; }
 #toggle-plan { width: 1fr; text-align: left; content-align: left middle;
     text-wrap: nowrap; text-overflow: ellipsis; }
 #cancel-plan { width: 16; min-width: 16; background: $panel; }
+#follow-plan { display: none; width: 11; min-width: 11; }
+#session-picker, #message-actions, #file-preview {
+    width: 90%; max-width: 90; height: 24; max-height: 85%;
+    padding: 0 2; border: round $primary 35%; background: $surface;
+}
+#session-list, #message-action-list, #file-preview-code { height: 1fr; border: none; }
+#session-picker-info { height: 2; color: $text-muted; }
+#session-picker Input { height: 1; margin: 0 0 1 0; }
+#session-picker Checkbox { height: 1; margin: 0 0 1 0; }
+#session-picker .dialog-actions Button { min-width: 7; }
+#session-picker .dialog-actions #session-use { background: $accent; color: $background; }
+#message-actions { height: auto; max-height: 85%; }
+#message-action-list { height: auto; max-height: 14; }
+#message-actions-close, #file-preview-close { height: 1; min-height: 1; width: 12;
+    padding: 0; border: none; background: $surface; color: $text; }
+#file-preview { height: 85%; }
+.assistant:focus { background: $primary 10%; }
 #plan-steps { height: auto; max-height: 5; padding-left: 2; }
 #plan-list { height: auto; color: $text-muted; }
 #execute-plan { width: auto; margin-top: 1; }
@@ -76,6 +97,9 @@ ModePicker { background: transparent; }
 .question { height: auto; margin: 1 0; padding: 0 1; color: $text;
     background: $panel; border-left: solid $primary 35%; }
 .assistant { margin: 0; padding: 0 1; background: $background; }
+.assistant MarkdownH1, .assistant MarkdownH2, .assistant MarkdownH3 { margin: 1 0 0 0; padding: 0; }
+.assistant MarkdownParagraph, .assistant MarkdownList { margin: 0 0 1 0; }
+.assistant MarkdownListItem MarkdownParagraph { margin: 0; }
 .speaker { height: 1; margin: 1 1 0 1; color: $accent; text-style: bold; }
 .tool-card { height: auto; margin: 0; border: none;
              padding: 0; }
@@ -144,6 +168,10 @@ ModePicker { align: right top; background: transparent; }
 #provider-error, #model-error { color: $text-muted; max-height: 3; }
 #provider-error.error, #model-error.error { color: $error; }
 #provider-error.success, #model-error.success { color: $success; }
+#provider-actions { align-horizontal: center; }
+#provider-actions #provider-test { width: 17; min-width: 17; }
+#provider-actions #provider-back { width: 10; min-width: 10; }
+#provider-actions #provider-save { width: 19; min-width: 19; }
 #model-list-state { height: 6; padding: 1; color: $text-muted; }
 #model-details { height: auto; padding: 0; border: none; }
 #model-details > Contents { padding: 0 1; }
@@ -184,4 +212,4 @@ ModePicker { align: right top; background: transparent; }
 .plan-proposal Static { height: auto; margin-bottom: 1; }
 .plan-proposal #plan-start { background: $accent; color: $background; }
 .welcome-title { color: $text; text-style: bold; margin: 1 0; }
-.compact-terminal #context-meter { max-width: 38%; }
+.compact-terminal #context-meter { max-width: 30%; }

@@ -21,3 +21,6 @@ class AgentEvent:
     context_limit: int | None = None
     counter_method: str = ""
     reported_tokens: int | None = None
+    output_tokens: int | None = None
+    generation_seconds: float | None = None
+    request_seconds: float | None = None

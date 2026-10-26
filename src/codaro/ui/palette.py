@@ -64,6 +64,11 @@ def system_commands(app, framework_commands):
         "Tarefas": ("/task list", "Ver tarefas deste projeto"),
         "Desfazer limpeza": ("/restore-clear", "Restaurar mensagens e contexto"),
     }
+    yield SystemCommand(
+        "Ações da última resposta",
+        "Copiar resposta/código ou visualizar arquivo · Ctrl+O",
+        app.action_message_actions,
+    )
     for title, (command, description) in actions.items():
         yield SystemCommand(
             title,

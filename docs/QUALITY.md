@@ -28,11 +28,21 @@ a pré-release. A avaliação de busca contém seis casos; três fixtures de imp
 aprovações reais e execução dos testes nas cópias temporárias. Esse replay verifica
 o fluxo da aplicação; a qualidade do modelo é medida na aceitação opt-in.
 
-`python scripts/capture_ui.py` gera 12 capturas SVG e texto em `artifacts/ui`, em
-80×24 e 120×35, sem chamadas ao modelo e usando configuração temporária. O job
+`python scripts/capture_ui.py` gera 51 capturas SVG e texto em `artifacts/ui`, em
+60×20, 80×24 e 120×35, sem chamadas ao modelo e usando configuração temporária.
+Inclui geração com velocidade sintética, plano extenso, pergunta longa, detalhes,
+ações da resposta, leitura local, conversas, revisão de diff e seleção de modelos. O job
 `ui-evidence` as publica por 14 dias. Novas pastas de capturas geradas são ignoradas
 pelo Git; relatórios e scripts continuam versionáveis. Evidências históricas não
 são apagadas. Capturas são evidência para revisão, não comparação visual automática.
+
+`tests/test_ui_experience.py` verifica as opções visíveis com textos longos,
+acompanhamento e rolagem manual do plano, retomada sem perder rascunho, cópia e
+leitura local, diff pequeno e layout compacto dos seletores. As métricas de geração
+têm testes próprios em `tests/test_ui_generation_rate.py`: estimativa com relógio
+controlado, tokenizer, rejeição de dados inválidos, reinício por chamada,
+cancelamento e duração nativa do Ollama via HTTP simulado. As capturas de velocidade
+demonstram o layout; não são um benchmark de inferência.
 
 Para proteger `develop`, configure nas regras do GitHub os checks `test (3.11)`,
 `test (3.12)`, `test (3.13)`, `retrieval-quality`, `installed-package (ubuntu-latest)`,

@@ -29,6 +29,7 @@ class Composer(Vertical):
                 yield Button("Enviar ↵", id="question-send", variant="primary")
         with Horizontal(id="composer-meta"):
             yield Static("Pronto", id="status", markup=False)
+            yield Static("", id="generation-rate", markup=False)
             yield Static("", id="context-meter", markup=False)
         yield Static("", id="prompt-hint", markup=False)
 

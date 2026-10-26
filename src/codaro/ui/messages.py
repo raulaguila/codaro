@@ -1,7 +1,7 @@
 """Transcript elements shared by live, restored and diagnostic conversations."""
 
 from rich.text import Text
-from textual.widgets import Static
+from textual.widgets import Markdown, Static
 
 from codaro.index import safe_preview
 
@@ -16,3 +16,24 @@ class UserMessage(Static):
         colors = self.app.get_css_variables()
         label = "Você · decisão\n" if self.decision else "Você\n"
         self.update(Text.assemble((label, colors["text-muted"]), safe_preview(self.message)))
+
+
+class AssistantMessage(Markdown):
+    can_focus = True
+
+    def __init__(self, text):
+        self.message_text = text
+        super().__init__(text, classes="assistant", open_links=False)
+
+    def on_mouse_down(self, event):
+        if event.button == 3:
+            event.stop()
+            self.show_actions()
+
+    def show_actions(self):
+        from textual.screen import ModalScreen
+
+        from codaro.ui.message_actions import MessageActions
+
+        if not isinstance(self.app.screen, ModalScreen):
+            self.app.push_screen(MessageActions(self.message_text))

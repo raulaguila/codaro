@@ -34,7 +34,8 @@ from codaro.ui import provider_actions
 from codaro.ui import streaming as stream_ui
 from codaro.ui.composer import Composer, Prompt
 from codaro.ui.formatting import short_path
-from codaro.ui.messages import UserMessage
+from codaro.ui.generation import GenerationRate
+from codaro.ui.messages import AssistantMessage, UserMessage
 from codaro.ui.palette import system_commands
 from codaro.ui.plan import ExecutionPlan
 from codaro.ui.questions import QuestionDock
@@ -63,11 +64,24 @@ class CodaroApp(App):
         Binding("ctrl+x", "cancel", "Cancelar", priority=True, key_display="Ctrl+X"),
         Binding("escape", "escape", "Voltar", show=False),
         Binding("ctrl+p", "command_palette", "Comandos", priority=True, key_display="Ctrl+P"),
+        Binding("ctrl+o", "message_actions", "Ações da resposta", show=False, priority=True),
     ]
 
     def action_command_palette(self):
         if self.use_command_palette and not CommandPalette.is_open(self):
             self.push_screen(CommandPalette(id="--command-palette", placeholder="Buscar comandos…"))
+
+    def action_message_actions(self):
+        if isinstance(self.screen, ModalScreen):
+            return
+        message = self.focused
+        while message is not None and not isinstance(message, AssistantMessage):
+            message = message.parent
+        if message is None:
+            messages = list(self.query(AssistantMessage))
+            message = messages[-1] if messages else None
+        if message is not None:
+            message.show_actions()
 
     def get_system_commands(self, screen):
         if isinstance(screen, ModalScreen):
@@ -192,6 +206,7 @@ class CodaroApp(App):
         self.retry_recovery = None
         self.generation_started = 0.0
         self.generation_phase = "Investigando…"
+        self.generation_rate = GenerationRate(encoder=agent.counter.encoder)
 
     def shortcut_display(self, key: str) -> str:
         key = key.upper()
@@ -324,7 +339,14 @@ class CodaroApp(App):
         model.styles.max_width = max(12, min(32, self.size.width // 3))
         mode = self.query_one("#select-mode", Button)
         selected = self.next_mode[0] if self.next_mode else self.agent.mode
-        mode.label = selected.label + (" · próximo" if self.next_mode else "") + " ▾"
+        automatic = self.next_mode[1] if self.next_mode else self.agent.policy.auto_edits
+        mode.label = (
+            selected.label
+            + (" · Auto" if automatic and selected == Mode.EXECUTE else "")
+            + (" →" if self.next_mode else "")
+            + " ▾"
+        )
+        mode.styles.width = min(max(18, len(str(mode.label)) + 1), max(18, self.size.width // 3))
         mode.disabled = False
         mode.tooltip = (
             "Edições automáticas nesta conversa; comandos e remoções exigem aprovação"
@@ -489,13 +511,18 @@ class CodaroApp(App):
             self.query_one("#status", Static).update(phase)
 
     def update_generation_status(self):
+        if not self.is_running or not self.query("#generation-rate"):
+            return
+        rate = self.query_one("#generation-rate", Static)
+        label, description = self.generation_rate.display()
+        rate.update(label)
+        rate.tooltip = description
+        rate.display = bool(label) and not self.pending_user_question
         if self.busy and self.generation_started:
             if self.pending_user_question:
                 return
             elapsed = max(0, int(time.monotonic() - self.generation_started))
-            self.query_one("#status", Static).update(
-                f"{self.generation_phase} · {elapsed}s · {self.shortcut_display('x')} cancelar"
-            )
+            self.query_one("#status", Static).update(f"{self.generation_phase} · {elapsed}s")
 
     def on_prompt_complete(self, event: Prompt.Complete):
         options = self.completion_options()
@@ -660,22 +687,11 @@ class CodaroApp(App):
                     )
                     return
                 if name == "/sessions" or not argument:
-                    data = self.agent.sessions.load()
-                    content = "\n".join(
-                        ("● " if item["id"] == self.agent.session_id else "  ")
-                        + item["id"]
-                        + " · "
-                        + item["title"]
-                        + (" · arquivada" if item.get("archived") else "")
-                        for item in data["items"]
-                    )
-                    self.mount_message(
-                        Static(
-                            content
-                            + "\n/session new título · /session ID · /session archive|restore ID",
-                            classes="notice",
-                            markup=False,
-                        )
+                    from codaro.ui.sessions import SessionPicker
+
+                    self.push_screen(
+                        SessionPicker(self.agent.sessions, self.agent.session_id),
+                        self.session_selected,
                     )
                     return
                 action, _, identifier = argument.partition(" ")
@@ -719,6 +735,7 @@ class CodaroApp(App):
                     )
                 )
                 self.update_session_header()
+                self.show_plan()
             except (OSError, ValueError) as exc:
                 self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
             return
@@ -897,6 +914,12 @@ class CodaroApp(App):
 
     def manage_provider_decision(self, result):
         return provider_actions.manage_provider_decision(self, result)
+
+    def session_selected(self, identifier):
+        if identifier == "new":
+            self.run_worker(self.action_new_conversation())
+        elif identifier:
+            self.run_worker(self.open_provider_menu("/session " + identifier))
 
     def provider_edited(self, previous, name, store):
         return provider_actions.provider_edited(self, previous, name, store)
@@ -1169,6 +1192,7 @@ class CodaroApp(App):
         self.query_one(ExecutionPlan).fit(self.size.height, answering=True)
         self.query_one("#status", Static).update("Aguardando sua resposta")
         self.generation_phase = "Aguardando sua resposta"
+        self.update_generation_status()
         self.update_completions()
         prompt.focus()
 
@@ -1272,6 +1296,7 @@ class CodaroApp(App):
         self.busy = True
         self.update_session_header()
         self.generation_started = time.monotonic()
+        self.generation_rate.reset()
         self.cancelled.clear()
         self.response_text = self.rendered_text = ""
         self.reply = None
@@ -1402,6 +1427,7 @@ class CodaroApp(App):
                 self.answer_preview.finish("cancelled")
                 self.answer_preview = None
             self.discard_response()
+            self.generation_rate.reset()
             settings = self.agent.provider.settings
             self.pending_recovery = RecoveryCard(
                 safe_preview(
@@ -1474,8 +1500,24 @@ class CodaroApp(App):
                 self.session_decisions = [*self.session_decisions, self.current_decisions][-50:]
                 self.current_decisions = []
                 self.save_session()
+            if len(self.session_turns) == 1:
+                try:
+                    item = next(
+                        item
+                        for item in self.agent.sessions.load()["items"]
+                        if item["id"] == self.agent.session_id
+                    )
+                    if item["title"] in {"Nova conversa", "Conversa original"}:
+                        title = " ".join(self.agent.memory.redact(self.active_question).split())[
+                            :80
+                        ]
+                        if title:
+                            self.agent.sessions.rename(self.agent.session_id, title)
+                except (OSError, ValueError, StopIteration):
+                    pass
         elif outcome == "context" and not self.context_scope_requested:
             self.request_context_scope()
+        self.update_generation_status()
 
     def request_context_scope(self):
         original = self.active_question

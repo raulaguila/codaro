@@ -54,7 +54,7 @@ class EditReview(ModalScreen[str]):
                         else colors["text-muted"]
                     )
                     diff.append(line, style=color)
-                yield Static(diff)
+                yield Static(diff, id="review-diff-text")
             with Horizontal(id="review-actions"):
                 yield Button("Rejeitar", id="reject-edit")
                 yield Button("Voltar", id="back-edit")
@@ -63,6 +63,18 @@ class EditReview(ModalScreen[str]):
     def on_mount(self):
         # Enter must never approve a patch just because the modal appeared.
         self.query_one("#back-edit", Button).focus()
+        self.fit_review()
+
+    def on_resize(self):
+        self.call_after_refresh(self.fit_review)
+
+    def fit_review(self):
+        title = self.query_one("#review-title", Static)
+        title.tooltip = f"{self.proposal.path}\n{self.proposal.reason}"
+        if self.size.height < 25:
+            title.update(safe_preview(f"Revisar · {self.proposal.path}"))
+        else:
+            title.update(safe_preview(f"Revisar · {self.proposal.path}\n{self.proposal.reason}"))
 
     def on_button_pressed(self, event: Button.Pressed):
         self.dismiss({"apply-edit": "apply", "reject-edit": "reject"}.get(event.button.id, "back"))
@@ -73,8 +85,9 @@ class EditReview(ModalScreen[str]):
 
 class ChangesReview(EditReview):
     def __init__(self, proposals):
+        self.proposals = list(proposals)
         sections = []
-        for item in proposals:
+        for item in self.proposals:
             lines = item.diff.splitlines()
             added = sum(line.startswith("+") and not line.startswith("+++") for line in lines)
             removed = sum(line.startswith("-") and not line.startswith("---") for line in lines)
@@ -87,6 +100,38 @@ class ChangesReview(EditReview):
             diff="\n\n".join(sections),
         )
         super().__init__(combined)
+
+    def fit_review(self):
+        super().fit_review()
+        width = max(20, self.query_one("#review-diff").content_size.width - 2)
+        content = Text()
+        colors = self.app.get_css_variables()
+        for index, item in enumerate(self.proposals):
+            if index:
+                content.append("\n\n")
+            lines = item.diff.splitlines()
+            added = sum(line.startswith("+") and not line.startswith("+++") for line in lines)
+            removed = sum(line.startswith("-") and not line.startswith("---") for line in lines)
+            for label in (
+                f"{item.operation} · {item.path} · +{added} −{removed}",
+                item.reason,
+            ):
+                heading = Text(safe_preview(label).replace("\n", " "))
+                heading.truncate(width, overflow="ellipsis")
+                content.append_text(heading)
+                content.append("\n")
+            for line in safe_preview(item.diff).splitlines(keepends=True):
+                color = (
+                    "success"
+                    if line.startswith("+")
+                    else "error"
+                    if line.startswith("-")
+                    else "text-muted"
+                )
+                content.append(line, style=colors[color])
+        body = self.query_one("#review-diff-text", Static)
+        body.update(content)
+        body.tooltip = safe_preview("\n\n".join(f"{p.path}\n{p.reason}" for p in self.proposals))
 
 
 class ScopeReview(ModalScreen[dict | None]):

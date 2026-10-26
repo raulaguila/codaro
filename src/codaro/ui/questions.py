@@ -1,7 +1,8 @@
 """Question, vertical choices and free response share the main composer."""
 
-from textual.containers import Vertical
-from textual.widgets import OptionList, Static
+from rich.text import Text
+from textual.containers import Horizontal, Vertical
+from textual.widgets import Button, OptionList, Static
 
 from codaro.index import safe_preview
 
@@ -9,7 +10,9 @@ from codaro.index import safe_preview
 class QuestionDock(Vertical):
     def compose(self):
         yield Static("? Pergunta", classes="question-label", markup=False)
-        yield Static("", id="question-title", markup=False)
+        with Horizontal(id="question-heading"):
+            yield Static("", id="question-title", markup=False)
+            yield Button("Detalhes", id="question-details")
         yield Static("", id="question-why", markup=False)
         yield OptionList(id="question-options")
 
@@ -37,6 +40,42 @@ class QuestionDock(Vertical):
         if question["choices"]:
             options.highlighted = question.get("recommended", 0)
         self.set_free_answer(False)
+        self.call_after_refresh(self.fit)
+
+    def on_resize(self):
+        if getattr(self, "question", None):
+            self.call_after_refresh(self.fit)
+
+    def fit(self):
+        if not getattr(self, "question", None) or not self.is_attached:
+            return
+        width = max(10, self.content_size.width - 12)
+        lines = Text(safe_preview(self.question["question"])).wrap(self.app.console, width)
+        if len(lines) > 2:
+            lines[1].truncate(max(1, width - 1))
+            lines[1].append("…")
+        self.query_one("#question-title", Static).update(Text("\n").join(lines[:2]))
+        self.refresh_choices()
+
+    def on_button_pressed(self, event):
+        if event.button.id != "question-details":
+            return
+        event.stop()
+        from codaro.ui.composer import Prompt
+        from codaro.ui.details import DetailsDialog
+
+        question = self.question
+        self.app.push_screen(
+            DetailsDialog(
+                "Detalhes da pergunta",
+                [
+                    ("Pergunta", question["question"]),
+                    ("Explicação", question.get("explanation") or "Sem explicação adicional"),
+                    *[(f"Opção {i + 1}", choice) for i, choice in enumerate(question["choices"])],
+                ],
+            ),
+            lambda _: self.app.query_one(Prompt).focus(),
+        )
 
     def set_paused(self, paused):
         self.query_one(".question-label", Static).update(
@@ -61,7 +100,10 @@ class QuestionDock(Vertical):
                 else "○ "
             )
             suffix = " · recomendada" if index == question.get("recommended") else ""
-            options.replace_option_prompt_at_index(index, mark + safe_preview(choice) + suffix)
+            label = Text(mark + safe_preview(choice).replace("\n", " ") + suffix)
+            # OptionList wraps renderables itself; no_wrap alone is insufficient.
+            label.truncate(max(1, options.content_size.width - 2), overflow="ellipsis")
+            options.replace_option_prompt_at_index(index, label)
 
     def on_option_list_option_highlighted(self, event):
         event.stop()
@@ -71,6 +113,7 @@ class QuestionDock(Vertical):
         options = self.query_one(OptionList)
         if options.option_count:
             options.highlighted = ((options.highlighted or 0) + direction) % options.option_count
+            options.scroll_visible(animate=False)
 
     def answer(self, text, question):
         if text.strip():

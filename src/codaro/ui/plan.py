@@ -1,9 +1,52 @@
 """Persistent task projection next to the composer, independent of chat turns."""
 
+from rich.text import Text
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Button, Static
 
 from codaro.index import safe_preview
+
+
+class PlanSteps(VerticalScroll):
+    def on_mouse_down(self, event):
+        if event.button == 1:
+            self.parent.manual_scroll()
+
+    def on_mouse_scroll_up(self):
+        self.parent.manual_scroll()
+
+    def on_mouse_scroll_down(self):
+        self.parent.manual_scroll()
+
+    def action_scroll_up(self):
+        self.parent.manual_scroll()
+        super().action_scroll_up()
+
+    def action_scroll_down(self):
+        self.parent.manual_scroll()
+        super().action_scroll_down()
+
+    def action_page_up(self):
+        self.parent.manual_scroll()
+        super().action_page_up()
+
+    def action_page_down(self):
+        self.parent.manual_scroll()
+        super().action_page_down()
+
+    def action_scroll_home(self):
+        self.parent.manual_scroll()
+        super().action_scroll_home()
+
+    def action_scroll_end(self):
+        self.parent.manual_scroll()
+        super().action_scroll_end()
+
+
+class PlanContent(Static):
+    def on_resize(self):
+        if isinstance(self.parent, PlanSteps) and isinstance(self.parent.parent, ExecutionPlan):
+            self.call_after_refresh(self.parent.parent.follow_active)
 
 
 class ExecutionPlan(Vertical):
@@ -11,13 +54,16 @@ class ExecutionPlan(Vertical):
         super().__init__(id="execution-plan")
         self.task_id = None
         self.expanded = True
+        self.following = True
+        self.steps = []
 
     def compose(self):
         with Horizontal(id="plan-heading"):
             yield Button("Plano", id="toggle-plan")
+            yield Button("Etapa atual", id="follow-plan")
             yield Button("Cancelar plano", id="cancel-plan")
-        with VerticalScroll(id="plan-steps"):
-            yield Static("", id="plan-list", markup=False)
+        with PlanSteps(id="plan-steps"):
+            yield PlanContent("", id="plan-list", markup=False)
         yield Button("Executar plano", id="execute-plan")
 
     def set_task(self, task, *, busy=False):
@@ -27,7 +73,9 @@ class ExecutionPlan(Vertical):
             return
         if task["id"] != self.task_id:
             self.task_id, self.expanded = task["id"], True
+            self.following = True
         steps = task["plan"]
+        self.steps = steps
         done = sum(step["state"] == "done" for step in steps)
         current = next((step["title"] for step in steps if step["state"] == "doing"), "")
         if not current:
@@ -55,12 +103,39 @@ class ExecutionPlan(Vertical):
             )
         self.query_one("#plan-list", Static).update(content)
         self.query_one("#plan-steps").display = self.expanded
+        self.query_one("#follow-plan").display = not self.following and self.expanded
+        if self.following and self.expanded:
+            self.call_after_refresh(self.follow_active)
         execute = self.query_one("#execute-plan", Button)
         execute.display = task["state"] == "planned"
         execute.disabled = busy
 
     def toggle(self):
         self.expanded = not self.expanded
+
+    def manual_scroll(self):
+        self.following = False
+        self.query_one("#follow-plan").display = self.expanded
+
+    def follow_active(self):
+        if not self.following or not self.is_attached or not self.expanded:
+            return
+        index = next((i for i, step in enumerate(self.steps) if step["state"] == "doing"), None)
+        if index is None:
+            index = next((i for i, step in enumerate(self.steps) if step["state"] == "todo"), 0)
+        width = max(10, self.query_one("#plan-list").content_size.width)
+        rows = sum(
+            len(Text("○ " + step["title"]).wrap(self.app.console, width))
+            for step in self.steps[:index]
+        )
+        self.query_one("#plan-steps", VerticalScroll).scroll_to(y=rows, animate=False)
+
+    def on_button_pressed(self, event):
+        if event.button.id == "follow-plan":
+            event.stop()
+            self.following = True
+            self.query_one("#follow-plan").display = False
+            self.follow_active()
 
     def fit(self, height, *, answering=False):
         self.query_one("#plan-steps").styles.max_height = (

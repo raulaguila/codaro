@@ -1056,6 +1056,7 @@ class Agent:
                             },
                         )
                     advertised = {tool["function"]["name"] for tool in tools or []}
+                    request_started = time.monotonic()
                     try:
                         request_budget.get().charge(tokens, self.max_output_tokens)
                         if streaming:
@@ -1252,6 +1253,16 @@ class Agent:
                     flow.response(message)
                     attempts = flow.turn.get("http_attempts", [])
                     usage = attempts[-1].get("usage") if attempts else None
+                    if isinstance(usage, dict) and type(usage.get("completion_tokens")) is int:
+                        detail(
+                            AgentEvent(
+                                "generation_metrics",
+                                "Velocidade de geração",
+                                output_tokens=usage["completion_tokens"],
+                                generation_seconds=usage.get("generation_seconds"),
+                                request_seconds=max(0.0, time.monotonic() - request_started),
+                            )
+                        )
                     actual = usage.get("prompt_tokens") if isinstance(usage, dict) else None
                     if type(actual) is int and 0 <= actual <= 2_000_000:
                         self.counter.observe(wire(payload), actual)

@@ -110,6 +110,11 @@ class Ollama(OpenAICompatible):
                 {
                     "prompt_tokens": data.get("prompt_eval_count"),
                     "completion_tokens": data.get("eval_count"),
+                    **(
+                        {"generation_seconds": data["eval_duration"] / 1_000_000_000}
+                        if type(data.get("eval_duration")) is int and data["eval_duration"] > 0
+                        else {}
+                    ),
                 },
             )
             # Preserve the terminal reason and usage even when validation raises.

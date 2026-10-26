@@ -1,5 +1,7 @@
 """One quiet progress area per turn, with details opened only by the user."""
 
+import time
+
 from rich.text import Text
 from textual.containers import Vertical
 from textual.widgets import Collapsible, Static
@@ -15,6 +17,7 @@ class TurnStages(Vertical):
         self.completed = ""
         self.current = ""
         self.running = True
+        self.started = time.monotonic()
 
     def progress(self, current="", completed=""):
         self.current = safe_preview(current.split("\n", 1)[0])[:120]
@@ -56,14 +59,20 @@ class TurnStages(Vertical):
             self.refresh_summary()
 
     def finish(self):
+        if not self.running:
+            return
         self.running = False
+        elapsed = max(1, round(time.monotonic() - self.started))
+        self.details.title += f" · {elapsed}s no total"
         self.refresh_summary()
 
 
 def ensure_stages(app):
     if app.activity_group is None:
         app.activity_group = ActivityGroup()
-        app.mount_message(TurnStages(app.activity_group))
+        stages = TurnStages(app.activity_group)
+        stages.started = app.generation_started or stages.started
+        app.mount_message(stages)
     return app.activity_group
 
 

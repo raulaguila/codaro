@@ -70,6 +70,9 @@ def activate_provider(app, settings: Settings | None, *, preserve_session=True):
                 token_encoding=current.token_encoding,
             )
         app.agent.set_provider(create_provider(settings))
+        app.generation_rate.reset()
+        app.generation_rate.encoder = app.agent.counter.encoder
+        app.query_one("#generation-rate").update("")
         app.provider_available = True
         app.setup_required = False
         app.hide_welcome()

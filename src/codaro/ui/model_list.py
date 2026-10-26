@@ -1,5 +1,7 @@
 """Visible, searchable model rows; highlighting is separate from activation."""
 
+from rich.cells import cell_len
+from rich.text import Text
 from textual.binding import Binding
 from textual.message import Message
 from textual.widgets import OptionList
@@ -37,21 +39,13 @@ class ModelList(OptionList):
             raise ValueError("Modelo não disponível nesta lista.") from exc
 
     def set_models(self, models, query=""):
+        self.models, self.search_query = models, query
         previous = self.value
         self.clear_options()
         self.add_options(
             [
                 Option(
-                    safe_preview(
-                        f"{model['id']} · "
-                        + (
-                            "sem conversa"
-                            if model["tools"] is False
-                            else compact_tokens(model["context_window"])
-                            if model["context_window"]
-                            else "Não informado"
-                        )
-                    ),
+                    self.row(model),
                     id=model["id"],
                     disabled=model["tools"] is False,
                 )
@@ -71,6 +65,25 @@ class ModelList(OptionList):
                     ),
                     None,
                 )
+
+    def row(self, model):
+        width = max(20, self.content_size.width or 60)
+        right = (
+            "sem ferramentas"
+            if model["tools"] is False
+            else compact_tokens(model["context_window"])
+            if model["context_window"]
+            else "Não informado"
+        )
+        left_width = max(4, width - cell_len(right) - 3)
+        left = Text(safe_preview(model["id"]), no_wrap=True, overflow="ellipsis")
+        left.truncate(left_width, overflow="ellipsis", pad=True)
+        left.append("  " + right)
+        return left
+
+    def on_resize(self):
+        if hasattr(self, "models"):
+            self.set_models(self.models, self.search_query)
 
     def on_option_list_option_highlighted(self, event):
         event.stop()

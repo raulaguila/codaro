@@ -3,25 +3,37 @@
 from __future__ import annotations
 
 from textual.containers import VerticalScroll
-from textual.widgets import Markdown, Static
+from textual.widgets import Static
 
 from codaro.agent import AgentEvent
 from codaro.index import safe_preview
 from codaro.llm import MAX_MESSAGE_CHARS
+from codaro.ui.messages import AssistantMessage
 from codaro.ui.session_details import compact_tokens
 from codaro.ui.stages import ensure_stages, progress
 from codaro.ui.widgets import GenerationPreview, ReasoningGroup
 
 
 def activity(app, event: AgentEvent):
+    if event.kind == "generation_metrics":
+        app.generation_rate.report(
+            event.output_tokens,
+            generation_seconds=event.generation_seconds,
+            request_seconds=event.request_seconds,
+        )
+        app.update_generation_status()
+        return
     if event.kind == "model_start":
         tokens = event.context_tokens or 0
         limit = event.context_limit or app.agent.adaptive_input_limit
         meter = app.query_one("#context-meter", Static)
         provisional = app.agent.provider.settings.context_source.startswith("fallback")
+        percent = round(tokens * 100 / max(1, limit))
         meter.update(
-            f"Contexto ≈{compact_tokens(tokens)}/{compact_tokens(limit)}"
-            + (" · provisório" if provisional else f" · {round(tokens * 100 / max(1, limit))}%")
+            f"Contexto ≈{percent}%" + (" · prov." if provisional else "")
+            if app.size.width < 100
+            else f"Contexto ≈{compact_tokens(tokens)}/{compact_tokens(limit)}"
+            + (" · provisório" if provisional else f" · {percent}%")
         )
         meter.tooltip = (
             f"Enviado: ≈ {tokens:,}/{limit:,} tokens · {app.agent.provider.settings.context_source}"
@@ -36,6 +48,7 @@ def activity(app, event: AgentEvent):
     if event.kind == "plan":
         app.show_plan()
     elif event.kind == "model_start":
+        app.generation_rate.reset()
         app.update_session_header()
         app.finish_preview("retry")
         if app.answer_preview is not None:
@@ -77,7 +90,9 @@ def activity(app, event: AgentEvent):
             completed=event.title
             + (" · " + event.detail.split("\n", 1)[0] if event.detail else ""),
         )
-        app.set_generation_status(f"{event.title} · {duration}")
+        app.set_generation_status(
+            f"{event.title} · {duration}" if not app.busy else "Analisando resultados…"
+        )
     else:
         app.set_generation_status("Investigando…")
 
@@ -86,6 +101,7 @@ def append_delta(app, delta: str):
     # A content delta may precede native tool_calls in the same message.
     # Only finish() can commit an answer to the conversation.
     app.draft_text = (app.draft_text + safe_preview(delta))[:MAX_MESSAGE_CHARS]
+    app.generation_rate.append(delta)
     app.set_generation_status("Respondendo…")
     # Render the first fragment immediately; subsequent fragments are coalesced by the timer.
     if app.generation_preview is None:
@@ -162,9 +178,10 @@ def flush_response(app):
     if app.reply is None:
         app.speaker = Static("Codaro", classes="speaker", markup=False)
         app.mount_message(app.speaker)
-        app.reply = Markdown(app.response_text, classes="assistant", open_links=False)
+        app.reply = AssistantMessage(app.response_text)
         app.mount_message(app.reply)
     else:
+        app.reply.message_text = app.response_text
         app.reply.update(app.response_text)
     app.rendered_text = app.response_text
     if follow:
