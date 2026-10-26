@@ -46,11 +46,15 @@ TOOLS = [
     ),
     schema(
         "read_lines",
-        "Lê de 1 a 160 linhas do arquivo atual, com limite de caracteres.",
+        "Lê até 160 linhas. Continue uma linha longa usando next_start_line e next_column "
+        "como start/column; envie file_hash para detectar mudança entre páginas.",
         {
             "path": {"type": "string", "maxLength": 2000},
             "start": {"type": "integer", "minimum": 1},
             "end": {"type": "integer", "minimum": 1},
+            "column": {"type": "integer", "minimum": 0},
+            "max_chars": {"type": "integer", "minimum": 200, "maximum": 6000},
+            "file_hash": {"type": "string", "maxLength": 64},
         },
         ["path", "start", "end"],
     ),

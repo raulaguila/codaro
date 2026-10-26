@@ -488,6 +488,11 @@ A busca inicial é textual e estrutural. Embeddings, reranking e LSP serão adic
 
 ## Limites de contexto e arquivos
 
+`read_lines` permite continuar linhas longas por `next_start_line`/`next_column`,
+com `file_hash` para detectar mudanças entre páginas. O cursor acompanha o trecho
+entregue mesmo quando o orçamento reduz a resposta. Veja o contrato e as próximas
+etapas em [Ferramentas do agente](docs/TOOLS.md).
+
 Uma chamada encerrada sem texto nem ferramentas válidas recebe até duas tentativas automáticas de síntese, sem ferramentas e com os resultados já obtidos. A síntese usa mensagens textuais novas, sem histórico de `tool_calls`/`tool`, com o pedido atual, orientações obrigatórias e evidências limitadas. Preserva referências de até dois turnos recentes e o resumo de continuidade como histórico, sem tratá-los como prova do código atual. Prioriza recibos de operações e código atual; trechos recortados atualizam o intervalo de linhas, truncamento e continuação. Saídas de comandos preservam início e fim para manter erros finais. Buscas grandes são reduzidas por item em vez de descartar todas as ocorrências. As recuperações reduzem o pacote de evidências e reforçam a conclusão breve. Raciocínio não é convertido em resposta final. A recuperação respeita os limites globais de tempo e requisições; se o provedor continuar sem responder, a atividade termina com diagnóstico e progresso preservados. O debug registra `empty_response_recovery`.
 
 O orçamento acumulado de resultados é separado do contexto ativo: compactar libera a requisição, mas não zera o volume investigado. O agente antecipa a síntese reservando espaço antes desse limite; chamadas em lote compartilham o espaço restante. Buscas reduzidas priorizam caminhos e pequenos trechos. Quando todos os itens encontrados precisam ser omitidos, `omitted_results` e um aviso distinguem essa situação de uma busca sem ocorrências, quando os metadados cabem no orçamento. O debug inclui `active_tool_chars`, `tool_chars_used`, `tool_volume_limit` e `context_char_limit`.

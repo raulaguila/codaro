@@ -273,11 +273,20 @@ class Repository:
         return self.render_lines(name, self.read_text(name), start, end)
 
     @staticmethod
-    def render_lines(name: str, text: str, start: int, end: int) -> dict:
+    def render_lines(
+        name: str, text: str, start: int, end: int, *, column=0, max_chars=6000
+    ) -> dict:
         if type(start) is not int or type(end) is not int or start < 1 or end < start:
             raise RepositoryError("Intervalo de linhas inválido.")
         if end - start >= 160:
             raise RepositoryError("Solicite de 1 a 160 linhas.")
+        if (
+            type(column) is not int
+            or column < 0
+            or type(max_chars) is not int
+            or not 200 <= max_chars <= 6000
+        ):
+            raise RepositoryError("Use coluna não negativa e max_chars entre 200 e 6000.")
         # split on LF to agree with Tree-sitter row numbering (including CRLF files).
         lines = text.split("\n")
         if lines and lines[-1] == "":
@@ -288,18 +297,23 @@ class Repository:
             raise RepositoryError(f"Arquivo tem apenas {len(lines)} linhas.")
         if not lines and start != 1:
             raise RepositoryError("Arquivo vazio.")
+        if column and (not lines or column >= len(lines[start - 1].removesuffix("\r"))):
+            raise RepositoryError("Coluna fora da linha atual.")
         output = []
         size = 0
         truncated = False
         last_line = start - 1
         next_line = None
         partial_line = None
+        next_column = 0
         for number, line in enumerate(lines[start - 1 : end], start):
             line = line.removesuffix("\r")
+            current_column = column if number == start else 0
+            line = line[current_column:]
             # Keep tabs but neutralize terminal control sequences in code previews.
             line = "".join(c if c == "\t" or ord(c) >= 32 and ord(c) != 127 else "�" for c in line)
             rendered = f"{number}: {line}"
-            available = 6000 - size - (1 if output else 0)
+            available = max_chars - size - (1 if output else 0)
             if available <= 0:
                 truncated = True
                 next_line = number
@@ -310,6 +324,7 @@ class Repository:
                 last_line = number
                 partial_line = number
                 next_line = number
+                next_column = current_column + max(0, available - len(f"{number}: "))
                 break
             output.append(rendered)
             last_line = number
@@ -325,4 +340,6 @@ class Repository:
             "total_lines": len(lines),
             "next_start_line": next_line,
             "partial_line": partial_line,
+            "start_column": column,
+            "next_column": next_column,
         }

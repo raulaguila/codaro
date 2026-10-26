@@ -10,7 +10,7 @@ def _fit_result(result: dict, budget: int) -> dict:
         result = dict(result)
         metadata = {
             key: result.get(key)
-            for key in ("end_line", "partial_line", "next_start_line", "truncated")
+            for key in ("end_line", "partial_line", "next_start_line", "next_column", "truncated")
         }
         content = result["content"]
         original = content.split("\n")
@@ -35,6 +35,12 @@ def _fit_result(result: dict, budget: int) -> dict:
             )
             result["partial_line"] = partial
             result["next_start_line"] = partial if partial is not None else end + 1
+            result["next_column"] = (
+                (result.get("start_column", 0) if partial == result["start_line"] else 0)
+                + max(0, len(lines[-1]) - len(f"{partial}: "))
+                if partial is not None and lines
+                else 0
+            )
 
         low, high = 0, len(content)
         while low < high:

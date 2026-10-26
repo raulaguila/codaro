@@ -793,6 +793,8 @@ class Agent:
                     if not isinstance(result, dict) or not result.get("content"):
                         continue
                     path, start = result.get("path", ""), result.get("start_line", 1)
+                    if result.get("start_column"):
+                        start += 1
                     end = result.get("end_line", 0)
                     if result.get("partial_line") is not None:
                         end = min(end, result["partial_line"] - 1)
@@ -1524,6 +1526,10 @@ class Agent:
                                 digest = hashlib.sha256(
                                     self.repository.read_bytes(path)
                                 ).hexdigest()
+                                if arguments.get("file_hash") and arguments["file_hash"] != digest:
+                                    raise ValueError(
+                                        "Arquivo mudou entre páginas; reinicie a leitura."
+                                    )
                                 key = serialize([name, arguments, digest])
                                 coverage_key = serialize([str(path), digest])
                                 if name == "read_lines":
@@ -1532,9 +1538,10 @@ class Agent:
                                         raise ValueError(
                                             "Solicite um intervalo válido de até 160 linhas."
                                         )
-                                    for first, last in sorted(coverage.get(coverage_key, [])):
-                                        if first <= start <= last:
-                                            start = last + 1
+                                    if not arguments.get("column"):
+                                        for first, last in sorted(coverage.get(coverage_key, [])):
+                                            if first <= start <= last:
+                                                start = last + 1
                                     already_read = start > end
                                     if start > arguments["start"] and not already_read:
                                         read_arguments = {**arguments, "start": start}
@@ -1795,13 +1802,19 @@ class Agent:
                                     self.edits.observe(result, self._read_snapshot)
                                     read_snapshots[call["id"]] = self._read_snapshot
                                 # Only cache successful reads of an unchanged source version.
-                                if key is not None and "error" not in result:
+                                if (
+                                    key is not None
+                                    and "error" not in result
+                                    and not result.get("truncated")
+                                ):
                                     cache.add(key)
                                     if coverage_key is not None and result.get("content"):
                                         end = result["end_line"]
                                         if result.get("partial_line") is not None:
                                             end = min(end, result["partial_line"] - 1)
-                                        if end >= result["start_line"]:
+                                        if end >= result["start_line"] and not result.get(
+                                            "start_column"
+                                        ):
                                             coverage.setdefault(coverage_key, []).append(
                                                 (result["start_line"], end)
                                             )
@@ -1822,6 +1835,8 @@ class Agent:
                         not in IGNORE_RULE_FILES
                     ):
                         start, end = result["start_line"], result["end_line"]
+                        if result.get("start_column"):
+                            start += 1
                         if result.get("partial_line") is not None:
                             end = min(end, result["partial_line"] - 1)
                         if end >= start:

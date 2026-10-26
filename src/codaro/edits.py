@@ -51,6 +51,10 @@ class EditManager:
         return [proposal for proposal in self.proposals.values() if proposal.state == "pending"]
 
     def observe(self, result: dict, data: bytes):
+        # A continuation does not establish that the beginning of its line was
+        # read. Keep whole-line edit authorization conservative.
+        if result.get("start_column"):
+            return
         if not result.get("content"):
             if result.get("total_lines") == 0 and data.decode("utf-8-sig") == "":
                 self.observed[result["path"]] = (data, [(0, 0)])

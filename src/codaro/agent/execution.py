@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import time
 
 from codaro.agent.events import AgentEvent
@@ -164,14 +165,23 @@ def execute_tool(agent, index: CodeIndex, name: str, args: dict) -> dict:
         path = agent.repository.resolve_file(args["path"])
         canonical = path.relative_to(agent.repository.root).as_posix()
         data = agent.repository.read_bytes(path)
+        digest = hashlib.sha256(data).hexdigest()
+        if args.get("file_hash") and args["file_hash"] != digest:
+            raise ValueError("Arquivo mudou entre páginas; reinicie a leitura.")
         if name == "read_symbol":
             result = index.read_symbol(canonical, args["symbol"], args.get("start_line"))
             if agent.repository.read_bytes(path) != data:
                 raise ValueError("Arquivo mudou durante a leitura. Leia novamente.")
         else:
             result = agent.repository.render_lines(
-                canonical, data.decode("utf-8-sig"), args["start"], args["end"]
+                canonical,
+                data.decode("utf-8-sig"),
+                args["start"],
+                args["end"],
+                column=args.get("column", 0),
+                max_chars=args.get("max_chars", 6000),
             )
+        result["file_hash"] = digest
         agent._read_snapshot = data
         return result
     paths = [str(path.relative_to(agent.repository.root)) for path in agent.repository.files()]
