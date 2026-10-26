@@ -4,6 +4,8 @@ import shlex
 
 
 def tool_target(name: str, args: dict) -> str:
+    if name == "ask_user_question":
+        return "Decisão pendente"
     if name == "search_conversation":
         return args["query"]
     if name == "read_conversation":
@@ -22,10 +24,13 @@ def tool_target(name: str, args: dict) -> str:
         return f"{args.get('path', '')} · {args.get('symbol', '')}"[:240]
     if name == "read_lines":
         return f"{args.get('path', '')}:{args.get('start', '')}–{args.get('end', '')}"[:240]
-    return f"Página a partir do arquivo {args.get('offset', 0)}"
+    if name == "list_files":
+        return f"Página a partir do arquivo {args.get('offset', 0)}"
+    return ""
 
 
 TOOL_TITLES = {
+    "ask_user_question": "Perguntar ao usuário",
     "get_context_status": "Consultar orçamento de contexto",
     "compact_context": "Liberar contexto",
     "request_tools": "Carregar ferramentas",
@@ -45,6 +50,8 @@ TOOL_TITLES = {
 def tool_outcome(result: dict) -> tuple[str, str]:
     if "error" in result:
         return "error", str(result["error"])[:200]
+    if "user_response" in result:
+        return "success", "Decisão registrada"
     if result.get("state") in {"applied", "partial", "conflict", "rejected"}:
         state = result["state"]
         label = {

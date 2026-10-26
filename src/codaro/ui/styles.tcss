@@ -95,8 +95,14 @@ ModePicker { background: transparent; }
 .recovery-actions Button { width: 1fr; min-width: 8; padding: 0; }
 #configure-start { height: 1; min-height: 1; width: auto; border: none; padding: 0; }
 .question { height: auto; margin: 1 0; padding: 0 1; color: $text;
-    background: $panel; border-left: solid $primary 35%; }
+    width: 100%; max-width: 100; background: $primary 5%; border-left: solid $primary 35%; }
+.decision { height: auto; width: 100%; max-width: 100; margin: 1 0; padding: 0 1;
+    background: $background; border-left: solid $primary 35%; }
 .assistant { margin: 0; padding: 0 1; background: $background; }
+.assistant MarkdownParagraph, .assistant MarkdownH1, .assistant MarkdownH2,
+.assistant MarkdownH3, .assistant MarkdownList, .assistant MarkdownBlockQuote,
+.generation-text MarkdownParagraph, .generation-text MarkdownH1, .generation-text MarkdownH2,
+.generation-text MarkdownH3, .generation-text MarkdownList { max-width: 100; }
 .assistant MarkdownH1, .assistant MarkdownH2, .assistant MarkdownH3 { margin: 1 0 0 0; padding: 0; }
 .assistant MarkdownParagraph, .assistant MarkdownList { margin: 0 0 1 0; }
 .assistant MarkdownListItem MarkdownParagraph { margin: 0; }
@@ -162,6 +168,10 @@ ModePicker { align: right top; background: transparent; }
 #model-fields Select, #model-fields Input { margin: 0 0 1 0; }
 #provider-fields Input, #model-fields Input, #preferences-fields Input {
     background: $background; padding: 0 1; }
+#provider-fields Input { height: 1; border: none; border-left: solid $primary 50%;
+    background: $primary 10%; color: $text; }
+#provider-fields Input:focus { border-left: solid $accent; background: $primary 20%; }
+#provider-fields Input > .input--placeholder { color: $text-muted; }
 #provider-fields Static, #model-fields Static { color: $text-muted; }
 #provider-tls-warning { color: $warning; }
 #provider-test-inference, #model-test { width: auto; color: $text; }
@@ -176,6 +186,15 @@ ModePicker { align: right top; background: transparent; }
 #model-details { height: auto; padding: 0; border: none; }
 #model-details > Contents { padding: 0 1; }
 #model-info { color: $text-muted; margin: 1 0; }
+#model-test-warning { height: 1; text-wrap: nowrap; text-overflow: ellipsis; }
+#model-id > .option-list--option-highlighted { background: $primary 25%;
+    color: $text; text-style: bold; }
+#model-id { scrollbar-size: 1 1; }
+.short-terminal #model-form .dialog-title { margin: 0 0 1 0; }
+.short-terminal #model-fields Select, .short-terminal #model-fields Input { margin: 0; }
+.short-terminal #model-id { height: 5; }
+.compact-terminal.short-terminal #model-id { height: 3; }
+.short-terminal #model-info { margin: 0; max-height: 2; }
 .dialog-title { height: auto; color: $text; text-style: bold; margin: 1 0; }
 .muted { color: $text-muted; }
 #details-dialog { width: 90%; max-width: 84; height: 24;
@@ -207,7 +226,9 @@ ModePicker { align: right top; background: transparent; }
 .recovery-card > Contents > Collapsible > Contents { max-height: 8; overflow-y: auto; }
 .outcome-actions { height: 1; margin: 1 1; }
 .task-receipt { height: auto; margin: 1; }
-.task-receipt Static { height: auto; color: $success; }
+.task-receipt Static { height: auto; color: $text-muted; }
+.task-receipt.verified Static { color: $success; }
+.task-receipt.failed Static { color: $warning; }
 .plan-proposal { height: auto; margin: 1; }
 .plan-proposal Static { height: auto; margin-bottom: 1; }
 .plan-proposal #plan-start { background: $accent; color: $background; }

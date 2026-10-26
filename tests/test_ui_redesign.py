@@ -94,8 +94,7 @@ def test_mode_selection_is_explicit_and_preserves_draft(tmp_path):
             assert agent.mode == Mode.EXECUTE and not agent.policy.auto_edits
             app.open_mode_picker()
             await pilot.pause()
-            app.screen.query_one("#edit-policy").collapsed = False
-            await pilot.pause()
+            assert app.screen.query_one("#edit-policy").display
             await pilot.click("#edit-auto")
             assert app.screen.query_one("#edit-auto", RadioButton).value
             assert not agent.policy.auto_edits
@@ -142,8 +141,7 @@ def test_expanded_mode_policy_keeps_confirmation_visible(tmp_path, size):
         async with app.run_test(size=size) as pilot:
             await pilot.click("#select-mode")
             await pilot.pause()
-            app.screen.query_one("#edit-policy").collapsed = False
-            await pilot.pause()
+            assert app.screen.query_one("#edit-policy").display
             for selector in ("#mode-apply", "#mode-help"):
                 button = app.screen.query_one(selector)
                 clip = app.screen._compositor.find_widget(button).clip

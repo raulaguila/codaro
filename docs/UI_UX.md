@@ -1,5 +1,28 @@
 # Correções da auditoria de UI e UX do Codaro
 
+## Revisão dos prints de cadastro, modos, modelos e conversa
+
+- O cálculo da largura das opções desconta padding e scrollbar do componente.
+  Contexto ausente usa —; seleção e metadados permanecem sincronizados após busca,
+  resize e troca de provedor. O modelo ativo fica visível mesmo em catálogos extensos.
+- Modos e política de edições têm seções distintas, sem um segundo submenu. A política
+  aparece somente em Executar. A altura acompanha o conteúdo, com confirmação fixa;
+  cancelar ou apenas navegar mantém as permissões anteriores.
+- Provedores têm nomes amigáveis, placeholder e foco visível na credencial, retorno
+  de conexão com quantidade de modelos e ação Salvar e escolher modelo em telas
+  maiores. Testar conexão consulta a lista; o teste de geração continua separado.
+  Credencial obrigatória ausente e URL inválida desabilitam consulta e gravação.
+- Texto corrido e listas têm limite de 100 colunas, sem estreitar código/diffs.
+  Mensagens do usuário usam destaque discreto. Pergunta e resposta confirmadas ficam
+  num único bloco de decisão, com a mesma apresentação após retomar a sessão.
+- Pedidos como me faça uma pergunta são consultas. A tool valida quando question
+  repete exatamente o pedido recebido e solicita reformulação ao modelo; não inventa
+  uma pergunta ou uma resposta. Ações de perguntas usam nomes legíveis e não mostram
+  informações de paginação de arquivos.
+- Recibos exigem alteração ou validação registrada. Ausência de verificação é neutra,
+  falhas são destacadas e apenas verificações aprovadas da revisão atual recebem verde.
+  A velocidade após o turno fica identificada como Última:.
+
 ## Ajustes de 26 de outubro
 
 - Perguntas reservam uma linha por opção, mesmo com textos longos. Título limitado
@@ -19,13 +42,13 @@
 - Conversas têm pesquisa, última atividade, retomada, arquivamento e restauração.
   Navegação preserva o rascunho e a ativação mantém a revogação de permissões.
 - Lista de modelos usa uma linha por ID e contexto alinhado. ID completo nos
-  detalhes. Testar modelo fica acessível no rodapé, separado de Testar catálogo;
+  detalhes. Testar modelo fica acessível no rodapé, separado de Testar conexão;
   formulário do provedor usa a altura dos campos visíveis.
 - Revisão de diff reduz o título em terminais baixos para priorizar as alterações.
   Voltar continua sendo o foco inicial: Enter não aprova uma edição por acidente.
 - Aprovação automática aparece como Executar · Auto no cabeçalho.
 
-O script `scripts/capture_ui.py` reproduz 17 estados em três tamanhos de terminal,
+O script `scripts/capture_ui.py` reproduz 21 estados em quatro tamanhos de terminal,
 com dados sintéticos e sem inferência. Os testes de interação e métricas ficam em
 `tests/test_ui_experience.py` e `tests/test_ui_generation_rate.py`.
 

@@ -35,6 +35,8 @@ class ModelList(OptionList):
             if self.get_option(value).disabled:
                 raise ValueError("Modelo indisponível para conversa.")
             self.highlighted = self.get_option_index(value)
+            if self.is_attached:
+                self.call_after_refresh(self.scroll_to_highlight, top=True)
         except Exception as exc:
             raise ValueError("Modelo não disponível nesta lista.") from exc
 
@@ -67,23 +69,36 @@ class ModelList(OptionList):
                 )
 
     def row(self, model):
-        width = max(20, self.content_size.width or 60)
+        padding = self.get_component_styles("option-list--option").padding.width
+        width = max(1, self.scrollable_content_region.width - padding - 1)
         right = (
             "sem ferramentas"
             if model["tools"] is False
             else compact_tokens(model["context_window"])
             if model["context_window"]
-            else "Não informado"
+            else "—"
         )
-        left_width = max(4, width - cell_len(right) - 3)
+        left_width = max(1, width - cell_len(right) - 2)
         left = Text(safe_preview(model["id"]), no_wrap=True, overflow="ellipsis")
         left.truncate(left_width, overflow="ellipsis", pad=True)
         left.append("  " + right)
+        left.truncate(width, overflow="ellipsis")
         return left
 
     def on_resize(self):
         if hasattr(self, "models"):
             self.set_models(self.models, self.search_query)
+
+    def watch_show_vertical_scrollbar(self, value):
+        if hasattr(self, "models"):
+            self.call_after_refresh(self.refresh_rows)
+
+    def refresh_rows(self):
+        models = {model["id"]: model for model in self.models}
+        for index in range(self.option_count):
+            model = models.get(self.get_option_at_index(index).id)
+            if model:
+                self.replace_option_prompt_at_index(index, self.row(model))
 
     def on_option_list_option_highlighted(self, event):
         event.stop()

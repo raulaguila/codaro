@@ -15,6 +15,7 @@ from codaro.sessions import SessionStore
 from codaro.ui.app import CodaroApp
 from codaro.ui.composer import Prompt
 from codaro.ui.details import DetailsDialog
+from codaro.ui.messages import DecisionMessage
 from codaro.ui.model_list import ModelList
 from codaro.ui.plan import PlanProposal
 from codaro.ui.providers import ModelPicker, ProviderSetup
@@ -52,7 +53,7 @@ def test_decisions_survive_interruption_and_resume_without_entering_tool_protoco
             await app.restore_session()
             await pilot.pause()
             assert any(
-                "Preservar /api/v2" in str(widget.render()) for widget in app.query(".question")
+                "Preservar /api/v2" in str(widget.render()) for widget in app.query(DecisionMessage)
             )
             assert agent.turns == [
                 [

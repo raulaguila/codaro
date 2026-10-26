@@ -5,6 +5,13 @@ from textual.widgets import Button, Static
 
 
 class TaskReceipt(Vertical):
+    @staticmethod
+    def has_evidence(task):
+        return bool(
+            any(v["revision"] == task["revision"] for v in task["validations"])
+            or any(e["kind"] == "change" for e in task["events"])
+        )
+
     def __init__(self, task):
         super().__init__(classes="task-receipt")
         self.record = task
@@ -22,13 +29,18 @@ class TaskReceipt(Vertical):
             if event["kind"] == "change" and event.get("path")
         }
         label = (
-            f"✓ {passed}/{len(checks)} validações aprovadas"
+            f"{'✓' if passed == len(checks) else '!'} {passed}/{len(checks)} validações aprovadas"
             if checks
             else "Validação não registrada"
         )
-        yield Static(label + f" · {len(files)} arquivo(s) alterado(s)", markup=False)
+        self.set_class(bool(checks) and passed == len(checks), "verified")
+        self.set_class(bool(checks) and passed != len(checks), "failed")
+        if files:
+            label += f" · {len(files)} arquivo(s) alterado(s)"
+        yield Static(label, markup=False)
         with Horizontal(classes="outcome-actions"):
-            yield Button("Ver alterações", id="recover-changes")
+            if files:
+                yield Button("Ver alterações", id="recover-changes")
             yield Button("Nova conversa", id="outcome-new")
 
 

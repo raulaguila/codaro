@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 
 import httpx
+from textual.widgets import Input
 
 from codaro.agent import Agent, AgentEvent
 from codaro.llm import Settings
@@ -20,6 +21,7 @@ from codaro.ui.app import CodaroApp
 from codaro.ui.composer import Prompt
 from codaro.ui.message_actions import FilePreview, MessageActions
 from codaro.ui.messages import UserMessage
+from codaro.ui.model_list import ModelList
 from codaro.ui.providers import ModelPicker, ProviderSetup
 from codaro.ui.reviews import ChangesReview
 from codaro.ui.sessions import SessionPicker
@@ -46,6 +48,7 @@ async def capture(output, root):
                             "id": "company-finetuned-production-model-with-a-long-identifier",
                             "context_window": 32768,
                         },
+                        *[{"id": f"local-{i:02}"} for i in range(30)],
                     ]
                 },
             )
@@ -54,7 +57,8 @@ async def capture(output, root):
     store.register(
         "openai-compatible", "synthetic-key", name="Local", base_url="https://demo.test/v1"
     )
-    for width, height in ((60, 20), (80, 24), (120, 35)):
+    store.select("Local", "local-21")
+    for width, height in ((60, 20), (80, 24), (120, 35), (160, 45)):
         project = root / f"project-{width}"
         project.mkdir()
         (project / "main.py").write_text('def greet(name):\n    return "hello " + name\n')
@@ -78,6 +82,8 @@ async def capture(output, root):
             app.query_one(Prompt).value = ""
             app.open_mode_picker()
             await save("modes")
+            await pilot.press("down", "down")
+            await save("modes-execute")
             await pilot.press("escape")
             app.show_user_question(
                 {
@@ -121,6 +127,10 @@ async def capture(output, root):
             )
             app.finish(answer)
             await save("chat-final")
+            app.mount_decision({"question": "Qual contrato preservar?", "answer": "API atual"})
+            await pilot.pause()
+            app.query_one("#conversation").scroll_end(animate=False, immediate=True)
+            await save("decision")
             app.push_screen(MessageActions(answer))
             await save("message-actions")
             await pilot.press("escape")
@@ -178,9 +188,17 @@ async def capture(output, root):
             await pilot.press("escape")
             app.push_screen(ModelPicker(store))
             await save("models")
+            app.screen.query_one(
+                ModelList
+            ).value = "company-finetuned-production-model-with-a-long-identifier"
+            await save("models-known-context")
             await pilot.press("escape")
             app.push_screen(ProviderSetup(store))
             await save("provider")
+            app.screen.query_one("#provider-key", Input).value = "synthetic-key"
+            await pilot.pause()
+            await app.screen.test_connection()
+            await save("provider-verified")
             await pilot.press("escape")
     (output / "manifest.json").write_text(
         json.dumps({"synthetic": True, "screens": manifest}, indent=2)

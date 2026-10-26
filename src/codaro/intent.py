@@ -40,6 +40,12 @@ def requests_changes(question):
 
 def is_information_request(question):
     text = normalized(question)
+    if re.fullmatch(
+        r"(?:(?:por favor,?\s+)?(?:me\s+)?faca\s+(?:uma|outra|mais uma)\s+pergunta"
+        r"|ask me (?:a|another) question)(?:\s*,?\s*por favor)?[.!? ]*",
+        text,
+    ):
+        return True
     continuation = re.match(
         r"(?:continue|continuar)\s+(?:(?:a|essa|esta|the)\s+)?"
         r"(?:resposta|explicacao|texto|answer|explanation|text)\b",

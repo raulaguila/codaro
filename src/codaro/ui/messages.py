@@ -37,3 +37,20 @@ class AssistantMessage(Markdown):
 
         if not isinstance(self.app.screen, ModalScreen):
             self.app.push_screen(MessageActions(self.message_text))
+
+
+class DecisionMessage(Static):
+    def __init__(self, question, answer):
+        super().__init__(classes="decision", markup=False)
+        self.question, self.answer = question, answer
+
+    def on_mount(self):
+        colors = self.app.get_css_variables()
+        self.update(
+            Text.assemble(
+                ("Decisão\n", colors["text-muted"]),
+                safe_preview(self.question) + "\n",
+                ("Você: ", colors["accent"]),
+                safe_preview(self.answer),
+            )
+        )

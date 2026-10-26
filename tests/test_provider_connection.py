@@ -95,7 +95,7 @@ def test_provider_form_tests_connection_before_registration(tmp_path, monkeypatc
             await pilot.click("#provider-test")
             for _ in range(100):
                 await pilot.pause(0.02)
-                if "Conexão verificada" in str(
+                if "Conexão válida" in str(
                     app.screen.query_one("#provider-error", Static).render()
                 ):
                     break

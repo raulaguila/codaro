@@ -2,7 +2,9 @@
 
 import time
 
+from codaro.intent import normalized
 from codaro.tool_registry import Tool, definition
+from codaro.trace import current_flow
 
 
 def register_questions(agent, callback):
@@ -13,6 +15,15 @@ def register_questions(agent, callback):
         del agent.registry.tools["ask_user_question"]
 
     def ask(arguments):
+        flow = current_flow.get()
+        if flow is not None and (
+            normalized(arguments["question"]).rstrip(".!? ")
+            == normalized(flow.data["user_question"]).rstrip(".!? ")
+        ):
+            raise ValueError(
+                "Formule uma pergunta para o usuário; question está repetindo o pedido recebido. "
+                "Use choices para sugerir respostas à pergunta, não para substituir seu enunciado."
+            )
         recommended = arguments.get("recommended")
         if recommended is not None and recommended >= len(arguments["choices"]):
             raise ValueError("Opção recomendada não existe.")
@@ -34,6 +45,8 @@ def register_questions(agent, callback):
                 "ask_user_question",
                 "Pergunta uma decisão necessária ao usuário, com até três sugestões "
                 "e resposta livre. "
+                "question é a pergunta formulada por você, não uma cópia do pedido do usuário. "
+                "choices contém respostas possíveis para essa pergunta. "
                 "Aguarde a resposta real. Não use para conceder permissões de edição/comandos.",
                 {
                     "question": {"type": "string", "minLength": 1, "maxLength": 300},

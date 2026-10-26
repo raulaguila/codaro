@@ -515,6 +515,9 @@ class CodaroApp(App):
             return
         rate = self.query_one("#generation-rate", Static)
         label, description = self.generation_rate.display()
+        if label and not self.busy:
+            label = "Última: " + label
+            description = "Última geração. " + description
         rate.update(label)
         rate.tooltip = description
         rate.display = bool(label) and not self.pending_user_question
@@ -948,10 +951,9 @@ class CodaroApp(App):
         return await conversation_ui.restore_session(self)
 
     def mount_decision(self, decision):
-        self.mount_message(
-            Static(safe_preview(decision["question"]), classes="speaker", markup=False)
-        )
-        self.mount_message(UserMessage(decision["answer"], decision=True))
+        from codaro.ui.messages import DecisionMessage
+
+        self.mount_message(DecisionMessage(decision["question"], decision["answer"]))
 
     def plan_reviewed(self, decision):
         if decision == "execute":
@@ -1480,7 +1482,12 @@ class CodaroApp(App):
             from codaro.ui.outcomes import EmptySearchActions, TaskReceipt
 
             task = self.agent.tasks.current()
-            if task and task["state"] == "completed":
+            if (
+                task
+                and task["state"] == "completed"
+                and self.agent.last_run_intent != "consultation"
+                and TaskReceipt.has_evidence(task)
+            ):
                 self.mount_message(TaskReceipt(task))
             if self.empty_search:
                 self.mount_message(EmptySearchActions(classes="outcome-actions"))

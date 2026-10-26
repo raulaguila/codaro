@@ -11,11 +11,21 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Button, Checkbox, Collapsible, Input, Select, Static
 
 from codaro.llm import ModelError, RequestCancelled, Settings
-from codaro.llm.endpoints import PRESETS
+from codaro.llm.endpoints import PRESETS, provider_base_url
 from codaro.llm.profiles import ProviderStore
 from codaro.ui.model_list import ModelList
 from codaro.ui.screen import DialogScreen as ModalScreen
 from codaro.ui.session_details import compact_tokens
+
+PROVIDER_LABELS = {
+    "openai": "OpenAI",
+    "anthropic": "Anthropic",
+    "gemini": "Google Gemini",
+    "groq": "Groq",
+    "ollama": "Ollama",
+    "openai-compatible": "OpenAI Compatible",
+    "custom": "Personalizado",
+}
 
 
 class ProviderSetup(ModalScreen[str | None]):
@@ -67,7 +77,7 @@ class ProviderSetup(ModalScreen[str | None]):
             with VerticalScroll(id="provider-fields"):
                 yield Static("Provedor", markup=False)
                 yield Select(
-                    [(kind, kind) for kind in PRESETS],
+                    [(PROVIDER_LABELS[kind], kind) for kind in PRESETS],
                     value=self.last_kind,
                     allow_blank=False,
                     id="provider-kind",
@@ -78,7 +88,12 @@ class ProviderSetup(ModalScreen[str | None]):
                         "Nova API key · vazio mantém a atual" if profile else "API key",
                         markup=False,
                     )
-                    yield Input(password=True, id="provider-key", compact=True)
+                    yield Input(
+                        placeholder="Cole sua API key…",
+                        password=True,
+                        id="provider-key",
+                        compact=True,
+                    )
                 with Vertical(id="provider-url-field"):
                     yield Static("URL do provedor", markup=False)
                     yield Input(
@@ -127,10 +142,12 @@ class ProviderSetup(ModalScreen[str | None]):
                     markup=False,
                 )
             yield Static(
-                "O teste consulta o catálogo, sem inferência.", id="provider-error", markup=False
+                "Teste a conexão para conferir os modelos disponíveis.",
+                id="provider-error",
+                markup=False,
             )
             with Horizontal(id="provider-actions"):
-                yield Button("Testar catálogo", id="provider-test")
+                yield Button("Testar conexão", id="provider-test")
                 yield Button("Cancelar", id="provider-back")
                 yield Button(
                     "Salvar e escolher",
@@ -140,6 +157,19 @@ class ProviderSetup(ModalScreen[str | None]):
 
     def on_mount(self):
         self.update_fields()
+        self.fit_actions()
+        self.query_one("#provider-kind").focus()
+
+    def on_resize(self):
+        self.app.call_after_refresh(self.app.sync_layout)
+        if self.query("#provider-save"):
+            self.call_after_refresh(self.fit_actions)
+
+    def fit_actions(self):
+        button = self.query_one("#provider-save", Button)
+        button.label = "Salvar e escolher modelo" if self.size.width >= 70 else "Salvar e escolher"
+        button.styles.width = 26 if self.size.width >= 70 else 19
+        button.tooltip = "Salvar o provedor e escolher um modelo para conversar"
 
     def update_fields(self):
         kind = str(self.query_one("#provider-kind", Select).value)
@@ -157,6 +187,23 @@ class ProviderSetup(ModalScreen[str | None]):
         self.query_one("#provider-test-inference", Button).disabled = self.saving or not isinstance(
             self.query_one("#provider-test-model", Select).value, str
         )
+        ready = True
+        try:
+            Settings(
+                provider_base_url(kind, self.query_one("#provider-url", Input).value),
+                "unselected",
+                self.form_key(),
+            )
+        except ValueError:
+            ready = False
+        if kind not in {"ollama", "custom", "openai-compatible"}:
+            ready = ready and bool(self.form_key())
+        if kind == "ollama" and self.query_one("#provider-auth", Checkbox).value:
+            ready = ready and bool(self.form_key())
+        for identifier in ("#provider-test", "#provider-save"):
+            self.query_one(identifier, Button).disabled = self.saving or not ready
+        if not ready:
+            self.query_one("#provider-test-inference", Button).disabled = True
         self.query_one("#provider-form").styles.height = (
             30
             if not advanced.collapsed
@@ -172,6 +219,9 @@ class ProviderSetup(ModalScreen[str | None]):
         self.update_fields()
 
     def on_checkbox_changed(self):
+        self.update_fields()
+
+    def on_input_changed(self):
         self.update_fields()
 
     def on_unmount(self):
@@ -206,7 +256,7 @@ class ProviderSetup(ModalScreen[str | None]):
         for control in self.query("Input, Select, Checkbox, Button"):
             control.disabled = True
         self.query_one("#provider-back", Button).disabled = False
-        self.query_one("#provider-back", Button).label = "Cancelar teste"
+        self.query_one("#provider-back", Button).label = "Cancelar"
         status = self.query_one("#provider-error", Static)
         status.update("Testando conexão…")
         model = self.query_one("#provider-test-model", Select).value if inference else None
@@ -231,7 +281,7 @@ class ProviderSetup(ModalScreen[str | None]):
             status.update(
                 "✓ Ferramentas e resposta verificadas. Nenhum perfil salvo."
                 if isinstance(model, str)
-                else f"✓ Conexão verificada · catálogo com {len(models)} modelos. "
+                else f"✓ Conexão válida · {len(models)} modelos encontrados. "
                 "Geração ainda não testada."
             )
             status.set_class(False, "error")
@@ -310,7 +360,7 @@ class ProviderSetup(ModalScreen[str | None]):
         for control in self.query("Input, Select, Checkbox, Button"):
             control.disabled = True
         back = self.query_one("#provider-back", Button)
-        back.disabled, back.label = False, "Cancelar consulta"
+        back.disabled, back.label = False, "Cancelar"
         self.query_one("#provider-error", Static).update("Consultando catálogo…")
         try:
             kind = str(self.query_one("#provider-kind", Select).value)
@@ -406,7 +456,8 @@ class ModelPicker(ModalScreen[Settings | None]):
                         compact=True,
                     )
             yield Static(
-                "Testar modelo: duas chamadas; pode consumir créditos.",
+                "Teste: 2 chamadas · pode consumir créditos.",
+                id="model-test-warning",
                 classes="muted",
                 markup=False,
             )
@@ -430,6 +481,7 @@ class ModelPicker(ModalScreen[Settings | None]):
         if any(model["id"] == profile["model"] and model["tools"] is not False for model in models):
             if not self.query_one("#model-search", Input).value:
                 self.query_one(ModelList).value = profile["model"]
+        self.update_model(self.query_one(ModelList).value)
 
     def on_input_changed(self, event: Input.Changed):
         if event.input.id == "model-search":
@@ -438,7 +490,8 @@ class ModelPicker(ModalScreen[Settings | None]):
 
     def on_model_list_changed(self, event: ModelList.Changed):
         try:
-            self.update_model(event.value)
+            # Resize/search can enqueue old highlights. Read the current selection.
+            self.update_model(self.query_one(ModelList).value)
         except (ValueError, OSError) as exc:
             self.query_one("#model-error", Static).update(str(exc))
 
@@ -495,7 +548,8 @@ class ModelPicker(ModalScreen[Settings | None]):
         )
         self.query_one("#model-metadata", Static).update(
             f"Modelo: {model['id']}\nOrigem: {settings.context_source}\n{capability}\n"
-            f"Saída máxima informada: {model['max_output_tokens'] or 'Não informada'}"
+            f"Saída máxima informada: {model['max_output_tokens'] or 'Não informada'}\n"
+            "— na lista: contexto não informado pelo catálogo."
         )
         info.tooltip = (
             settings.context_source + f" · Saída: {model['max_output_tokens'] or 'não informada'}"

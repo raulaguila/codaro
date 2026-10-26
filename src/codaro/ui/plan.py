@@ -150,6 +150,11 @@ class PlanProposal(Vertical):
         super().__init__(classes="plan-proposal")
         self.plan_task = task
 
+    def on_mount(self):
+        # /plan explicitly opens this review. Native focus reveals its controls
+        # after layout; Enter starts a draft instead of executing the plan.
+        self.query_one("#plan-adjust", Button).focus()
+
     def compose(self):
         yield Static("Codaro", classes="speaker", markup=False)
         yield Static(safe_preview(self.plan_task["objective"]), markup=False)

@@ -227,7 +227,7 @@ def test_provider_form_model_rows_and_auto_indicator_are_compact(tmp_path):
             app.push_screen(ProviderSetup(store))
             await pilot.pause()
             assert app.screen.query_one("#provider-form").region.height <= 18
-            assert "Testar catálogo" in visible(app)
+            assert "Testar conexão" in visible(app)
             assert "Salvar e escolher" in visible(app)
             await pilot.press("escape")
             app.push_screen(ModelPicker(store))

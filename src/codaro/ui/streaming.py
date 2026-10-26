@@ -72,6 +72,10 @@ def activity(app, event: AgentEvent):
             app.answer_preview.finish("retry", event.title)
             app.answer_preview = None
     elif event.kind == "tool_start":
+        if event.title == "Perguntar ao usuário":
+            progress(app, "Aguardando sua decisão")
+            app.set_generation_status("Aguardando sua resposta")
+            return
         progress(
             app, event.title + (" · " + event.detail.split("\n", 1)[0] if event.detail else "")
         )

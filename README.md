@@ -205,7 +205,8 @@ pela métrica do servidor ao terminar a chamada. Quando a API informa somente o
 consumo, **20 t/s méd.** representa a média da requisição inteira, incluindo espera
 e processamento da entrada. Essas métricas podem incluir raciocínio e argumentos
 de ferramentas. Não há velocidade estimada quando a resposta chega inteira de uma
-vez; sem dados suficientes, o indicador fica oculto. `/status` detalha sua origem.
+vez; sem dados suficientes, o indicador fica oculto. Ao concluir, o indicador usa
+**Última:** para identificar a medição anterior. `/status` detalha sua origem.
 
 Perguntas longas mantêm as três opções visíveis; **Detalhes** abre a pergunta,
 explicação e sugestões completas sem responder por você. O plano acompanha a etapa
@@ -219,9 +220,24 @@ respeita os arquivos permitidos e mascara credenciais reconhecidas, sem enviar u
 nova solicitação ao modelo nem autorizar edições. Copiar depende do suporte do
 terminal à área de transferência via OSC52. `/sessions` abre a lista pesquisável de
 conversas do projeto, com última atividade, retomada, arquivamento e restauração.
-**Testar catálogo** verifica a listagem do provedor; **Testar modelo** verifica
+**Testar conexão** verifica a listagem do provedor, sem inferência; **Testar modelo** verifica
 geração e ferramentas e pode consumir créditos. O ID completo e os metadados do
 modelo ficam nos detalhes; a lista mostra uma linha por modelo, com contexto à direita.
+
+O seletor de modelos usa **—** quando o catálogo não informa o contexto. Os detalhes
+acompanham a opção destacada e identificam o orçamento provisório. No cadastro,
+campos têm foco visível e ações ficam desabilitadas enquanto faltarem credenciais
+obrigatórias ou uma URL válida. Nenhuma requisição é enviada nessa validação local.
+O seletor de modo mostra a política de edições em uma seção própria, apenas em
+Executar; navegar não aplica a escolha.
+
+Parágrafos e listas do chat têm largura máxima de 100 colunas; blocos de código e
+diffs mantêm a largura disponível. As decisões confirmadas agrupam a pergunta e a
+resposta em um único bloco, inclusive ao retomar uma conversa. A ferramenta de
+perguntas instrui o modelo a formular a pergunta e sugerir respostas. Uma cópia
+exata do pedido atual é devolvida como erro recuperável para reformulação, sem
+presumir uma resposta. Recibos de execução aparecem somente com alterações ou
+validações registradas; sucesso exige verificações aprovadas na revisão atual.
 
 O chat detecta o sistema onde o processo está rodando. No macOS, o rodapé e `/help` mostram Command (`⌘`) com a alternativa Ctrl, e Option (`⌥`) nas dicas da entrada. Linux e Windows mantêm Ctrl/Alt. Em SSH, a detecção corresponde ao servidor.
 

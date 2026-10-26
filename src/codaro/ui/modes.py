@@ -3,7 +3,7 @@
 from rich.text import Text
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import Button, Collapsible, OptionList, RadioButton, RadioSet, Static
+from textual.widgets import Button, OptionList, RadioButton, RadioSet, Static
 
 from codaro.policies import Mode
 from codaro.ui.screen import DialogScreen as ModalScreen
@@ -18,18 +18,20 @@ DESCRIPTIONS = {
 class ModePicker(ModalScreen[tuple[Mode, bool] | None]):
     DEFAULT_CSS = """
     ModePicker { align: right top; background: transparent; }
-    #mode-picker { width: 62; max-width: 96%; height: 11; max-height: 80%;
+    #mode-picker { width: 62; max-width: 96%; height: 9; max-height: 100%;
         margin: 3 2 0 0; padding: 0 1; border: round $primary 35%; background: $surface; }
     #mode-fields { height: 1fr; }
     #mode-picker Static { height: auto; }
+    #mode-title { margin-bottom: 1; color: $text; text-style: bold; }
     #mode-options { height: 3; border: none; padding: 0; background: $surface; }
     #mode-options > .option-list--option { padding: 0 1; }
     #mode-options > .option-list--option-highlighted { background: $primary 15%;
         color: $text; text-style: none; }
-    #edit-policy { border: none; padding: 0; height: auto; }
-    #edit-policy > Contents { padding: 0; }
+    #edit-policy { border-top: solid $primary 30%; padding: 0; height: auto; margin-top: 1; }
+    #edit-policy-label { color: $text-muted; }
     #edit-policy RadioSet { height: auto; border: none; padding: 0; }
-    #mode-actions { height: 3; padding-top: 1; border-top: solid $primary 30%; }
+    #mode-policy-help { color: $text-muted; max-height: 2; }
+    #mode-actions { height: 2; border-top: solid $primary 30%; }
     #mode-help { width: 1fr; height: 1; color: $text-muted; }
     #mode-actions Button { height: 1; min-height: 1; border: none;
         width: 12; min-width: 8; padding: 0; background: $accent;
@@ -50,18 +52,19 @@ class ModePicker(ModalScreen[tuple[Mode, bool] | None]):
     def compose(self):
         with Vertical(id="mode-picker"):
             with VerticalScroll(id="mode-fields"):
-                yield Static("Modo de trabalho", markup=False)
+                yield Static("Modo de trabalho", id="mode-title", markup=False)
                 yield OptionList(
                     *[
                         Text(
-                            f"{m.label:9}  {DESCRIPTIONS[m]}"
-                            + (" · Atual" if m == self.current else "")
+                            ("✓ " if m == self.current else "  ")
+                            + f"{m.label:9}  {DESCRIPTIONS[m]}"
                         )
                         for m in self.modes
                     ],
                     id="mode-options",
                 )
-                with Collapsible(title="Edições · permissões", collapsed=True, id="edit-policy"):
+                with Vertical(id="edit-policy"):
+                    yield Static("Edições", id="edit-policy-label", markup=False)
                     with RadioSet(id="edit-options"):
                         yield RadioButton(
                             "Pedir autorização",
@@ -76,8 +79,8 @@ class ModePicker(ModalScreen[tuple[Mode, bool] | None]):
                             compact=True,
                         )
                     yield Static(
-                        "Criar e editar arquivos permitidos nesta conversa. "
-                        "Remoções e comandos continuam exigindo autorização.",
+                        "Criar e editar nesta conversa.\nRemoções e comandos pedem autorização.",
+                        id="mode-policy-help",
                         markup=False,
                     )
             with Horizontal(id="mode-actions"):
@@ -98,23 +101,9 @@ class ModePicker(ModalScreen[tuple[Mode, bool] | None]):
         self.fit()
 
     def fit(self):
-        policy = self.query_one("#edit-policy", Collapsible)
         self.query_one("#mode-picker").styles.height = (
-            17 if policy.display and not policy.collapsed else 10
+            16 if self.query_one("#edit-policy").display else 9
         )
-        automatic = self.query_one("#edit-auto", RadioButton).value
-        policy.title = "Edições: " + (
-            "aprovar automaticamente" if automatic else "pedir autorização"
-        )
-
-    def on_radio_set_changed(self):
-        self.fit()
-
-    def on_collapsible_expanded(self):
-        self.fit()
-
-    def on_collapsible_collapsed(self):
-        self.fit()
 
     def on_option_list_option_highlighted(self):
         self.update_policy()
