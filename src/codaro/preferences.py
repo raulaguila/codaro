@@ -16,6 +16,7 @@ from codaro.trace import atomic_write
 class Preferences:
     mode: str = "execute"
     resume: bool = False
+    show_summaries: bool = True
     max_steps: int | None = None
     max_seconds: int = 1800
     max_corrections: int = 3
@@ -25,6 +26,8 @@ class Preferences:
         Mode(self.mode)
         if type(self.resume) is not bool:
             raise ValueError("Retomar conversa deve ser true ou false.")
+        if type(self.show_summaries) is not bool:
+            raise ValueError("Resumos deve ser true ou false.")
         for name, low, high in (
             ("max_steps", 1, 200),
             ("max_seconds", 1, 7200),
@@ -97,9 +100,9 @@ def preference_value(name, value):
         raise ValueError("Preferência desconhecida: " + name)
     if name == "mode":
         return Mode(value).value
-    if name == "resume":
+    if name in {"resume", "show_summaries"}:
         if value.lower() not in {"true", "false"}:
-            raise ValueError("Use true ou false para resume.")
+            raise ValueError("Use true ou false para " + name + ".")
         return value.lower() == "true"
     if name == "max_steps" and value.lower() in {"auto", "automatic"}:
         return None

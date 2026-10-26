@@ -8,6 +8,7 @@ from textual.widgets import Markdown, Static
 from codaro.agent import AgentEvent
 from codaro.index import safe_preview
 from codaro.llm import MAX_MESSAGE_CHARS
+from codaro.ui.session_details import compact_tokens
 from codaro.ui.stages import ensure_stages, progress
 from codaro.ui.widgets import GenerationPreview, ReasoningGroup
 
@@ -16,9 +17,12 @@ def activity(app, event: AgentEvent):
     if event.kind == "model_start":
         tokens = event.context_tokens or 0
         limit = event.context_limit or app.agent.adaptive_input_limit
-        capacity = f"{limit / 1000:.1f}k" if limit >= 1000 else str(limit)
         meter = app.query_one("#context-meter", Static)
-        meter.update(f"Contexto ≈ {round(tokens * 100 / max(1, limit))}% · {capacity} · /status")
+        provisional = app.agent.provider.settings.context_source.startswith("fallback")
+        meter.update(
+            f"Contexto ≈{compact_tokens(tokens)}/{compact_tokens(limit)}"
+            + (" · provisório" if provisional else f" · {round(tokens * 100 / max(1, limit))}%")
+        )
         meter.tooltip = (
             f"Enviado: ≈ {tokens:,}/{limit:,} tokens · {app.agent.provider.settings.context_source}"
         )
@@ -63,6 +67,11 @@ def activity(app, event: AgentEvent):
         app.show_plan()
         duration = f"{event.elapsed_ms:.0f} ms" if event.elapsed_ms is not None else ""
         ensure_stages(app).add(event)
+        if event.title == "Buscar código" and any(
+            phrase in event.detail.lower()
+            for phrase in ("nenhum resultado", "0 resultado", "sem resultado")
+        ):
+            app.empty_search = True
         progress(
             app,
             completed=event.title
@@ -88,7 +97,8 @@ def append_reasoning(app, delta: str):
     details.has_reasoning = True
     if not details.events:
         details.title = "Etapas · raciocínio do modelo · detalhes"
-    progress(app, "Analisando o projeto")
+    if not getattr(details.parent, "current", ""):
+        progress(app, "Analisando a solicitação")
     if app.reasoning_preview is None:
         app.reasoning_preview = GenerationPreview(reasoning=True)
         app.reasoning_preview.collapsed = False
@@ -101,8 +111,9 @@ def append_reasoning(app, delta: str):
             def mount_reasoning():
                 from textual.widgets import Collapsible
 
-                if details.is_attached:
-                    details.query_one(Collapsible.Contents).mount(group)
+                contents = list(details.query(Collapsible.Contents))
+                if details.is_attached and contents and app.is_running:
+                    contents[0].mount(group)
                     if app.show_reasoning:
                         details.collapsed = False
 

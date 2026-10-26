@@ -27,7 +27,10 @@ class TurnStages(Vertical):
             return
         summary = self.query_one(".live-steps", Static)
         summary.display = (
-            self.running and self.details.collapsed and bool(self.current or self.completed)
+            self.running
+            and self.app.live_summaries
+            and self.details.collapsed
+            and bool(self.current or self.completed)
         )
         colors = self.app.get_css_variables()
         content = Text()

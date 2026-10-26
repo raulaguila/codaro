@@ -6,7 +6,10 @@ on:
 permissions:
   contents: read
 jobs:
+  quality:
+    uses: ./.github/workflows/ci.yml
   build:
+    needs: quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -68,7 +71,7 @@ jobs:
           subprocess.run([sys.executable, str(script)], cwd=script.parent, check=True)
   publish:
     if: github.ref_type == 'tag'
-    needs: verify
+    needs: [quality, verify]
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -94,10 +94,15 @@ antigos de compatibilidade não devem virar novas dependências internas.
 | Descoberta de modelos | `llm/catalog.py` |
 | I/O HTTP cancelável | `llm/transport.py` |
 | Sessão, modo, provedor e calibração do agente | `agent/lifecycle.py` |
+| Gravação compartilhada e decisões da conversa | `conversation.py`, `sessions.py` |
+| Catálogo e arquivamento de sessões | `session_catalog.py` |
+| Seleção de ferramentas e perfis de contexto | `agent/capabilities.py` |
+| Compactação de lotes de ferramentas concluídos | `agent/context_recovery.py` |
 | Aprovação e aplicação de alterações | `agent/reviews.py` |
 | Reconhecimento de pedidos | `intent.py` |
 | Cadastro e seleção persistida | `llm/profiles.py` |
 | Telas e ativação do provedor na UI | `ui/provider_actions.py` |
+| Retomada, limpeza e navegação das conversas | `ui/conversations.py` |
 | Comando do menu Ctrl+P | `ui/palette.py` |
 | Input e informações junto ao campo | `ui/composer.py` |
 | Plano fixo e projeção do progresso | `ui/plan.py` |

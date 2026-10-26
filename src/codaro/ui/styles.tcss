@@ -9,7 +9,7 @@ ModePicker { background: transparent; }
     text-overflow: ellipsis; }
 #select-mode, #select-model { height: 1; min-height: 1; padding: 0;
     border: none; background: $background; color: $text-muted; text-style: none; }
-#select-mode { width: 18; min-width: 12; background: $panel; margin-left: 1; }
+#select-mode { width: 18; min-width: 12; background: $background; margin-left: 1; }
 #select-model { width: auto; min-width: 8; max-width: 32; text-overflow: ellipsis;
     text-wrap: nowrap; }
 #select-model:hover, #select-model:focus { background: $panel; color: $text; border: none; }
@@ -43,6 +43,7 @@ ModePicker { background: transparent; }
 .short-terminal #question-dock { max-height: 4; }
 .short-terminal #question-title { margin-top: 0; }
 .short-terminal .question-label, .short-terminal #question-why { display: none; }
+.short-terminal .paused .question-label { display: block; }
 #entry { height: auto; border-top: solid $primary; }
 #entry:focus-within { border-top: solid $accent; }
 #entry-mark { width: 2; height: 1; color: $accent; }
@@ -69,7 +70,7 @@ ModePicker { background: transparent; }
 #plan-steps { height: auto; max-height: 5; padding-left: 2; }
 #plan-list { height: auto; color: $text-muted; }
 #execute-plan { width: auto; margin-top: 1; }
-.recovery-actions { height: 3; }
+.recovery-actions { height: 1; margin: 1 0; }
 .recovery-actions Button { width: 1fr; min-width: 8; padding: 0; }
 #configure-start { height: 1; min-height: 1; width: auto; border: none; padding: 0; }
 .question { height: auto; margin: 1 0; padding: 0 1; color: $text;
@@ -87,6 +88,7 @@ ModePicker { background: transparent; }
 .generation-text { height: auto; color: $text; }
 .generation-preview CollapsibleTitle { color: $text-muted; }
 .reasoning-preview { margin: 0 1 1 1; }
+.reasoning-preview > CollapsibleTitle { display: none; }
 .reasoning-group { height: auto; border: none; margin: 0; padding: 0; }
 .reasoning-group > CollapsibleTitle { color: $text-muted; }
 .tool-card, .reasoning-group, .generation-preview { background: $background; }
@@ -125,3 +127,61 @@ ModePicker { background: transparent; }
     background: $accent; color: $background; text-style: bold; }
 #review-actions #reject-edit { color: $error; }
 #preferences-actions { height: 2; border-top: solid $primary 30%; }
+
+/* Shared compact forms and read-only views. Hover never changes the box model. */
+DialogScreen { align: center middle; background: #080d14 70%; }
+ModePicker { align: right top; background: transparent; }
+#provider-form { height: 24; }
+#model-form { height: 24; }
+#provider-key-field, #provider-url-field { height: auto; }
+#provider-fields Select, #provider-fields Input,
+#model-fields Select, #model-fields Input { margin: 0 0 1 0; }
+#provider-fields Input, #model-fields Input, #preferences-fields Input {
+    background: $background; padding: 0 1; }
+#provider-fields Static, #model-fields Static { color: $text-muted; }
+#provider-tls-warning { color: $warning; }
+#provider-test-inference, #model-test { width: auto; color: $text; }
+#provider-error, #model-error { color: $text-muted; max-height: 3; }
+#provider-error.error, #model-error.error { color: $error; }
+#provider-error.success, #model-error.success { color: $success; }
+#model-list-state { height: 6; padding: 1; color: $text-muted; }
+#model-details { height: auto; padding: 0; border: none; }
+#model-details > Contents { padding: 0 1; }
+#model-info { color: $text-muted; margin: 1 0; }
+.dialog-title { height: auto; color: $text; text-style: bold; margin: 1 0; }
+.muted { color: $text-muted; }
+#details-dialog { width: 90%; max-width: 84; height: 24;
+    max-height: 85%; padding: 0 2; border: round $primary 35%; background: $surface; }
+#details-body { height: 1fr; scrollbar-size: 1 1; }
+#details-body Static { height: auto; }
+.detail-row { height: auto; min-height: 1; margin-bottom: 0; }
+.detail-key { width: 24; color: $text-muted; }
+.detail-value { width: 1fr; color: $text; }
+.dialog-actions { height: 2; border-top: solid $primary 30%; padding-top: 0; }
+.dialog-actions Button { width: 1fr; min-width: 8; padding: 0; height: 1;
+    min-height: 1; border: none; background: $surface; color: $text-muted; text-style: none; }
+.dialog-actions .-primary { background: $accent; color: $background; text-style: bold; }
+#resume-dialog { width: 90%; max-width: 76; height: auto; max-height: 90%;
+    padding: 0 2 1 2; border: round $primary 35%; background: $surface; }
+#resume-dialog Static { height: auto; margin-bottom: 1; }
+#new-conversation { max-width: 76; padding: 0 2; }
+#new-conversation Static { margin-bottom: 1; }
+#new-conversation Horizontal { height: 2; border-top: solid $primary 30%; padding-top: 0; }
+#begin-conversation { background: $accent; color: $background; text-style: bold; }
+#review { height: 70%; max-height: 26; }
+#review-actions Button { width: auto; margin: 0 1; }
+#review-actions #apply-edit { min-width: 20; }
+.recovery-actions Button, .outcome-actions Button { width: auto; min-width: 8;
+    margin-right: 2; height: 1; min-height: 1; border: none; padding: 0;
+    background: $background; color: $text-muted; text-style: none; }
+.recovery-description { height: auto; color: $text-muted; }
+.recovery-card > Contents > Collapsible { height: auto; border: none; padding: 0; }
+.recovery-card > Contents > Collapsible > Contents { max-height: 8; overflow-y: auto; }
+.outcome-actions { height: 1; margin: 1 1; }
+.task-receipt { height: auto; margin: 1; }
+.task-receipt Static { height: auto; color: $success; }
+.plan-proposal { height: auto; margin: 1; }
+.plan-proposal Static { height: auto; margin-bottom: 1; }
+.plan-proposal #plan-start { background: $accent; color: $background; }
+.welcome-title { color: $text; text-style: bold; margin: 1 0; }
+.compact-terminal #context-meter { max-width: 38%; }

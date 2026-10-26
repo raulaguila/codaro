@@ -29,6 +29,7 @@ from codaro.llm import (
 )
 from codaro.policies import Mode
 from codaro.storage import private_lock
+from codaro.ui import conversations as conversation_ui
 from codaro.ui import provider_actions
 from codaro.ui import streaming as stream_ui
 from codaro.ui.composer import Composer, Prompt
@@ -45,6 +46,7 @@ from codaro.ui.reviews import (
     ExternalToolReview,
     ScopeReview,
 )
+from codaro.ui.screen import WorkspaceScreen
 from codaro.ui.theme import CODARO_THEME
 from codaro.ui.widgets import ActivityGroup, GenerationPreview, ProposalCard, ReasoningGroup
 
@@ -83,7 +85,7 @@ class CodaroApp(App):
         )
 
     async def open_provider_menu(self, command: str):
-        if (self.busy and command not in {"/help", "/status"}) or isinstance(
+        if (self.busy and command not in {"/help", "/status", "/mode"}) or isinstance(
             self.screen, ModalScreen
         ):
             return
@@ -109,6 +111,8 @@ class CodaroApp(App):
         resume: bool = False,
         setup_required: bool = False,
         setup_profile: str | None = None,
+        offer_resume: bool = False,
+        show_summaries: bool = True,
     ):
         super().__init__()
         self.register_theme(CODARO_THEME)
@@ -128,6 +132,17 @@ class CodaroApp(App):
                     )
         self.agent = agent
         self.busy = False
+        self.next_mode = None
+        self.live_summaries = show_summaries
+        self.session_decisions = copy.deepcopy(agent.conversation.store.decisions)
+        if not agent.conversation.store.turns:
+            self.session_decisions = [[] for _ in agent.turns]
+        self.current_decisions = copy.deepcopy(agent.conversation.store.pending_decisions)
+        self.question_paused = False
+        self.offer_resume = offer_resume
+        self.layout_size = None
+        self.context_scope_requested = False
+        self.empty_search = False
         self.cancelled = threading.Event()
         self.response_text = ""
         self.rendered_text = ""
@@ -150,10 +165,9 @@ class CodaroApp(App):
         self.completion_index = 0
         self.activity_group: ActivityGroup | None = None
         self.resume_requested = resume
-        self.session = agent.sessions.store(
-            agent.session_id, getattr(getattr(agent.provider, "settings", None), "api_key", "")
-        )
-        self.session_turns: list[list[dict]] = list(agent.turns)
+        self.session = agent.conversation.store
+        self.recorded_completions = agent.conversation.completed
+        self.session_turns: list[list[dict]] = copy.deepcopy(self.session.turns or agent.turns)
         self.approval_dialog: CommandReview | None = None
         if not agent.legacy or agent.allow_edits:
             agent.approve_command = self.approve_command
@@ -197,10 +211,17 @@ class CodaroApp(App):
         children = []
         if not self.provider_available:
             children = [
-                Static("Conecte um provedor para começar.", markup=False),
-                Button("Configurar provedor", id="configure-start"),
+                Static(
+                    "Vamos conectar seu primeiro modelo.", classes="welcome-title", markup=False
+                ),
+                Static("Use sua própria chave ou um modelo local.", markup=False),
+                Button("Conectar provedor", id="configure-start"),
+                Static("A chave é configurada fora da conversa.", markup=False),
             ]
         return Vertical(*children, id="welcome")
+
+    def get_default_screen(self):
+        return WorkspaceScreen(id="_default")
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="session-header"):
@@ -217,18 +238,26 @@ class CodaroApp(App):
 
     async def on_mount(self):
         self.update_session_header()
+        if self.setup_required:
+            self.query_one("#status", Static).update("Conecte um provedor para começar")
         self.set_interval(0.08, self.flush_preview)
         self.set_interval(1, self.update_generation_status)
         self.query_one(Prompt).focus()
         self.refresh_reference_paths()
-        if self.resume_requested:
+        if self.resume_requested and not self.offer_resume:
             await self.restore_session()
+        elif self.offer_resume and self.session.path.exists():
+            from codaro.ui.details import ResumeDialog
+
+            self.push_screen(ResumeDialog(), self.resume_decision)
         try:
             self.show_plan()
         except (ValueError, OSError) as exc:
             self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
-        if self.setup_required:
-            self.call_after_refresh(self.start_setup)
+
+    def resume_decision(self, restore):
+        if restore:
+            self.run_worker(self.restore_session())
 
     def start_setup(self):
         from codaro.llm.profiles import ProviderStore
@@ -254,8 +283,19 @@ class CodaroApp(App):
             self.update_session_header()
             self.update_completions()
 
+    def sync_layout(self):
+        if not self.is_running or not self.query("#session"):
+            return
+        size = (self.size.width, self.size.height)
+        if self.layout_size == size:
+            return
+        self.layout_size = size
+        self.update_session_header()
+        self.update_completions()
+
     def update_session_header(self):
         self.set_class(self.size.height < 25, "short-terminal")
+        self.set_class(self.size.width < 80, "compact-terminal")
         settings = self.agent.provider.settings
         tls = "TLS sem verificação" if settings.tls_insecure else "TLS verificação ativa"
         if settings.base_url.startswith("http://"):
@@ -283,32 +323,29 @@ class CodaroApp(App):
         model.disabled = self.busy
         model.styles.max_width = max(12, min(32, self.size.width // 3))
         mode = self.query_one("#select-mode", Button)
-        mode.label = (
-            self.agent.mode.label + (" · auto" if self.agent.policy.auto_edits else "") + " ▾"
-        )
-        mode.disabled = self.busy
+        selected = self.next_mode[0] if self.next_mode else self.agent.mode
+        mode.label = selected.label + (" · próximo" if self.next_mode else "") + " ▾"
+        mode.disabled = False
         mode.tooltip = (
             "Edições automáticas nesta conversa; comandos e remoções exigem aprovação"
             if self.agent.policy.auto_edits
             else "Trocar modo e revisar a aprovação de edições"
         )
-        self.query_one("#prompt-hint", Static).update(
-            "Enter envia · / comandos · Ctrl+P menu"
-            if self.size.width < 80
-            else f"Enter envia · {self.option_display('Enter')} nova linha · "
-            "/ comandos · Ctrl+P menu"
-        )
+        self.update_prompt_hint()
         self.query_one(ExecutionPlan).fit(
             self.size.height, answering=bool(self.pending_user_question)
         )
 
     def open_mode_picker(self):
-        if self.busy or isinstance(self.screen, ModalScreen):
+        if isinstance(self.screen, ModalScreen):
             return
         from codaro.ui.modes import ModePicker
 
         self.push_screen(
-            ModePicker(self.agent.mode, auto_edits=self.agent.policy.auto_edits),
+            ModePicker(
+                self.next_mode[0] if self.next_mode else self.agent.mode,
+                auto_edits=self.next_mode[1] if self.next_mode else self.agent.policy.auto_edits,
+            ),
             self.mode_selected,
         )
 
@@ -317,6 +354,13 @@ class CodaroApp(App):
             self.query_one(Prompt).focus()
             return
         mode, automatic = selection
+        if self.busy:
+            self.next_mode = selection
+            self.update_session_header()
+            self.query_one("#status", Static).update("Próximo pedido: " + mode.label)
+            self.query_one(Prompt).focus()
+            return
+        self.next_mode = None
         try:
             self.agent.set_mode(mode)
             self.agent.policy.auto_edits = automatic
@@ -329,6 +373,32 @@ class CodaroApp(App):
         except (ValueError, OSError) as exc:
             self.query_one("#status", Static).update(safe_preview(str(exc)))
         self.query_one(Prompt).focus()
+
+    def update_prompt_hint(self):
+        if not self.query("#prompt-hint"):
+            return
+        prompt = self.query_one(Prompt)
+        if self.pending_user_question:
+            choices = self.pending_user_question.get("choices", [])
+            hint = (
+                "Enter envia seu texto · Esc pausa"
+                if prompt.value.strip() or not choices
+                else "↑↓ escolher · Enter confirmar · ou digite · Esc pausa"
+            )
+            self.query_one("#question-send", Button).disabled = not (
+                prompt.value.strip() or choices
+            )
+        elif prompt.suggesting:
+            hint = "↑↓ navegar · Enter abre · Tab completa · Esc fecha"
+        elif self.busy:
+            hint = self.shortcut_display("x") + " interrompe · rascunho preservado"
+        else:
+            hint = "Enter envia · / comandos · " + self.shortcut_display("p") + " menu"
+            if self.size.width >= 80:
+                hint += f" · {self.option_display('Enter')} nova linha"
+        if self.agent.policy.auto_edits and not self.pending_user_question:
+            hint += " · Edições automáticas"
+        self.query_one("#prompt-hint", Static).update(hint)
 
     @work(thread=True, exclusive=True, group="files")
     def refresh_reference_paths(self):
@@ -360,8 +430,13 @@ class CodaroApp(App):
             reserved += self.query_one(QuestionDock).region.height
         max_height = max(2, min(8, self.size.height - 16 - unread_row - reserved))
         prompt.styles.height = min(max_height, max(2, prompt.wrapped_document.height + 1))
+        cursor = prompt.document.get_index_from_location(prompt.cursor_location)
+        command_text = prompt.value[:cursor]
+        is_command = command_text.startswith("/") and not any(c.isspace() for c in command_text)
         menu.display = (
-            bool(options) and not self.completions_dismissed and not self.pending_user_question
+            (bool(options) or is_command)
+            and not self.completions_dismissed
+            and not self.pending_user_question
         )
         self.query_one(Prompt).suggesting = menu.display
         if options and menu.display:
@@ -385,16 +460,19 @@ class CodaroApp(App):
                 row = Text(label, no_wrap=True, overflow="ellipsis")
                 row.truncate(width, overflow="ellipsis")
                 rows.append(row)
-            menu.styles.height = len(rows) + 1
-            menu.update(
-                Text("\n").join(
-                    [*rows, Text("↑↓ escolher · Enter abrir · Tab completa · Esc fecha")]
-                )
-            )
+            menu.styles.height = len(rows)
+            menu.update(Text("\n").join(rows))
+        elif menu.display:
+            menu.styles.height = 1
+            menu.update("Nenhum comando encontrado. Esc fecha a lista.")
+        self.update_prompt_hint()
 
     def action_escape(self):
         if self.pending_user_question:
+            self.question_paused = True
+            self.query_one(QuestionDock).set_paused(True)
             self.query_one("#status", Static).update("Pergunta pausada · responda para continuar")
+            self.update_prompt_hint()
         elif self.query_one("#completion").display:
             self.completions_dismissed = True
             self.update_completions()
@@ -491,6 +569,20 @@ class CodaroApp(App):
             self.mount_message(Static("Revise as edições pendentes primeiro.", classes="notice"))
             return
         self.query_one(Prompt).value = ""
+        if name in {"/status", "/help"}:
+            from codaro.ui.session_details import help_dialog, session_dialog
+
+            self.push_screen(session_dialog(self) if name == "/status" else help_dialog(self))
+            return
+        if name == "/plan" and not argument:
+            task = self.agent.tasks.current()
+            if task and task["plan"] and task["state"] not in {"completed", "cancelled"}:
+                from codaro.ui.plan import PlanProposal
+
+                for proposal in self.query(PlanProposal):
+                    proposal.remove()
+                self.mount_message(PlanProposal(task))
+                return
         if name == "/mode" and not argument:
             self.open_mode_picker()
             return
@@ -574,28 +666,47 @@ class CodaroApp(App):
                         + item["id"]
                         + " · "
                         + item["title"]
+                        + (" · arquivada" if item.get("archived") else "")
                         for item in data["items"]
                     )
                     self.mount_message(
                         Static(
-                            content + "\n/session new título ou /session identificador",
+                            content
+                            + "\n/session new título · /session ID · /session archive|restore ID",
                             classes="notice",
                             markup=False,
                         )
                     )
                     return
-                self.save_session()
+                action, _, identifier = argument.partition(" ")
+                if action in {"archive", "restore"}:
+                    self.agent.sessions.archive(identifier.strip(), archived=action == "archive")
+                    self.mount_message(
+                        Static(
+                            "Sessão " + ("arquivada." if action == "archive" else "restaurada."),
+                            classes="notice",
+                        )
+                    )
+                    return
+                if not self.save_session():
+                    return
                 if argument == "new" or argument.startswith("new "):
-                    identifier = self.agent.sessions.create(argument[4:].strip() or "Nova conversa")
+                    from codaro.agent.lifecycle import new_session
+
+                    self.session = new_session(self.agent, argument[4:].strip() or "Nova conversa")
+                    identifier = self.agent.session_id
                 else:
                     identifier = argument
-                self.session = self.agent.activate_session(identifier)
+                    self.session = self.agent.activate_session(identifier)
+                self.recorded_completions = self.agent.conversation.completed
                 self.session.secret = getattr(self.agent.provider.settings, "api_key", "")
                 try:
                     self.session_turns = self.session.load()
                 except FileNotFoundError:
                     self.session_turns = []
                     self.session.save([], self.agent.provider.settings.model)
+                self.session_decisions = copy.deepcopy(self.session.decisions)
+                self.current_decisions = copy.deepcopy(self.session.pending_decisions)
                 if self.session_turns:
                     await self.restore_session()
                 else:
@@ -690,24 +801,6 @@ class CodaroApp(App):
                     return
             else:
                 text = "Use /permissions action ou /permissions task."
-        elif name == "/help":
-            text = "\n".join(f"{key} · {description}" for key, description in COMMANDS.items())
-            text += (
-                "\n\nTab completa · ↑↓ escolhem sugestões/histórico · "
-                f"{self.option_display('↑↓')} histórico\n"
-            )
-            text += 'Referências: @src/main.py ou @"pasta com espaços/main.py"\n'
-            text += (
-                f"{self.shortcut_display('x')} cancela · {self.shortcut_display('l')} limpa · "
-                f"{self.shortcut_display('p')} comandos · {self.shortcut_display('q')} sai"
-            )
-            if self.is_macos:
-                text += (
-                    "\n\n⌘ = Command · ⌥ = Option. Command funciona quando o terminal envia "
-                    "a tecla ao Codaro; se abrir um menu ou encerrar o terminal, use Ctrl. "
-                    "Para Option, configure o terminal para enviar Alt/Esc. "
-                    "Shift+Enter também insere uma nova linha quando reconhecido pelo terminal."
-                )
         elif name == "/pwd":
             text = f"Diretório da sessão\n{self.agent.repository.root}"
         elif name in {"/memory", "/history", "/map", "/changes", "/undo"}:
@@ -787,36 +880,19 @@ class CodaroApp(App):
             self.agent.reset_calibration()
             text = "Calibração removida. A próxima chamada verificará os limites novamente."
         elif name == "/compact":
-            before = len(str(self.agent.turns))
+            self.query_one("#status", Static).update("Reorganizando contexto…")
+            self.query_one("#context-meter", Static).update("Preservando decisões e resultados")
+            await asyncio.sleep(0)
             self.agent.turns = [[turn[0], turn[-1]] for turn in self.agent.turns[-4:]]
-            text = f"Histórico compactado: {before} → {len(str(self.agent.turns))} caracteres. "
-            text += (
-                "Contexto limitado aos quatro turnos mais recentes; "
-                "o código será consultado novamente."
-            )
             self.save_session()
-        else:
-            text = (
-                f"Projeto: {self.agent.repository.root}\n"
-                f"Modelo: {self.agent.provider.settings.model}\n"
-                f"Modo: {self.agent.mode.label} · aprovação {self.agent.policy.kind}\n"
-                f"Edições automáticas nesta conversa: {self.agent.policy.auto_edits}\n"
-                f"Turnos no contexto: {len(self.agent.turns)}\n"
-                f"Turnos da conversa: {len(self.session_turns)}\n"
-                f"Último contexto enviado: {self.context_chars} "
-                f"caracteres / limite {self.agent.context_budget}\n"
-                f"Entrada estimada: {self.context_tokens} / {self.context_limit} tokens\n"
-                f"Janela configurada: {self.agent.context_window} tokens · "
-                f"origem: {self.agent.provider.settings.context_source}\n"
-                "saída: "
-                f"{self.agent.provider.settings.max_output_tokens or 'Automático'}\n"
-                f"reserva de contexto: {self.agent.max_output_tokens} · margem: 512\n"
-                f"Contagem: {self.agent.counter.method}\n"
-                f"Tokens informados pelo servidor: {self.reported_tokens}\n"
-                f"Calibração: {self.agent.counter.scale:.2f} · "
-                f"amostras: {len(self.agent.counter.samples)}\n"
-                f"Sessão: {self.session.path}\nDebug: .codaro/prompt.json"
+            self.query_one("#context-meter", Static).update("Contexto reorganizado")
+            self.query_one("#status", Static).update(
+                "Pronto · histórico completo disponível para recuperação"
             )
+            self.update_prompt_hint()
+            return
+        else:
+            text = "Use /help para consultar os comandos disponíveis."
         self.mount_message(Static(safe_preview(text), classes="question", markup=False))
 
     def manage_provider_decision(self, result):
@@ -830,6 +906,11 @@ class CodaroApp(App):
 
     def preferences_saved(self, saved):
         if saved:
+            from codaro.preferences import PreferencesStore
+
+            self.live_summaries = PreferencesStore().load().show_summaries
+            for stages in self.query(".turn-stages"):
+                stages.refresh_summary()
             self.query_one("#status", Static).update(
                 "Preferências salvas · usadas na próxima inicialização"
             )
@@ -838,54 +919,37 @@ class CodaroApp(App):
         return provider_actions.activate_provider(self, settings, preserve_session=preserve_session)
 
     def save_session(self):
-        try:
-            self.session.save(self.session_turns, self.agent.provider.settings.model)
-        except (ValueError, OSError, ModelError) as exc:
-            self.mount_message(
-                Static(
-                    safe_preview(f"Não foi possível salvar a sessão: {exc}"),
-                    classes="notice",
-                    markup=False,
-                )
-            )
+        return conversation_ui.save_session(self)
 
     async def restore_session(self):
-        try:
-            turns = self.session.load()
-        except (ValueError, OSError, ModelError) as exc:
-            self.mount_message(
-                Static(
-                    safe_preview(f"Não foi possível retomar: {exc}"), classes="notice", markup=False
-                )
-            )
-            return
-        if not turns:
-            self.mount_message(Static("Nenhuma conversa salva neste projeto.", classes="notice"))
-            return
-        self.session_turns = turns
-        self.agent.turns = list(turns)
-        self.history = InputHistory(turn[0]["content"] for turn in turns)
-        self.reply = self.speaker = None
-        self.response_text = self.rendered_text = ""
-        self.activity_group = None
-        self.reasoning_group = None
-        conversation = self.query_one("#conversation", VerticalScroll)
-        await conversation.remove_children()
-        for turn in turns[-30:]:
-            self.mount_message(UserMessage(turn[0]["content"]))
-            self.mount_message(Static("Codaro", classes="speaker", markup=False))
-            self.mount_message(
-                Markdown(safe_preview(turn[-1]["content"]), classes="assistant", open_links=False)
-            )
+        return await conversation_ui.restore_session(self)
+
+    def mount_decision(self, decision):
         self.mount_message(
-            Static(
-                "Sessão retomada. Revise os arquivos atuais; propostas anteriores "
-                "não são reaplicadas.",
-                classes="notice",
-                markup=False,
-            )
+            Static(safe_preview(decision["question"]), classes="speaker", markup=False)
         )
-        self.query_one("#status", Static).update("Pronto · sessão retomada")
+        self.mount_message(UserMessage(decision["answer"], decision=True))
+
+    def plan_reviewed(self, decision):
+        if decision == "execute":
+            self.run_worker(self.execute_plan())
+        elif decision == "adjust":
+            self.next_mode = None
+            self.agent.set_mode(Mode.PLAN)
+            self.update_session_header()
+            self.query_one(Prompt).value = "Ajuste o plano: "
+            self.query_one(Prompt).move_cursor(self.query_one(Prompt).document.end)
+            self.query_one(Prompt).focus()
+
+    async def execute_plan(self):
+        if self.busy:
+            return
+        self.next_mode = None
+        if self.agent.mode != Mode.EXECUTE:
+            self.agent.set_mode(Mode.EXECUTE)
+        await self.submit_question(
+            "Execute o plano da tarefa ativa e valide o resultado.", preserve_draft=True
+        )
 
     def approve_command(self, argv, timeout, cancelled):
         decision, ready = [], threading.Event()
@@ -1030,6 +1094,9 @@ class CodaroApp(App):
         prompt = event.text_area
         if self.pending_user_question:
             self.query_one(QuestionDock).set_free_answer(bool(prompt.value.strip()))
+            if prompt.value.strip():
+                self.question_paused = False
+                self.query_one(QuestionDock).set_paused(False)
         self.completion_index = 0
         self.completions_dismissed = False
         prompt.styles.height = min(8, max(2, prompt.wrapped_document.height + 1))
@@ -1093,6 +1160,7 @@ class CodaroApp(App):
         prompt = self.query_one(Prompt)
         self.question_draft = (prompt.value, prompt.selection)
         self.pending_user_question, self.question_resolved = question, resolved
+        self.question_paused = False
         prompt.value = ""
         prompt.placeholder = "Escreva sua resposta…"
         prompt.answering = True
@@ -1108,6 +1176,7 @@ class CodaroApp(App):
         if self.pending_user_question is None:
             return
         self.pending_user_question = self.question_resolved = None
+        self.question_paused = False
         self.query_one(QuestionDock).set_question(None)
         self.query_one(Composer).remove_class("answering")
         prompt = self.query_one(Prompt)
@@ -1117,6 +1186,7 @@ class CodaroApp(App):
             prompt.value, prompt.selection = self.question_draft
         self.question_draft = None
         self.query_one(ExecutionPlan).fit(self.size.height)
+        self.update_completions()
 
     def answer_user_question(self, text):
         question = self.pending_user_question
@@ -1129,15 +1199,23 @@ class CodaroApp(App):
             )
             return
         resolved = self.question_resolved
-        self.mount_message(
-            Static(safe_preview(question["question"]), classes="speaker", markup=False)
-        )
-        self.mount_message(UserMessage(answer))
+        if len(self.current_decisions) >= 32:
+            self.query_one("#status", Static).update(
+                "Limite de decisões neste turno · cancele para continuar em outra mensagem"
+            )
+            return
+        decision = {"question": question["question"], "answer": answer}
+        previous = self.current_decisions
+        self.current_decisions = [*previous, decision]
+        if not self.save_session():
+            self.current_decisions = previous
+            return
+        self.mount_decision(decision)
         self.clear_user_question()
         resolved(answer)
         self.set_generation_status("Continuando…")
 
-    async def submit_question(self, value: str, *, preserve_draft=False):
+    async def submit_question(self, value: str, *, preserve_draft=False, scope_retry=False):
         question = value.strip()
         if not question:
             return
@@ -1180,7 +1258,14 @@ class CodaroApp(App):
                 button.disabled = True
         self.proposal_cards.clear()
         self.history.push(question)
+        if self.next_mode:
+            mode, automatic = self.next_mode
+            self.agent.set_mode(mode)
+            self.agent.policy.auto_edits = automatic
+            self.next_mode = None
         self.active_question = question
+        self.empty_search = False
+        self.context_scope_requested = scope_retry
         self.activity_group = None
         self.reasoning_group = None
         self.answer_preview = None
@@ -1342,7 +1427,7 @@ class CodaroApp(App):
             "Aguardando revisão de edições" if self.agent.edits.pending else "Pronto"
         )
 
-        if not self.agent.legacy and self.agent.last_run_intent != "consultation":
+        if successful and not self.agent.legacy and self.agent.last_run_intent != "consultation":
             try:
                 task = self.agent.tasks.current()
                 if task:
@@ -1356,59 +1441,68 @@ class CodaroApp(App):
             except (ValueError, OSError):
                 pass
 
-        if successful:
-            self.session_turns.append(
-                [
-                    {"role": "user", "content": self.active_question},
-                    {"role": "assistant", "content": answer},
-                ]
+        if not successful:
+            self.query_one("#status", Static).update(
+                {
+                    "cancelled": "Execução interrompida · progresso preservado",
+                    "authentication": "Configuração necessária",
+                    "unavailable": "Conexão interrompida",
+                    "context": "Vamos analisar uma parte por vez",
+                }.get(outcome, "Aguardando nova tentativa")
             )
-            self.session_turns = self.session_turns[-50:]
-            self.save_session()
+        if successful:
+            from codaro.ui.outcomes import EmptySearchActions, TaskReceipt
 
-    async def action_clear_chat(self):
-        if self.busy or isinstance(self.screen, ModalScreen):
-            return
-        self.clear_backup = (copy.deepcopy(self.agent.turns), copy.deepcopy(self.session_turns))
-        self.agent.turns.clear()
-        self.session_turns.clear()
-        self.response_text = self.rendered_text = ""
-        self.reply = self.speaker = None
-        self.activity_group = None
-        self.reasoning_group = None
-        self.pending_recovery = self.retry_recovery = None
-        self.answer_preview = self.generation_preview = self.reasoning_preview = None
-        conversation = self.query_one("#conversation", VerticalScroll)
-        await conversation.remove_children()
-        await conversation.mount(self.welcome())
-        self.proposal_cards.clear()
-        for proposal in self.agent.edits.pending:
-            card = ProposalCard(proposal)
-            self.proposal_cards[proposal.id] = card
-            self.mount_message(card)
-        self.show_plan()
-        self.update_session_header()
-        self.save_session()
-        self.query_one(Prompt).focus()
-        self.query_one("#new-messages").display = False
-        self.query_one("#status", Static).update(
-            "Mensagens limpas · tarefa, escopo e propostas mantidos · /restore-clear desfaz"
+            task = self.agent.tasks.current()
+            if task and task["state"] == "completed":
+                self.mount_message(TaskReceipt(task))
+            if self.empty_search:
+                self.mount_message(EmptySearchActions(classes="outcome-actions"))
+            if self.agent.conversation.completed != self.recorded_completions:
+                self.session_turns = copy.deepcopy(self.session.turns)
+                self.session_decisions = copy.deepcopy(self.session.decisions)
+                self.current_decisions = copy.deepcopy(self.session.pending_decisions)
+                self.recorded_completions = self.agent.conversation.completed
+            else:
+                self.session_turns = [
+                    *self.session_turns,
+                    [
+                        {"role": "user", "content": self.active_question},
+                        {"role": "assistant", "content": answer},
+                    ],
+                ][-50:]
+                self.session_decisions = [*self.session_decisions, self.current_decisions][-50:]
+                self.current_decisions = []
+                self.save_session()
+        elif outcome == "context" and not self.context_scope_requested:
+            self.request_context_scope()
+
+    def request_context_scope(self):
+        original = self.active_question
+        self.show_user_question(
+            {
+                "question": "Por onde devemos continuar a análise?",
+                "explanation": "Vou investigar uma parte por vez para preservar os detalhes.",
+                "choices": ["Estrutura e pontos de entrada", "Arquivos relacionados à tarefa"],
+                "recommended": 0,
+            },
+            lambda scope: self.run_worker(
+                self.submit_question(
+                    original[:6000]
+                    + "\n\nEscopo escolhido: "
+                    + scope[:1500]
+                    + ". Investigue em partes usando leituras pequenas.",
+                    preserve_draft=True,
+                    scope_retry=True,
+                )
+            ),
         )
 
+    async def action_clear_chat(self):
+        return await conversation_ui.action_clear_chat(self)
+
     async def restore_clear(self):
-        if self.clear_backup is None:
-            self.mount_message(Static("Não há limpeza para desfazer.", classes="notice"))
-            return
-        self.agent.turns, self.session_turns = self.clear_backup
-        self.clear_backup = None
-        self.save_session()
-        await self.restore_session()
-        self.proposal_cards.clear()
-        for proposal in self.agent.edits.pending:
-            card = ProposalCard(proposal)
-            self.proposal_cards[proposal.id] = card
-            self.mount_message(card)
-        self.show_plan()
+        return await conversation_ui.restore_clear(self)
 
     async def action_new_conversation(self):
         if self.busy or isinstance(self.screen, ModalScreen):
@@ -1423,32 +1517,7 @@ class CodaroApp(App):
         self.run_worker(self.reset_conversation(objective))
 
     async def reset_conversation(self, objective):
-        try:
-            for proposal in list(self.agent.edits.pending):
-                self.agent.edits.reject(proposal.id)
-            self.agent.policy.reset()
-            previous = self.agent.tasks.current()
-            if previous and previous["state"] not in {"completed", "cancelled"}:
-                self.agent.tasks.state("cancelled", "Encerrado ao começar outra conversa.")
-            self.agent.tasks.mutate(lambda data: data.update(active=None))
-            self.agent.memory.clear_task()
-            await self.action_clear_chat()
-            self.clear_backup = None
-            self.history = InputHistory()
-            if objective:
-                self.agent.tasks.start(objective, new=True)
-            self.update_session_header()
-            self.query_one("#status", Static).update(
-                "Nova conversa · permissões por ação · propostas anteriores descartadas"
-            )
-        except (ValueError, OSError, ModelError) as exc:
-            self.mount_message(
-                Static(
-                    safe_preview(f"Não foi possível iniciar outra conversa: {exc}"),
-                    classes="notice",
-                    markup=False,
-                )
-            )
+        return await conversation_ui.reset_conversation(self, objective)
 
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "question-send":
@@ -1462,6 +1531,23 @@ class CodaroApp(App):
             return
         if event.button.id == "select-mode":
             self.open_mode_picker()
+            return
+        if event.button.id == "outcome-new" and not self.busy:
+            self.run_worker(self.action_new_conversation())
+            return
+        if event.button.id == "recover-changes" and not self.busy:
+            self.run_worker(self.open_provider_menu("/changes"))
+            return
+        if event.button.id == "refine-search" and not self.busy:
+            self.query_one(
+                Prompt
+            ).value = "Refine a busca anterior usando nomes e símbolos alternativos."
+            self.query_one(Prompt).focus()
+            return
+        if event.button.id == "indicate-file" and not self.busy:
+            self.query_one(Prompt).value = "@"
+            self.query_one(Prompt).move_cursor(self.query_one(Prompt).document.end)
+            self.query_one(Prompt).focus()
             return
         if event.button.id == "toggle-plan":
             self.query_one(ExecutionPlan).toggle()
@@ -1482,6 +1568,9 @@ class CodaroApp(App):
             event.button.id in {"recover-provider", "recover-model", "configure-start"}
             and not self.busy
         ):
+            if event.button.id == "configure-start":
+                self.start_setup()
+                return
             command = "/models" if event.button.id == "recover-model" else "/providers"
             if event.button.id == "recover-provider" and self.agent.provider.settings.provider_id:
                 command = "/provider-manage"
@@ -1490,10 +1579,7 @@ class CodaroApp(App):
         if event.button.id == "execute-plan":
             if self.busy:
                 return
-            self.agent.set_mode(Mode.EXECUTE)
-            self.update_session_header()
-            self.query_one(Prompt).value = "Execute o plano da tarefa ativa e valide o resultado."
-            self.query_one(Prompt).focus()
+            self.run_worker(self.open_provider_menu("/plan"))
             return
         if (event.button.id or "").startswith("validate-") and not self.busy:
             if self.agent.edits.pending:

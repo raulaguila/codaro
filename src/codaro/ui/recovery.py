@@ -26,24 +26,25 @@ class RecoveryCard(Collapsible):
 
     def __init__(self, message, kind):
         titles = {
-            "cancelled": "Geração cancelada",
-            "authentication": "Confira a credencial do provedor",
-            "unavailable": "Provedor indisponível",
+            "cancelled": "Execução interrompida",
+            "authentication": "Não foi possível autenticar no provedor",
+            "unavailable": "A conexão com o provedor foi interrompida",
             "context": "Vamos reduzir o escopo da pergunta",
             "limit": "Resposta interrompida pelo limite do modelo",
         }
         actions = {
-            "cancelled": ["retry-question"],
+            "cancelled": ["retry-question", "recover-changes"],
             "authentication": ["recover-provider"],
-            "unavailable": ["retry-question", "recover-provider"],
+            "unavailable": ["retry-question", "recover-model", "recover-provider"],
             "context": ["retry-question", "recover-model"],
             "limit": ["retry-question", "recover-model"],
             "error": ["retry-question"],
         }.get(kind, ["retry-question", "recover-provider", "recover-model"])
         labels = {
-            "retry-question": "Repetir",
-            "recover-provider": "Configurar",
-            "recover-model": "Outro modelo",
+            "retry-question": "Revisar e retomar" if kind == "cancelled" else "Tentar novamente",
+            "recover-provider": "Configurar provedor",
+            "recover-model": "Trocar modelo",
+            "recover-changes": "Ver alterações",
         }
         self.actions = Horizontal(
             *(Button(labels[action], id=action) for action in actions),
@@ -51,9 +52,16 @@ class RecoveryCard(Collapsible):
         )
         super().__init__(
             Static(
-                message, classes="notice neutral" if kind == "cancelled" else "notice", markup=False
+                "Confira a chave cadastrada para continuar."
+                if kind == "authentication"
+                else "Seu progresso e rascunho foram preservados.",
+                classes="recovery-description",
+                markup=False,
             ),
             self.actions,
+            Collapsible(
+                Static(message, classes="notice", markup=False), title="Detalhes", collapsed=True
+            ),
             title=titles.get(kind, "Não foi possível concluir"),
             collapsed=False,
             classes="recovery-card neutral" if kind == "cancelled" else "recovery-card",

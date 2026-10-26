@@ -5,16 +5,16 @@ import shlex
 from pathlib import Path
 from types import SimpleNamespace
 
-from rich.syntax import Syntax
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.screen import ModalScreen
 from textual.widgets import Button, Checkbox, Static, TextArea
 
 from codaro.edits import EditProposal
 from codaro.index import safe_preview
 from codaro.policies import ApprovalPolicy
+from codaro.ui.screen import DialogScreen as ModalScreen
 
 
 class EditReview(ModalScreen[str]):
@@ -43,15 +43,22 @@ class EditReview(ModalScreen[str]):
                 markup=False,
             )
             with VerticalScroll(id="review-diff"):
-                yield Static(
-                    Syntax(
-                        safe_preview(self.proposal.diff), "diff", theme="monokai", word_wrap=True
+                colors = self.app.get_css_variables()
+                diff = Text()
+                for line in safe_preview(self.proposal.diff).splitlines(keepends=True):
+                    color = (
+                        colors["success"]
+                        if line.startswith("+")
+                        else colors["error"]
+                        if line.startswith("-")
+                        else colors["text-muted"]
                     )
-                )
+                    diff.append(line, style=color)
+                yield Static(diff)
             with Horizontal(id="review-actions"):
-                yield Button("Aplicar", variant="success", id="apply-edit")
-                yield Button("Rejeitar", variant="error", id="reject-edit")
+                yield Button("Rejeitar", id="reject-edit")
                 yield Button("Voltar", id="back-edit")
+                yield Button("Aplicar e continuar", variant="primary", id="apply-edit")
 
     def on_mount(self):
         # Enter must never approve a patch just because the modal appeared.
@@ -66,12 +73,18 @@ class EditReview(ModalScreen[str]):
 
 class ChangesReview(EditReview):
     def __init__(self, proposals):
+        sections = []
+        for item in proposals:
+            lines = item.diff.splitlines()
+            added = sum(line.startswith("+") and not line.startswith("+++") for line in lines)
+            removed = sum(line.startswith("-") and not line.startswith("---") for line in lines)
+            sections.append(
+                f"{item.operation} · {item.path} · +{added} −{removed}\n{item.reason}\n{item.diff}"
+            )
         combined = SimpleNamespace(
             path=f"{len(proposals)} arquivo(s)",
             reason="Aprovar aplica este conjunto; o agente continuará para validar.",
-            diff="\n".join(
-                f"{item.operation} · {item.path} · {item.reason}\n{item.diff}" for item in proposals
-            ),
+            diff="\n\n".join(sections),
         )
         super().__init__(combined)
 

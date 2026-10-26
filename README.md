@@ -47,14 +47,14 @@ codaro --resume             # retoma a conversa
 codaro --mode plan          # começa em planejamento
 ```
 
-No primeiro acesso, o Codaro abre o cadastro do provedor, testa o acesso ao catálogo
+No primeiro acesso, **Conectar provedor** abre o cadastro e o teste do catálogo
 e permite selecionar um modelo. Depois disso, basta executar `codaro`: o perfil e
 o modelo escolhidos ficam salvos. Para Ollama, inicie o serviço e baixe antes um
 modelo com suporte a ferramentas. O teste de inferência com ferramentas continua
 opcional e informa quando pode haver custo.
 
 Use **Ctrl+P → Preferências** (ou `/settings`) para salvar o modo inicial, a
-retomada da conversa e os limites avançados. Essas preferências valem para novas
+oferta de retomada, os resumos das etapas e os limites avançados. Essas preferências valem para novas
 inicializações; não mudam as permissões da tarefa aberta. Provedor, modelo e TLS
 continuam no cadastro de provedores.
 
@@ -119,7 +119,7 @@ codaro execute 'Execute o plano da tarefa ativa e valide o resultado'
 codaro edit 'Corrija a validação de entrada'
 ```
 
-No chat, `/mode ask|plan|execute` troca o modo; `/ask`, `/plan` e `/execute` são atalhos. A troca preserva conversa e tarefa, e revoga o escopo de aprovação anterior. O plano aparece em um bloco expansível. **Executar plano** seleciona Executar e preenche uma mensagem; Enter inicia a atividade. `/execute` também preenche esse rascunho quando existe uma tarefa. Trocas durante execução/revisão são bloqueadas.
+No chat, `/mode` abre o seletor e `/mode ask|plan|execute` troca o modo. `/plan` revisa o plano ativo, com opções para ajustar ou executar; sem plano, seleciona Planejar. **Executar plano** abre essa revisão; **Executar com revisão** inicia a atividade, respeitando as aprovações configuradas. `/execute` continua disponível para preparar um rascunho de execução. Durante a geração, o seletor permite escolher o modo do próximo pedido, sem modificar a atividade em andamento. Uma troca efetiva de modo revoga o escopo anterior.
 
 O agente registra etapas (`todo`, `doing`, `done`) e critérios com `update_plan`, recupera páginas de tarefa com `get_task` e sinaliza plano/conclusão/bloqueio com `finish_task`. Uma conclusão com etapas pendentes ou sem validação da revisão atual é recusada pela ferramenta. O plano pode declarar `validation_commands` com os comandos exatos esperados; atualizar essa lista permite substituir verificações obsoletas após uma mudança de arquitetura, sem conceder autorização para executá-las. Perguntas simples podem concluir sem planejamento formal. O controlador informa pendências quando o modelo encerra a resposta antes de completar a atividade.
 
@@ -181,21 +181,21 @@ Detalhamento das correções: [UI e UX](docs/UI_UX.md) e [auditoria por interaç
 
 ## Interface e streaming
 
-A nova interface segue a [proposta consolidada de UI/UX](docs/design/ui-prototype/README.md), com [protótipo navegável](docs/design/ui-prototype/prototype.html). A revisão de fidelidade entrega cabeçalho compacto, mensagens identificadas, etapas unificadas, streaming separado, plano persistente, perguntas no input compartilhado e busca de modelos. Veja a [comparação com o protótipo e as capturas da CLI real](docs/audits/2026-10-21-prototype-fidelity/README.md). A [primeira etapa](docs/audits/2026-10-21-native-ui/README.md) permanece como registro histórico da adoção.
+A nova interface segue a [proposta consolidada de UI/UX](docs/design/ui-prototype/README.md), com [protótipo navegável](docs/design/ui-prototype/prototype.html). Cabeçalho compacto, etapas unificadas, streaming separado, plano persistente e perguntas compartilham a mesma hierarquia. Ajuda e status usam modais; o rodapé acompanha a interação atual. Veja as [correções da comparação completa e capturas da CLI](docs/audits/2026-10-21-ui-parity-fixes/README.md). As auditorias anteriores permanecem como registro histórico.
 
 - `codaro chat` exibe a resposta final após o agente concluir e validar o turno, em Markdown, com títulos, listas, tabelas e destaque de sintaxe em blocos de código. Durante a geração, a barra de status e as ferramentas mostram o progresso.
 - A abertura fica limpa quando já existe um modelo configurado. Sem provedor, o cadastro guiado continua disponível. Enter envia; Alt+Enter insere uma nova linha (Shift+Enter também funciona quando reconhecido pelo terminal). A entrada cresce até oito linhas, adaptando-se à altura do terminal, e preserva rascunhos acima de 8.000 caracteres. Ao digitar `/`, setas navegam e Enter abre o comando destacado; Tab completa sem executar e Esc fecha a lista. A lista limita sua altura para preservar espaço para o chat.
 - O plano ativo fica fixo junto ao input, aberto inicialmente, com progresso e rolagem própria. Recolher mantém o resumo visível; atualizações não reabrem a lista. Mensagens, configurações, falhas e interrupções da geração preservam o plano. **Cancelar plano** encerra a tarefa e revoga permissões, preservando arquivos já alterados. Concluir a tarefa remove o plano do composer; `/task` mantém os detalhes disponíveis. `Ctrl+X` interrompe a geração e deixa a tarefa bloqueada para retomada, sem cancelar seu plano.
-- Clique no modo do cabeçalho ou use `/mode` / **Ctrl+P → Modo de trabalho**. Setas destacam uma opção, Enter ou Aplicar confirma; Esc cancela sem mudar modo, permissões ou rascunho. Em Executar, **Edições → Aprovar automaticamente** autoriza criar/editar arquivos permitidos nesta conversa; remoções, renomeações e comandos seguem as autorizações existentes. A opção aparece como **auto** no seletor, não é persistida e é revogada ao começar outra conversa, trocar de sessão/provedor/modo ou revogar permissões.
+- Clique no modo do cabeçalho ou use `/mode` / **Ctrl+P → Modo de trabalho**. Setas destacam; Enter ou Aplicar confirma; Esc cancela. Durante a execução, a seleção vale para o próximo pedido. **Edições → Aprovar automaticamente** permite criar/editar arquivos autorizados nesta conversa; ações destrutivas e comandos exigem confirmação. O estado aparece junto ao input e é revogado em nova conversa ou troca efetiva de modo/sessão/provedor.
 - Quando precisar de uma decisão, o agente pode chamar `ask_user_question`. Pergunta, sugestões verticais e resposta livre compartilham o mesmo input. Setas e Enter escolhem; digitar substitui a sugestão, incluindo texto iniciado com `/`. Pausar/Esc mantém a pergunta pendente. A resposta real volta ao modelo como resultado da ferramenta, sem conceder aprovação de edição/comandos.
-- Cada pergunta tem um resumo expansível das ações, leituras, buscas e duração. Dentro dele ficam consulta ou arquivo/símbolo, resultados ou linhas e indicação de leitura parcial ou reutilização de conteúdo. Erros abrem os detalhes automaticamente.
+- Cada turno tem uma seção **Etapas** com ações, leituras e buscas. Os detalhes mostram consulta, arquivo, resultados e leitura parcial. Novos eventos e erros respeitam a escolha de manter o grupo recolhido.
 - As atividades aparecem uma única vez na conversa. A barra de status informa o arquivo ou consulta durante a execução.
-- A barra superior mostra pasta abreviada, modelo, modo de edição e conexão. A barra de status informa o estado atual. `/pwd` mostra o caminho completo.
-- O texto recebido por streaming aparece automaticamente em **Texto em geração · não validado**, fora do resumo de atividades. Ao concluir o turno, esse mesmo bloco vira a resposta final em Markdown, sem apagar e recriar a mensagem nem duplicar seu texto. A geração acompanha até 16.000 caracteres (limite textual do provedor), inclusive após os primeiros 4.000. Se a etapa terminar em ferramentas, nova tentativa ou interrupção, o bloco permanece identificado e recolhido; etapas arquivadas mostram até 4.000 caracteres, com fluxo completo em `.codaro/prompt.json`. Somente a resposta aceita é salva no histórico.
+- O cabeçalho mostra projeto, modelo e modo. TLS sem verificação permanece identificado. O status informa a etapa atual; `/status` abre os detalhes e `/pwd` mostra o caminho completo.
+- O streaming aparece com o rótulo **Codaro**, fora das etapas, e a resposta final permanece nessa área. Se a etapa terminar em ferramentas, nova tentativa ou interrupção, a prévia é arquivada nos detalhes. A geração acompanha até 16.000 caracteres; etapas arquivadas mostram até 4.000, com fluxo completo em `.codaro/prompt.json`. Somente a resposta aceita é salva como resposta final.
 - Quando o servidor envia `reasoning_content` ou `reasoning` textual separado, ele aparece em **Raciocínio enviado pelo modelo · provisório**, em um bloco próprio com até 4.000 caracteres. Ao terminar a etapa, fica recolhido. Esse texto não é misturado à resposta, reenviado como conversa nem salvo na sessão; o dump HTTP continua disponível para diagnóstico. Modelos que não expõem esse campo mostram apenas geração e atividades. Não inferimos raciocínio a partir de texto comum.
 - `codaro ask`, `plan` e `execute` mostram progresso no terminal e enviam atividade para stderr; o texto final aparece após o retorno do agente. O conteúdo provisório fica no JSON de diagnóstico.
 - O provedor solicita SSE da API OpenAI-compatible e entrega fragmentos conforme chegam. Se o servidor responder com JSON comum ou acumular o conteúdo antes de enviar, a resposta chega de uma vez; a interface não simula streaming. Confira os eventos SSE e o corpo da resposta em `.codaro/prompt.json` para distinguir esse caso.
-- Uma resposta interrompida ou cancelada não é salva no histórico. O chat informa a interrupção e conserva a prévia recolhida apenas na investigação daquela tela. Retomar a sessão restaura somente perguntas e respostas concluídas.
+- Uma resposta interrompida ou cancelada não é salva como resposta final. O chat conserva a prévia recolhida naquela tela. Decisões já enviadas pelo usuário são salvas imediatamente e restauradas, mesmo que a geração seja interrompida depois. Essa apresentação fica separada das mensagens do protocolo de ferramentas.
 
 O chat detecta o sistema onde o processo está rodando. No macOS, o rodapé e `/help` mostram Command (`⌘`) com a alternativa Ctrl, e Option (`⌥`) nas dicas da entrada. Linux e Windows mantêm Ctrl/Alt. Em SSH, a detecção corresponde ao servidor.
 
@@ -216,9 +216,9 @@ Chamadas de ferramentas devem chegar no campo nativo `tool_calls`, com nomes e a
 
 O menu **Ctrl+P** (ou **⌘P** no macOS com suporte do terminal) oferece **Cadastrar provedor** para abrir o formulário BYOK e **Selecionar provedor e modelo** para escolher entre os perfis já cadastrados. Abrir esses formulários pelo menu preserva o rascunho da mensagem.
 
-No chat, `/providers` abre o cadastro: escolha **OpenAI Compatible, OpenAI, Ollama, Anthropic, Gemini ou Groq**, informe a chave com entrada oculta e clique em **Cadastrar e listar modelos**. Os provedores conhecidos já têm URL preenchida; OpenAI Compatible precisa da URL base do seu servidor. O formulário inclui **TLS Insecure**, também disponível como flag na CLI. Ollama local não exige chave. Depois do cadastro, escolha um modelo na lista recebida da API. `/models` ou `/model` reabre a seleção; **Atualizar API** consulta novamente o catálogo.
+No chat, `/providers` abre o cadastro: escolha **OpenAI Compatible, OpenAI, Ollama, Anthropic, Gemini ou Groq**, informe a chave com entrada oculta e salve para escolher o modelo. A URL fica visível para Ollama e OpenAI Compatible; provedores conhecidos já têm o endereço preenchido. **TLS Insecure**, com explicação junto à opção, fica em Avançado e também existe como flag da CLI. Ollama local esconde a chave; habilite autenticação em Avançado se necessário. `/models` reabre a busca; **Atualizar catálogo** consulta novamente a API. Modelos incompatíveis aparecem desabilitados com o motivo, e contextos desconhecidos são identificados como provisórios.
 
-O botão **Testar conexão** verifica o catálogo sem salvar o perfil. Depois desse teste, escolha um modelo no campo **Modelo para testar** e pressione novamente: o Codaro verifica o ciclo completo de ferramenta e resposta com duas chamadas curtas de inferência (que podem ter custo). Assim, uma listagem bem-sucedida não esconde um erro no endpoint de conversa. O teste não grava a chave no histórico nem no JSON da conversa.
+**Testar conexão** sempre verifica somente o catálogo, sem salvar o perfil nem fazer inferência. **Testar ferramentas e resposta** é uma ação separada em Avançado e nos detalhes do seletor de modelos: verifica o ciclo completo com duas chamadas curtas que podem ter custo. Os resultados são apresentados separadamente; testar não ativa o modelo nem grava a chave no histórico.
 
 Para **Ollama**, a URL pode ser `http://localhost:11434`, `http://localhost:11434/api` ou `http://localhost:11434/v1`: o perfil Ollama usa a API nativa `/api/chat`, enquanto o catálogo usa `/api/tags`. A URL salva pode continuar terminando em `/v1`; o adaptador resolve os endpoints nativos. Perfis Ollama já salvos sem `/v1` recebem a correção ao carregar. URLs de OpenAI Compatible continuam sendo explícitas, sem adivinhar o prefixo do servidor.
 
@@ -285,7 +285,11 @@ codaro ./outro-projeto --resume
 codaro --resume
 ```
 
-A última conversa de cada projeto é salva automaticamente em `.codaro/session.json`, com até 50 turnos e 512 KB; ao retomar, o chat mostra até 30 turnos recentes. O contexto enviado à IA mantém seu próprio limite e pode descartar turnos antigos sem apagar a conversa salva. `/clear` limpa a sessão em memória; o arquivo anterior permanece disponível para `/resume` até outra pergunta concluída substituí-lo. Propostas pendentes não são reaplicadas ao retomar; resultados de aprovação já registrados são preservados.
+A conversa original é salva automaticamente em `.codaro/session.json`, com até 50 turnos e 512 KB; conversas adicionais usam arquivos por identificador. Ao retomar, o chat mostra até 30 turnos recentes. O contexto enviado à IA mantém seu próprio limite e pode descartar turnos antigos sem apagar a conversa salva. Agente e UI compartilham a mesma gravação, incluindo decisões confirmadas e respostas pendentes. As respostas reais do usuário ficam pesquisáveis e voltam ao contexto de forma limitada; decisões maiores são recuperadas com `search_conversation` e `read_conversation`. Elas não concedem permissões de execução.
+
+`/clear` e Ctrl+L limpam as mensagens e salvam essa limpeza, preservando a tarefa e as propostas atuais. `/restore-clear` desfaz a última limpeza enquanto a aplicação estiver aberta. `/new` abre outra conversa; se a criação ou preparação falhar, a tarefa, as propostas e as permissões atuais são preservadas. Propostas antigas não são reaplicadas ao retomar e permissões são revogadas na troca de sessão.
+
+Use `/sessions` para listar conversas, `/session ID` para trocar e `/session archive ID` para arquivar uma conversa inativa sem apagar seus dados. `/session restore ID` a devolve à lista. Há até 30 sessões disponíveis e 300 entradas armazenadas, incluindo arquivadas. Na CLI, use `codaro sessions list`, `codaro sessions use ID`, `codaro sessions archive ID` e `codaro sessions restore ID`.
 
 O arquivo usa gravação atômica e `0600` em POSIX, bloqueia links e valida raiz, versão e mensagens ao carregar. A chave do provedor é mascarada, inclusive em formas escapadas. A conversa pode conter código e outros dados do projeto: mantenha `.codaro/` no `.gitignore`. Sessões simultâneas no mesmo projeto compartilham o arquivo e a última gravação prevalece.
 
@@ -587,7 +591,8 @@ macOS/Windows, MCP, plugins e LSP ainda não recebem esse isolamento. Consulte
 ## Preparação de releases
 
 Versões do `pyproject.toml` e `codaro.__version__` devem coincidir. O workflow
-`release` constrói wheel e sdist, executa `twine check`, gera `SHA256SUMS` e valida
+`release` exige primeiro os mesmos checks do CI (lint, testes, avaliações, pacote
+instalado e capturas da UI), constrói wheel e sdist, executa `twine check`, gera `SHA256SUMS` e valida
 o pacote instalado nos três sistemas. Uma execução manual gera artefatos para
 revisão. Uma tag `v0.1.1`, criada no commit revisado e enviada ao GitHub, publica
 uma **pré-release** apenas depois dessas verificações. Não publica no PyPI.
@@ -628,8 +633,9 @@ codaro evaluate evaluations/cases.json --agent --output .codaro/evaluation-agent
 
 O modo local mede precisão dos até seis resultados, recall dos caminhos esperados e duração. `--agent` mede conclusão, correspondência das expectativas textuais, recall de arquivos efetivamente lidos, precisão das citações quando presentes, chamadas ao modelo/ferramentas, chamadas repetidas, compactações, estimativas e usage disponível. Uma resposta sem citações pode passar quando as fontes esperadas foram lidas e as expectativas textuais foram satisfeitas; referências inventadas, quando presentes, falham. O relatório informa quantas chamadas possuem consumo real; ausência de usage não é apresentada como consumo zero. Casos com erro não interrompem os seguintes; o comando retorna código 1 se alguma expectativa falhar.
 
-Há um benchmark de correção em `evaluations/workflows.json`, executado em cópia
-temporária, com uma implementação propositalmente incompleta e testes existentes:
+Há três benchmarks de correção em `evaluations/workflows.json`, executados em cópias
+temporárias: autorização, paginação e configuração com valores falsos. As implementações
+propositalmente incompletas têm testes existentes que devem ser preservados:
 
 ```bash
 codaro evaluate-workflows evaluations/workflows.json --allow-execution --output .codaro/workflow-benchmark.json

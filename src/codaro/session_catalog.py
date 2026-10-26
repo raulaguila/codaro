@@ -10,7 +10,9 @@ from codaro.trace import atomic_write, timestamp
 
 
 def validate_id(identifier):
-    if identifier != "default" and not re.fullmatch(r"[a-f0-9]{12}", identifier or ""):
+    if not isinstance(identifier, str) or (
+        identifier != "default" and not re.fullmatch(r"[a-f0-9]{12}", identifier)
+    ):
         raise ValueError("Identificador de sessão inválido.")
     return identifier
 
@@ -33,7 +35,7 @@ class SessionCatalog:
             not isinstance(value, dict)
             or value.get("version") != 1
             or not isinstance(value.get("items"), list)
-            or len(value["items"]) > 30
+            or len(value["items"]) > 300
         ):
             raise ValueError("Catálogo de sessões inválido.")
         identifiers = set()
@@ -45,11 +47,14 @@ class SessionCatalog:
                 identifier in identifiers
                 or not isinstance(item.get("title"), str)
                 or not 1 <= len(item["title"]) <= 100
+                or type(item.get("archived", False)) is not bool
             ):
                 raise ValueError("Metadados de sessão inválidos.")
             identifiers.add(identifier)
         if value.get("active") not in identifiers:
             raise ValueError("Sessão ativa não encontrada.")
+        if any(item["id"] == value["active"] and item.get("archived") for item in value["items"]):
+            raise ValueError("Sessão ativa não pode estar arquivada.")
         return value
 
     def create(self, title="Nova conversa"):
@@ -57,8 +62,12 @@ class SessionCatalog:
             raise ValueError("Nome deve ter de 1 a 100 caracteres.")
         with private_lock(self.path.with_suffix(".lock")):
             value = self.load()
-            if len(value["items"]) >= 30:
-                raise ValueError("Limite de 30 sessões alcançado.")
+            if sum(not item.get("archived", False) for item in value["items"]) >= 30:
+                raise ValueError(
+                    "Limite de 30 sessões alcançado. Arquive uma com /session archive ID."
+                )
+            if len(value["items"]) >= 300:
+                raise ValueError("Limite de 300 sessões armazenadas alcançado.")
             identifier = uuid.uuid4().hex[:12]
             value["items"].append(
                 {"id": identifier, "title": title.strip(), "created": timestamp()}
@@ -70,9 +79,49 @@ class SessionCatalog:
         validate_id(identifier)
         with private_lock(self.path.with_suffix(".lock")):
             value = self.load()
-            if not any(item["id"] == identifier for item in value["items"]):
+            if not any(
+                item["id"] == identifier and not item.get("archived") for item in value["items"]
+            ):
                 raise ValueError("Sessão não encontrada.")
             value["active"] = identifier
+            atomic_write(self.path, json.dumps(value, ensure_ascii=False).encode())
+
+    def archive(self, identifier, *, archived=True):
+        validate_id(identifier)
+        with private_lock(self.path.with_suffix(".lock")):
+            value = self.load()
+            item = next((item for item in value["items"] if item["id"] == identifier), None)
+            if item is None:
+                raise ValueError("Sessão não encontrada.")
+            if archived and identifier == value["active"]:
+                raise ValueError("Troque de sessão antes de arquivar a sessão ativa.")
+            if (
+                not archived
+                and item.get("archived")
+                and sum(not row.get("archived", False) for row in value["items"]) >= 30
+            ):
+                raise ValueError("Limite de 30 sessões alcançado.")
+            item["archived"] = bool(archived)
+            atomic_write(self.path, json.dumps(value, ensure_ascii=False).encode())
+
+    def discard_empty(self, identifier):
+        """Roll back only a newly created, inactive catalog entry with no data."""
+        validate_id(identifier)
+        with private_lock(self.path.with_suffix(".lock")):
+            value = self.load()
+            if identifier == "default" or identifier == value["active"]:
+                return
+            if any(
+                path.exists()
+                for path in (
+                    self.store(identifier).path,
+                    self.summary_path(identifier),
+                    self.root / (".codaro/tasks-" + identifier + ".json"),
+                    self.root / (".codaro/memory-" + identifier + ".sqlite3"),
+                )
+            ):
+                return
+            value["items"] = [item for item in value["items"] if item["id"] != identifier]
             atomic_write(self.path, json.dumps(value, ensure_ascii=False).encode())
 
     def store(self, identifier, secret=""):

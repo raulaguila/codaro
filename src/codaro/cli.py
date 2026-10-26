@@ -422,6 +422,8 @@ def chat(
                 max_corrections=config.preferences.max_corrections,
             ),
             resume=config.preferences.resume,
+            offer_resume=config.preferences.resume and resume is None,
+            show_summaries=config.preferences.show_summaries,
             setup_required=config.needs_setup,
             setup_profile=config.setup_profile,
         ).run()

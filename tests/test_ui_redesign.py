@@ -5,7 +5,7 @@ import asyncio
 import pytest
 from test_tui import UIModel, run_ui, wait_ready
 from textual.containers import VerticalScroll
-from textual.widgets import Button, OptionList, RadioButton, Static
+from textual.widgets import OptionList, RadioButton, Static
 
 from codaro.agent import Agent
 from codaro.index import CodeIndex
@@ -102,12 +102,13 @@ def test_mode_selection_is_explicit_and_preserves_draft(tmp_path):
             await pilot.click("#mode-apply")
             await pilot.pause()
             assert agent.policy.auto_edits
-            assert "auto" in str(app.query_one("#select-mode", Button).label)
+            assert "automáticas" in str(app.query_one("#prompt-hint", Static).render())
             start_plan(agent)
             identifier = agent.tasks.current()["id"]
+            previous_store = agent.tasks
             await app.reset_conversation("")
             assert not agent.policy.auto_edits
-            previous = next(t for t in agent.tasks.load()["tasks"] if t["id"] == identifier)
+            previous = next(t for t in previous_store.load()["tasks"] if t["id"] == identifier)
             assert previous["state"] == "cancelled"
 
     run_ui(scenario())
@@ -122,8 +123,8 @@ def test_slash_menu_enter_opens_highlighted_command(tmp_path):
             await pilot.press("/", "m", "o")
             await pilot.pause()
             assert app.query_one(Prompt).suggesting
-            assert app.completion_options()[0].value.strip() == "/mode"
-            await pilot.press("enter")
+            assert app.completion_options()[0].value.strip() == "/models"
+            await pilot.press("down", "enter")
             await pilot.pause()
             assert isinstance(app.screen, ModePicker)
             assert not model.started.is_set()

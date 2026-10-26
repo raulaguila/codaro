@@ -1,0 +1,37 @@
+[
+  {
+    "name": "hover-stable-size",
+    "passed": true,
+    "detail": "Hover no modo não muda dimensões"
+  },
+  {
+    "name": "finished-tool-not-running",
+    "passed": true,
+    "detail": "Resumo após fim da ferramenta: completed='Buscar testes · 3 resultados', current=''"
+  },
+  {
+    "name": "stages-stay-collapsed",
+    "passed": true,
+    "detail": "Evento novo preserva recolhimento manual dos detalhes"
+  },
+  {
+    "name": "plan-stays-collapsed",
+    "passed": true,
+    "detail": "Atualização de ferramenta mantém plano recolhido junto ao input"
+  },
+  {
+    "name": "question-decision-restored",
+    "passed": false,
+    "detail": "A decisão deve continuar no histórico visível após /resume"
+  },
+  {
+    "name": "resize-short-layout",
+    "passed": false,
+    "detail": "Após resize 120×35 → 60×20: app.size=Size(width=60, height=20), classes=['-dark-mode']"
+  },
+  {
+    "name": "mode-available-during-execution",
+    "passed": false,
+    "detail": "Protótipo permite preparar o modo da próxima mensagem; nativo bloqueia enquanto busy"
+  }
+]

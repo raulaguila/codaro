@@ -15,3 +15,10 @@ htmlcov/
 
 # Cache gerado pela versão anterior do projeto
 .codelens/
+
+# New automated audit captures are published as CI artifacts.
+# Historical evidence already versioned remains available.
+/docs/audits/**/screens/
+/docs/audits/**/screenshots/
+/docs/audits/**/captures/
+/artifacts/

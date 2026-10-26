@@ -33,7 +33,15 @@ def resolve_configuration(**overrides):
     source = "preferências salvas" if PreferencesStore().path.exists() else "padrão"
     sources = {
         name: source
-        for name in ("mode", "resume", "max_steps", "max_seconds", "max_corrections", "timeout")
+        for name in (
+            "mode",
+            "resume",
+            "show_summaries",
+            "max_steps",
+            "max_seconds",
+            "max_corrections",
+            "timeout",
+        )
     }
     updates = {}
     for name in ("mode", "resume", "max_steps", "max_seconds", "max_corrections"):

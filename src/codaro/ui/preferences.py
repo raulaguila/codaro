@@ -3,10 +3,10 @@
 from dataclasses import asdict
 
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.screen import ModalScreen
 from textual.widgets import Button, Checkbox, Collapsible, Input, Select, Static
 
 from codaro.preferences import PreferencesStore, preference_value
+from codaro.ui.screen import DialogScreen as ModalScreen
 
 
 class PreferencesDialog(ModalScreen[bool]):
@@ -40,11 +40,19 @@ class PreferencesDialog(ModalScreen[bool]):
                     value=values["mode"],
                     allow_blank=False,
                     id="preference-mode",
+                    compact=True,
                 )
                 yield Checkbox(
-                    "Retomar a última conversa ao abrir",
+                    "Oferecer retomada da última conversa",
                     value=values["resume"],
                     id="preference-resume",
+                    compact=True,
+                )
+                yield Checkbox(
+                    "Mostrar resumos curtos das etapas",
+                    value=values["show_summaries"],
+                    id="preference-summaries",
+                    compact=True,
                 )
                 with Collapsible(
                     title="Limites avançados", collapsed=True, id="preferences-advanced"
@@ -59,6 +67,7 @@ class PreferencesDialog(ModalScreen[bool]):
                         yield Input(
                             "" if values[name] is None else str(values[name]),
                             id="preference-" + name,
+                            compact=True,
                         )
                 yield Static(
                     "Usadas em novas inicializações. Não altera permissões da tarefa atual.\n"
@@ -81,6 +90,7 @@ class PreferencesDialog(ModalScreen[bool]):
             changes = {
                 "mode": str(self.query_one("#preference-mode", Select).value),
                 "resume": self.query_one("#preference-resume", Checkbox).value,
+                "show_summaries": self.query_one("#preference-summaries", Checkbox).value,
             }
             for name in ("max_steps", "max_seconds", "max_corrections", "timeout"):
                 raw = self.query_one("#preference-" + name, Input).value.strip()

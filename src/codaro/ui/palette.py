@@ -11,6 +11,11 @@ def system_commands(app, framework_commands):
     )
     if app.busy:
         yield SystemCommand(
+            "Modo do próximo pedido",
+            "Preparar o modo sem alterar a atividade em andamento",
+            app.open_mode_picker,
+        )
+        yield SystemCommand(
             "Cancelar atividade",
             "Solicitar interrupção; rascunho preservado",
             app.action_cancel,

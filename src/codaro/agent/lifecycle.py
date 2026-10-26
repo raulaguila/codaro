@@ -1,6 +1,7 @@
 """Session, mode and provider transitions; public methods remain on Agent."""
 
 from codaro.context import TokenCounter
+from codaro.conversation import Conversation
 from codaro.memory import ConversationMemory
 from codaro.policies import Mode
 from codaro.tasks import TaskStore
@@ -75,41 +76,65 @@ def set_provider(agent, provider):
     )
     agent.memory.redact = lambda value: current(previous(value))
     agent.tasks.redact = agent.memory.redact
+    agent.conversation.store.redact = agent.memory.redact
     agent.turns = agent.memory.redact(agent.turns)
     agent.artifacts.redact = agent.memory.redact
     agent.policy.reset()
 
 
-def activate_session(agent, identifier):
-    if agent._lock.locked() or agent.edits.pending:
+def activate_session(agent, identifier, *, discard_pending=False):
+    if agent._lock.locked() or (agent.edits.pending and not discard_pending):
         raise ValueError("Aguarde a execução e revise propostas antes de trocar sessão.")
-    agent._pending_text_continuation = False
-    store = agent.sessions.store(identifier)
+    secret = getattr(getattr(agent.provider, "settings", None), "api_key", "")
+    store = agent.sessions.store(identifier, secret)
+    store.redact = agent.memory.redact
     try:
         turns = store.load()
     except FileNotFoundError:
         turns = []
     summary = agent.sessions.summary(identifier)
-    agent.sessions.activate(identifier)
     old_redact = agent.memory.redact
-    agent.memory = ConversationMemory(
+    memory = ConversationMemory(
         agent.repository.root,
         getattr(getattr(agent.provider, "settings", None), "api_key", ""),
         ephemeral=agent.tasks.ephemeral,
     )
-    agent.memory.redact = old_redact
-    agent.tasks = TaskStore(
-        agent.repository.root, ephemeral=agent.tasks.ephemeral, redact=old_redact
-    )
+    memory.redact = old_redact
+    tasks = TaskStore(agent.repository.root, ephemeral=agent.tasks.ephemeral, redact=old_redact)
     if identifier != "default":
-        agent.memory.path = agent.repository.root / (".codaro/memory-" + identifier + ".sqlite3")
-        agent.tasks.path = agent.repository.root / (".codaro/tasks-" + identifier + ".json")
+        memory.path = agent.repository.root / (".codaro/memory-" + identifier + ".sqlite3")
+        tasks.path = agent.repository.root / (".codaro/tasks-" + identifier + ".json")
+    memory.session_store = store
+    conversation = Conversation(store, ephemeral=tasks.ephemeral)
+    memory.decision_source = conversation.decisions
+    conversation.index_decisions(
+        memory, getattr(getattr(agent.provider, "settings", None), "model", "")
+    )
+    # Validate destination data before changing the catalog or any live state.
+    tasks.load()
+    agent.sessions.activate(identifier)
+    agent.memory, agent.tasks, agent.conversation = memory, tasks, conversation
+    agent._pending_text_continuation = False
     agent.edits.checkpoints.session_id = identifier
     agent.session_id = agent.artifacts.session_id = identifier
     agent.artifacts.redact = old_redact
     agent.turns = turns
     agent.context.summary = summary
     agent.policy.reset()
+    if discard_pending:
+        for proposal in list(agent.edits.pending):
+            agent.edits.reject(proposal.id)
     agent.edits.observed.clear()
     agent.edits.proposals.clear()
     return store
+
+
+def new_session(agent, title="Nova conversa"):
+    if agent._lock.locked():
+        raise ValueError("Aguarde a execução antes de começar outra conversa.")
+    identifier = agent.sessions.create(title)
+    try:
+        return activate_session(agent, identifier, discard_pending=True)
+    except (ValueError, OSError):
+        agent.sessions.discard_empty(identifier)
+        raise

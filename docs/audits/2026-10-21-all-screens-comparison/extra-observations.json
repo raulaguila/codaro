@@ -1,0 +1,542 @@
+[
+  {
+    "scene": "palette-extra",
+    "size": [
+      120,
+      35
+    ],
+    "capture": "palette-extra-120x35",
+    "screen": "CommandPalette",
+    "note": "",
+    "controls": [
+      {
+        "id": null,
+        "type": "CommandInput",
+        "region": [
+          4,
+          4,
+          115,
+          3
+        ],
+        "clip": [
+          1,
+          4,
+          118,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": null,
+        "type": "CommandList",
+        "region": [
+          0,
+          7,
+          120,
+          24
+        ],
+        "clip": [
+          0,
+          7,
+          120,
+          26
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "scene": "provider-manager-extra",
+    "size": [
+      120,
+      35
+    ],
+    "capture": "provider-manager-extra-120x35",
+    "screen": "ProviderManager",
+    "note": "",
+    "controls": [
+      {
+        "id": "profile-edit-Local",
+        "type": "Button",
+        "region": [
+          17,
+          9,
+          43,
+          1
+        ],
+        "clip": [
+          17,
+          9,
+          86,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "profile-remove-Local",
+        "type": "Button",
+        "region": [
+          60,
+          9,
+          43,
+          1
+        ],
+        "clip": [
+          17,
+          9,
+          86,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "profile-add",
+        "type": "Button",
+        "region": [
+          17,
+          27,
+          43,
+          1
+        ],
+        "clip": [
+          17,
+          27,
+          86,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "manager-back",
+        "type": "Button",
+        "region": [
+          60,
+          27,
+          43,
+          1
+        ],
+        "clip": [
+          17,
+          27,
+          86,
+          3
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "scene": "finished-tool-extra",
+    "size": [
+      120,
+      35
+    ],
+    "capture": "finished-tool-extra-120x35",
+    "screen": "Screen",
+    "note": "",
+    "controls": [
+      {
+        "id": "select-model",
+        "type": "Button",
+        "region": [
+          87,
+          1,
+          12,
+          1
+        ],
+        "clip": [
+          2,
+          1,
+          116,
+          1
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "select-mode",
+        "type": "Button",
+        "region": [
+          100,
+          1,
+          18,
+          1
+        ],
+        "clip": [
+          2,
+          1,
+          116,
+          1
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "prompt",
+        "type": "Prompt",
+        "region": [
+          4,
+          31,
+          114,
+          2
+        ],
+        "clip": [
+          2,
+          31,
+          116,
+          2
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "scene": "question-restored-extra",
+    "size": [
+      120,
+      35
+    ],
+    "capture": "question-restored-extra-120x35",
+    "screen": "Screen",
+    "note": "",
+    "controls": [
+      {
+        "id": "select-model",
+        "type": "Button",
+        "region": [
+          87,
+          1,
+          12,
+          1
+        ],
+        "clip": [
+          2,
+          1,
+          116,
+          1
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "select-mode",
+        "type": "Button",
+        "region": [
+          100,
+          1,
+          18,
+          1
+        ],
+        "clip": [
+          2,
+          1,
+          116,
+          1
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "toggle-plan",
+        "type": "Button",
+        "region": [
+          2,
+          29,
+          100,
+          1
+        ],
+        "clip": [
+          2,
+          29,
+          116,
+          1
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "cancel-plan",
+        "type": "Button",
+        "region": [
+          102,
+          29,
+          16,
+          1
+        ],
+        "clip": [
+          2,
+          29,
+          116,
+          1
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "prompt",
+        "type": "Prompt",
+        "region": [
+          4,
+          31,
+          114,
+          2
+        ],
+        "clip": [
+          2,
+          31,
+          116,
+          2
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "scene": "question-plan-extra",
+    "size": [
+      60,
+      20
+    ],
+    "capture": "question-plan-extra-60x20",
+    "screen": "Screen",
+    "note": "",
+    "controls": [
+      {
+        "id": "select-model",
+        "type": "Button",
+        "region": [
+          25,
+          1,
+          12,
+          1
+        ],
+        "clip": [
+          2,
+          1,
+          54,
+          1
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "select-mode",
+        "type": "Button",
+        "region": [
+          38,
+          1,
+          18,
+          1
+        ],
+        "clip": [
+          2,
+          1,
+          54,
+          1
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "toggle-plan",
+        "type": "Button",
+        "region": [
+          2,
+          5,
+          38,
+          1
+        ],
+        "clip": [
+          2,
+          5,
+          54,
+          1
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "cancel-plan",
+        "type": "Button",
+        "region": [
+          40,
+          5,
+          16,
+          1
+        ],
+        "clip": [
+          2,
+          5,
+          54,
+          1
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "question-options",
+        "type": "OptionList",
+        "region": [
+          4,
+          13,
+          50,
+          3
+        ],
+        "clip": [
+          4,
+          8,
+          50,
+          8
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "prompt",
+        "type": "Prompt",
+        "region": [
+          6,
+          16,
+          26,
+          2
+        ],
+        "clip": [
+          4,
+          16,
+          50,
+          2
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "question-pause",
+        "type": "Button",
+        "region": [
+          33,
+          16,
+          10,
+          1
+        ],
+        "clip": [
+          4,
+          16,
+          50,
+          2
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "question-send",
+        "type": "Button",
+        "region": [
+          44,
+          16,
+          10,
+          1
+        ],
+        "clip": [
+          4,
+          16,
+          50,
+          2
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "scene": "provider-extra",
+    "size": [
+      60,
+      20
+    ],
+    "capture": "provider-extra-60x20",
+    "screen": "ProviderSetup",
+    "note": "",
+    "controls": [
+      {
+        "id": "provider-key",
+        "type": "Input",
+        "region": [
+          6,
+          8,
+          48,
+          3
+        ],
+        "clip": [
+          6,
+          3,
+          48,
+          12
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "provider-test",
+        "type": "Button",
+        "region": [
+          6,
+          17,
+          16,
+          1
+        ],
+        "clip": [
+          6,
+          17,
+          48,
+          1
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "provider-back",
+        "type": "Button",
+        "region": [
+          22,
+          17,
+          16,
+          1
+        ],
+        "clip": [
+          6,
+          17,
+          48,
+          1
+        ],
+        "fully_visible": true,
+        "disabled": false
+      },
+      {
+        "id": "provider-save",
+        "type": "Button",
+        "region": [
+          38,
+          17,
+          16,
+          1
+        ],
+        "clip": [
+          6,
+          17,
+          48,
+          1
+        ],
+        "fully_visible": true,
+        "disabled": false
+      }
+    ]
+  }
+]

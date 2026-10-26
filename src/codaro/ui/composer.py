@@ -32,6 +32,9 @@ class Composer(Vertical):
             yield Static("", id="context-meter", markup=False)
         yield Static("", id="prompt-hint", markup=False)
 
+    def on_resize(self):
+        self.app.call_after_refresh(self.app.sync_layout)
+
 
 class Prompt(TextArea):
     """A wrapping composer with explicit submission and portable newline shortcuts."""

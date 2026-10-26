@@ -129,8 +129,9 @@ class ReasoningGroup(Collapsible):
         self.title = f"Raciocínio do modelo · {self.steps} etapas"
 
         def mount_step():
-            if self.is_attached:
-                self.query_one(Collapsible.Contents).mount(preview)
+            contents = list(self.query(Collapsible.Contents))
+            if self.is_attached and contents:
+                contents[0].mount(preview)
 
         self.call_after_refresh(mount_step)
 
@@ -163,8 +164,9 @@ class ActivityGroup(Collapsible):
         )
 
         def mount_archive():
-            if self.is_attached:
-                self.query_one(Collapsible.Contents).mount(archived)
+            contents = list(self.query(Collapsible.Contents))
+            if self.is_attached and contents:
+                contents[0].mount(archived)
 
         self.call_after_refresh(mount_archive)
         preview.display = False

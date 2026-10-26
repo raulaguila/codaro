@@ -14,6 +14,17 @@ from codaro.trace import atomic_write, timestamp
 MAX_SESSION_BYTES = 512_000
 
 
+def validate_decisions(decisions):
+    if not isinstance(decisions, list) or len(decisions) > 32:
+        raise ValueError("Decisões de sessão inválidas.")
+    for item in decisions:
+        if not isinstance(item, dict) or set(item) != {"question", "answer"}:
+            raise ValueError("Decisão de sessão inválida.")
+        for key, limit in (("question", 300), ("answer", 8000)):
+            if not isinstance(item[key], str) or not 1 <= len(item[key]) <= limit:
+                raise ValueError("Decisão de sessão inválida.")
+
+
 def validate_turns(turns):
     if not isinstance(turns, list) or len(turns) > 50:
         raise ValueError("Histórico de sessão inválido.")
@@ -63,10 +74,28 @@ class SessionStore:
         self.root = root
         self.path = root / ".codaro" / "session.json"
         self.secret = secret
+        self.ephemeral = False
+        self.turns = []
+        self.decisions = []
+        self.pending_decisions = []
 
-    def save(self, turns: list[list[dict]], model: str):
+    def save(self, turns: list[list[dict]], model: str, *, decisions=None, pending_decisions=None):
         retained = turns[-50:]
         validate_turns(retained)
+        decisions = self.decisions if decisions is None else decisions
+        pending = self.pending_decisions if pending_decisions is None else pending_decisions
+        validate_decisions(pending)
+        if not isinstance(decisions, list) or len(decisions) > 50:
+            raise ValueError("Decisões de sessão inválidas.")
+        for group in decisions:
+            validate_decisions(group)
+        groups = (
+            (decisions + [[] for _ in range(max(0, len(retained) - len(decisions)))])[
+                -len(retained) :
+            ]
+            if retained
+            else []
+        )
         while True:
             value = {
                 "schema_version": 1,
@@ -74,15 +103,24 @@ class SessionStore:
                 "updated_at": timestamp(),
                 "model": model,
                 "turns": retained,
+                "decisions": groups,
+                "pending_decisions": pending,
             }
             data = json.dumps(self.redact(value), ensure_ascii=False)
             encoded = data.encode("utf-8")
             if len(encoded) <= MAX_SESSION_BYTES:
-                atomic_write(self.path, encoded)
+                if not self.ephemeral:
+                    atomic_write(self.path, encoded)
+                self.turns = self.redact(retained)
+                self.decisions = self.redact(groups)
+                self.pending_decisions = self.redact(pending)
                 return
             if not retained:
                 raise ValueError("Sessão excede o limite de armazenamento.")
             retained = retained[1:]
+            groups = groups[1:]
+            if not retained and pending and len(encoded) > MAX_SESSION_BYTES:
+                raise ValueError("Decisões pendentes excedem o limite de armazenamento.")
 
     def redact(self, value):
         forms = {self.secret}
@@ -108,6 +146,8 @@ class SessionStore:
         return redact_credentials(clean(value))
 
     def load(self) -> list[list[dict]]:
+        if self.ephemeral:
+            return self.redact(self.turns)
         if self.path.parent.is_symlink():
             raise ValueError("A sessão não pode usar links simbólicos.")
         flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
@@ -135,6 +175,15 @@ class SessionStore:
             ):
                 raise ValueError("Sessão incompatível com este projeto.")
             validate_turns(data.get("turns"))
+            groups = data.get("decisions", [[] for _ in data["turns"]])
+            if not isinstance(groups, list) or len(groups) != len(data["turns"]):
+                raise ValueError("Decisões de sessão inválidas.")
+            for group in groups:
+                validate_decisions(group)
+            pending = data.get("pending_decisions", [])
+            validate_decisions(pending)
+            self.decisions, self.pending_decisions = groups, pending
+            self.turns = data["turns"]
             return data["turns"]
         except (UnicodeError, json.JSONDecodeError, RecursionError) as exc:
             raise ValueError("Arquivo de sessão inválido.") from exc

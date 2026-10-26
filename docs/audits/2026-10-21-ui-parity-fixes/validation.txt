@@ -1,0 +1,11 @@
+Complete suite: 703 passed, 16 skipped in 155.58s (0:02:35)
+Post-release focused checks: 19 passed in 13.78s
+Audit interaction checks: 21/21 passed.
+46 scenarios; 92 baseline and 8 supplementary native captures; no capture errors.
+Primary controls are fully visible in the 120x35 and 80x24 captured states.
+Approved prototype visual sources unchanged; only its README now links the native implementation.
+Ruff check and format: passed.
+Wheel built with build --wheel --no-isolation; installed with pip --no-deps --no-index outside the checkout.
+Installed package: CLI, imports, CSS, agent, diagnostics and UI passed.
+37 verificações passaram; 46 estados renderizados. Validação visual nativa pendente.
+Headless real Textual rendering with synthetic events and mocked HTTP. No live provider inference.

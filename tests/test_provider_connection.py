@@ -95,22 +95,24 @@ def test_provider_form_tests_connection_before_registration(tmp_path, monkeypatc
             await pilot.click("#provider-test")
             for _ in range(100):
                 await pilot.pause(0.02)
-                if "Catálogo acessível" in str(
+                if "Conexão verificada" in str(
                     app.screen.query_one("#provider-error", Static).render()
                 ):
                     break
             assert not store.path.exists()
             app.screen.query_one("#provider-test-model", Select).value = "llama3.1:8b"
+            app.screen.query_one("#provider-advanced").collapsed = False
+            await pilot.pause()
             await pilot.pause()
             # Textual ignores clicks while the previous click animation is active.
             # Fast mocked responses can finish before that animation on CI.
-            button = app.screen.query_one("#provider-test", Button)
+            button = app.screen.query_one("#provider-test-inference", Button)
             for _ in range(100):
                 if not button.has_class("-active") and not button.disabled:
                     break
                 await pilot.pause(0.02)
             assert not button.has_class("-active") and not button.disabled
-            await pilot.click("#provider-test")
+            await pilot.click("#provider-test-inference")
             for _ in range(100):
                 await pilot.pause(0.02)
                 if "verificadas" in str(app.screen.query_one("#provider-error", Static).render()):

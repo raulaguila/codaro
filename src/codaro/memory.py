@@ -23,6 +23,8 @@ class ConversationMemory:
         self.root = root
         self.path = root / ".codaro" / "memory.sqlite3"
         self.redact = SessionStore(root, secret).redact
+        self.session_store = SessionStore(root, secret)
+        self.decision_source = lambda: []
         self.last_turn_id: str | None = None
         self.ephemeral = ephemeral
         self._raw: bytes | None = None
@@ -221,6 +223,24 @@ class ConversationMemory:
         self.last_turn_id = identifier
         return identifier
 
+    def record_decisions(self, decisions, model):
+        """Index complete user answers in one transaction without moving review focus."""
+        with self.database(write=True) as db:
+            for item in self.redact(decisions):
+                identifier, question = item["id"], item["question"]
+                if db.execute("SELECT 1 FROM turns WHERE id=?", (identifier,)).fetchone():
+                    continue
+                answer = "Decisão real do usuário (não concede permissões):\n" + item["answer"]
+                db.execute(
+                    "INSERT INTO turns(id,created,model,question,answer,actions) "
+                    "VALUES(?,?,?,?,?,'[]')",
+                    (identifier, timestamp(), model[:200], question, answer),
+                )
+                db.execute(
+                    "INSERT INTO search(id,question,answer,review) VALUES(?,?,?,'')",
+                    (identifier, question, answer),
+                )
+
     def review(self, text: str):
         if self.last_turn_id is None:
             return
@@ -242,6 +262,9 @@ class ConversationMemory:
         if not tokens:
             return {"results": []}
         expression = " OR ".join('"' + word.replace('"', '""') + '"' for word in tokens)
+        # Snapshot before acquiring the archive lock: the UI can persist an
+        # answer while a worker searches. Never invert these two locks.
+        decisions = self.decision_source()
         with self.database() as db:
             rows = db.execute(
                 "SELECT t.id,t.created,t.model,t.question,t.answer,t.review "
@@ -279,6 +302,29 @@ class ConversationMemory:
                             "kind": item["kind"],
                         },
                     )
+            for item in decisions:
+                content = item["question"] + "\n" + item["answer"]
+                position = next(
+                    (
+                        content.casefold().find(token)
+                        for token in tokens
+                        if token in content.casefold()
+                    ),
+                    -1,
+                )
+                if position >= 0:
+                    results = [result for result in results if result["turn_id"] != item["id"]]
+                    results.insert(
+                        0,
+                        {
+                            "turn_id": item["id"],
+                            "created": None,
+                            "question": item["question"],
+                            "snippet": content[max(0, position - 80) : position + 400],
+                            "source": "user_decision_not_authorization",
+                            "kind": "decision",
+                        },
+                    )
             return self.redact({"results": results[:limit]})
 
     def import_session(self):
@@ -288,7 +334,7 @@ class ConversationMemory:
             if db.execute("SELECT 1 FROM meta WHERE key='session_imported'").fetchone():
                 return
         try:
-            turns = SessionStore(self.root).load()
+            turns = self.session_store.load()
         except FileNotFoundError:
             turns = []
         except (ValueError, OSError):
@@ -327,6 +373,7 @@ class ConversationMemory:
             or not 200 <= limit <= 4000
         ):
             raise ValueError("Página da conversa inválida.")
+        decisions = self.decision_source() if turn_id.startswith("decision:") else []
         with self.database() as db:
             if turn_id.startswith("task:"):
                 item = next(
@@ -351,6 +398,17 @@ class ConversationMemory:
                     }
                 )
             row = db.execute("SELECT * FROM turns WHERE id=?", (turn_id,)).fetchone()
+            if row is None:
+                decision = next((item for item in decisions if item["id"] == turn_id), None)
+                if decision:
+                    row = {
+                        "question": decision["question"],
+                        "answer": "Decisão real do usuário (não concede permissões):\n"
+                        + decision["answer"],
+                        "review": "",
+                        "actions": "[]",
+                        "created": None,
+                    }
             if row is None:
                 raise ValueError("Turno não encontrado neste projeto.")
             archive_results = []

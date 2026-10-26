@@ -21,6 +21,25 @@ depender da disponibilidade ou da variabilidade de um provedor.
 O job de pacote mantém a matriz Linux/macOS/Windows. `runs-on: matrix.os` é
 intencional e necessário para executar nos três sistemas.
 
+O workflow de checks também aceita `workflow_call`: o build de uma release depende
+dele, e a publicação depende dos checks e da validação do pacote. Uma falha bloqueia
+a pré-release. A avaliação de busca contém seis casos; três fixtures de implementação
+(autorização, paginação e configuração) também são exercitadas com respostas simuladas,
+aprovações reais e execução dos testes nas cópias temporárias. Esse replay verifica
+o fluxo da aplicação; a qualidade do modelo é medida na aceitação opt-in.
+
+`python scripts/capture_ui.py` gera 12 capturas SVG e texto em `artifacts/ui`, em
+80×24 e 120×35, sem chamadas ao modelo e usando configuração temporária. O job
+`ui-evidence` as publica por 14 dias. Novas pastas de capturas geradas são ignoradas
+pelo Git; relatórios e scripts continuam versionáveis. Evidências históricas não
+são apagadas. Capturas são evidência para revisão, não comparação visual automática.
+
+Para proteger `develop`, configure nas regras do GitHub os checks `test (3.11)`,
+`test (3.12)`, `test (3.13)`, `retrieval-quality`, `installed-package (ubuntu-latest)`,
+`installed-package (macos-latest)`, `installed-package (windows-latest)` e `ui-evidence`.
+Ative revisão de PR e bloqueie force-push. A configuração de proteção é administrativa
+no GitHub e não é aplicada apenas por versionar este workflow.
+
 ## Aceitação com modelos reais
 
 Os testes em `tests/live` ficam desabilitados por padrão. A seleção explícita de
@@ -44,6 +63,10 @@ após retirar seu conteúdo do contexto recente. Com `--live-execution`, todos o
 casos de `evaluations/workflows.json` rodam em cópias descartáveis: o agente só
 recebe aprovação para os arquivos e comandos declarados no caso. Os testes
 existentes verificam correções e revalidação de implementações que falharam.
+
+Os cenários reais também verificam uma decisão confirmada após recriar o agente e
+leitura de um arquivo sintético grande em páginas curtas. Permanecem opt-in: não
+há alegação de validação com um provedor real quando esses cenários são pulados.
 
 O relatório registra métricas de chamadas, ferramentas, repetições, tokens,
 compactações e diagnóstico nos cenários do agente; o teste de streaming mede
@@ -110,6 +133,10 @@ podem precisar de revisão manual. Mantenha `.codaro/` fora do Git.
 ## Organização e compatibilidade
 
 - `agent/lifecycle.py`: transições de sessão, modo, provedor e calibração.
+- `conversation.py`: gravação compartilhada, decisões completas e projeção limitada no contexto.
+- `agent/capabilities.py`: ferramentas e instruções para cada perfil de contexto.
+- `agent/context_recovery.py`: compactação de lotes completos do protocolo.
+- `ui/conversations.py`: renderização da retomada, limpeza e criação de conversas.
 - `agent/reviews.py`: aprovação, aplicação e registro das alterações.
 - `ui/provider_actions.py`: transições de telas e ativação de provedores.
 - `intent.py`: reconhecimento compartilhado de pedidos, sem conceder permissões.

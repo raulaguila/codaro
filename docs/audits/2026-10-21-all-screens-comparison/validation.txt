@@ -1,0 +1,8 @@
+46/46 prototype scenarios indexed; 92 baseline native captures + 8 supplementary captures = 100.
+189 application/prototype files match the previously published snapshot; no implementation changes.
+16/21 audit expectations met. Five failures document four distinct differences (fallback repeats by size).
+9 native fidelity tests passed (pytest).
+37 prototype checks passed; 46 states rendered (node validate.mjs).
+All native SVGs parse; all matrix links resolve; gallery JavaScript syntax passes.
+Ruff checks pass for the three audit scripts.
+Real Textual headless renderer; synthetic events and mocked HTTP; no live inference or physical-terminal validation.

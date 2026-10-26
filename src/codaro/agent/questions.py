@@ -18,7 +18,13 @@ def register_questions(agent, callback):
             raise ValueError("Opção recomendada não existe.")
         started = time.monotonic()
         try:
-            return callback(arguments, agent._cancelled)
+            result = callback(arguments, agent._cancelled)
+            answer = result.get("user_response") if isinstance(result, dict) else result
+            if isinstance(answer, str) and answer.strip():
+                model = getattr(getattr(agent.provider, "settings", None), "model", "")
+                agent.conversation.confirm(arguments["question"], answer, model)
+                agent.conversation.index_decisions(agent.memory, model)
+            return result
         finally:
             agent._deadline += time.monotonic() - started
 

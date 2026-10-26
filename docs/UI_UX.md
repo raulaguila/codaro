@@ -52,3 +52,27 @@ URL, TLS e teste de ferramentas. A validação visual adicional lê o conteúdo
 efetivamente renderizado, além de verificar propriedades dos componentes.
 
 As capturas locais anteriores e posteriores permanecem em `docs/audits/2026-10-07-ui-ux/`. Terminais nativos de macOS/Windows, leitores de tela e inferência com provedores externos reais permanecem fora desta validação. A auditoria de segurança e maturidade geral tem escopo separado; esta entrega trata UI e UX.
+
+
+## Adoção após a comparação das 46 telas
+
+A [revisão completa](audits/2026-10-21-ui-parity-fixes/README.md) trata os 14 achados
+da comparação. A galeria nova registra as capturas posteriores; os relatórios
+anteriores preservam as evidências históricas.
+
+- Decisões do usuário são persistidas imediatamente, redigidas como decisões no
+  histórico e restauradas separadamente do protocolo do modelo.
+- Pergunta, plano e input se adaptam ao resize. Ajuda do rodapé é contextual;
+  pausa e comando sem correspondência têm estados explícitos.
+- Ajuda/status usam modais; a revisão do plano permanece no chat, com Ajustar
+  e Executar com revisão. Seleções de modo durante geração ficam para o próximo pedido.
+- Cadastro tem campos compactos, URL local visível, autenticação opcional do Ollama
+  e consequência de TLS ao lado da opção. Testes de catálogo e inferência são separados.
+- Modelos têm busca, carregamento, vazio e incompatibilidade visível. Fallback é
+  identificado; origem e janela manual ficam em detalhes acessíveis pelo teclado.
+- A conclusão deriva validações e arquivos do registro real da tarefa. Resultados
+  declarados pelo modelo não viram contagens de testes da aplicação.
+- Uma nova conversa preserva a sessão anterior e volta às permissões por ação.
+
+A validação automatizada usa Textual real em modo headless, HTTP simulado e
+eventos sintéticos. Não comprova inferência real nem atalhos de um terminal físico.

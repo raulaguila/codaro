@@ -16,6 +16,7 @@ from codaro.llm import create_provider
 from codaro.llm.catalog import ModelCatalog
 from codaro.llm.profiles import ProviderStore
 from codaro.repository import Repository
+from codaro.sessions import SessionStore
 from codaro.trace_metrics import evaluation_metrics
 from codaro.workflow_evaluation import evaluate_workflows
 
@@ -133,6 +134,44 @@ def test_history_recall_after_removing_recent_turns(project, live_provider, reco
     answer = agent.ask(
         "Use search_conversation e read_conversation para recuperar a decisão anterior "
         "sobre o nome da release. Qual foi o nome escolhido?"
+    )
+    assert marker in answer
+    record_run(project, record_property)
+
+
+def test_confirmed_decision_reaches_model_after_restart(project, live_provider, record_property):
+    marker = "release_" + uuid.uuid4().hex[:12]
+    store = SessionStore(project)
+    store.save(
+        [
+            [
+                {"role": "user", "content": "Definir o nome da release"},
+                {"role": "assistant", "content": "Decisão registrada."},
+            ]
+        ],
+        live_provider.settings.model,
+        decisions=[[{"question": "Qual nome?", "answer": marker}]],
+    )
+    agent = Agent(Repository(project), live_provider, mode="ask", max_seconds=180)
+    agent.activate_session("default")
+    agent.turns.clear()
+    answer = agent.ask("Qual nome da release eu confirmei? Responda com o nome registrado.")
+    assert marker in answer
+    assert agent.memory.search(marker)["results"]
+    assert not agent.policy.auto_edits
+    record_run(project, record_property)
+
+
+def test_large_source_is_read_in_pages(project, live_provider, record_property):
+    # Larger than the configured input window; only a bounded first page is needed.
+    marker = "SOURCE_MARKER_" + uuid.uuid4().hex[:12]
+    (project / "large.py").write_text(f'RELEASE = "{marker}"\n' + "# synthetic filler\n" * 20_000)
+    agent = Agent(
+        Repository(project), live_provider, mode="ask", persist_memory=False, max_seconds=180
+    )
+    answer = agent.ask(
+        "Leia somente as primeiras linhas de large.py e informe o valor de RELEASE. "
+        "O arquivo é grande: use páginas pequenas."
     )
     assert marker in answer
     record_run(project, record_property)

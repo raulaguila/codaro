@@ -1,0 +1,416 @@
+[
+  {
+    "id": "welcome",
+    "title": "Início com modelo configurado",
+    "group": "Início",
+    "kind": "welcome",
+    "assessment": "Revisado",
+    "priority": "F12",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "first-run",
+    "title": "Primeiro acesso",
+    "group": "Início",
+    "kind": "first-run",
+    "assessment": "Revisado",
+    "priority": "F12",
+    "detail": "Primeiro acesso limpo, controle de resumos, oferta de retomada e nova conversa curta, preservando a sessão anterior."
+  },
+  {
+    "id": "slash",
+    "title": "Menu / com navegação",
+    "group": "Entrada",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F04, F05",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "slash-filter",
+    "title": "Comandos filtrados",
+    "group": "Entrada",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F04, F05",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "slash-empty",
+    "title": "Comando não encontrado",
+    "group": "Entrada",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F04, F05",
+    "detail": "Comandos frequentes primeiro, navegação por setas/Enter/Tab/Esc e estado vazio persistente no menu."
+  },
+  {
+    "id": "thinking",
+    "title": "Modelo analisando",
+    "group": "Conversa",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F11, F14",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "tool-running",
+    "title": "Ferramenta em execução",
+    "group": "Conversa",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F11, F14",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "stages-expanded",
+    "title": "Atividade e raciocínio expandidos",
+    "group": "Conversa",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F11, F14",
+    "detail": "Menos títulos de raciocínio, contexto usado/orçamento compacto, recuos e cores consistentes, política de edições junto ao input."
+  },
+  {
+    "id": "streaming",
+    "title": "Resposta em streaming",
+    "group": "Conversa",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F11, F14",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "answer",
+    "title": "Resposta final",
+    "group": "Conversa",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F11, F14",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "conversation",
+    "title": "Conversa com várias mensagens",
+    "group": "Conversa",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F11, F14",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "ask-choice",
+    "title": "Pergunta com opções",
+    "group": "Perguntas",
+    "kind": "question",
+    "assessment": "Revisado",
+    "priority": "F01, F03, F04",
+    "detail": "Resize recalcula a variante compacta; plano/pergunta rolam internamente e preservam chat, input e rodapé."
+  },
+  {
+    "id": "ask-text",
+    "title": "Pergunta com resposta livre",
+    "group": "Perguntas",
+    "kind": "question",
+    "assessment": "Revisado",
+    "priority": "F01, F03, F04",
+    "detail": "Rodapé contextual, pergunta pausada identificada e botão Enviar desabilitado quando não há resposta/opção."
+  },
+  {
+    "id": "ask-followup",
+    "title": "Resposta do usuário e continuação",
+    "group": "Perguntas",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F01, F03, F04",
+    "detail": "Decisões persistidas imediatamente, redigidas como decisões e restauradas; JSON antigo continua compatível. Metadados visuais não são enviados como protocolo de ferramentas."
+  },
+  {
+    "id": "plan",
+    "title": "Plano para revisar",
+    "group": "Execução",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F10, F11",
+    "detail": "Revisão do plano no chat, Ajustar/Executar com revisão e modo preparado para o próximo pedido sem alterar a execução atual."
+  },
+  {
+    "id": "plan-collapsed",
+    "title": "Plano de execução recolhido",
+    "group": "Execução",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F10, F11",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "plan-expanded",
+    "title": "Plano de execução expandido",
+    "group": "Execução",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F10, F11",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "plan-chat",
+    "title": "Plano fixo durante a conversa",
+    "group": "Execução",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F10, F11",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "review-diff",
+    "title": "Aprovação de alterações",
+    "group": "Execução",
+    "kind": "review",
+    "assessment": "Revisado",
+    "priority": "F10, F11",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "command-approval",
+    "title": "Aprovação de comando",
+    "group": "Execução",
+    "kind": "command",
+    "assessment": "Revisado",
+    "priority": "F10, F11",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "validating",
+    "title": "Validação em andamento",
+    "group": "Execução",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F10, F11",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "done",
+    "title": "Tarefa concluída",
+    "group": "Execução",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F10, F11",
+    "detail": "Diff com cores do tema e contagem por arquivo; erros com detalhes recolhidos e ações próprias; recibo baseado nas validações da revisão atual."
+  },
+  {
+    "id": "provider",
+    "title": "Cadastro de provedor",
+    "group": "Provedores",
+    "kind": "provider",
+    "assessment": "Revisado",
+    "priority": "F06, F07",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "provider-custom",
+    "title": "OpenAI compatible e TLS",
+    "group": "Provedores",
+    "kind": "provider",
+    "assessment": "Revisado",
+    "priority": "F06, F07",
+    "detail": "Campos compactos, URL visível para endpoints locais/compatíveis, autenticação opcional do Ollama e aviso TLS junto à opção."
+  },
+  {
+    "id": "provider-ollama",
+    "title": "Ollama local",
+    "group": "Provedores",
+    "kind": "provider",
+    "assessment": "Revisado",
+    "priority": "F06, F07",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "provider-testing",
+    "title": "Teste de conexão em andamento",
+    "group": "Provedores",
+    "kind": "provider",
+    "assessment": "Revisado",
+    "priority": "F06, F07",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "provider-success",
+    "title": "Conexão verificada",
+    "group": "Provedores",
+    "kind": "provider",
+    "assessment": "Revisado",
+    "priority": "F06, F07",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "provider-error",
+    "title": "Erro ao testar conexão",
+    "group": "Provedores",
+    "kind": "provider",
+    "assessment": "Revisado",
+    "priority": "F06, F07",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "models",
+    "title": "Busca e seleção de modelo",
+    "group": "Modelos",
+    "kind": "models",
+    "assessment": "Revisado",
+    "priority": "F02, F07, F08",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "models-loading",
+    "title": "Atualização do catálogo",
+    "group": "Modelos",
+    "kind": "models",
+    "assessment": "Revisado",
+    "priority": "F02, F07, F08",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "models-empty",
+    "title": "Catálogo sem resultados",
+    "group": "Modelos",
+    "kind": "models",
+    "assessment": "Revisado",
+    "priority": "F02, F07, F08",
+    "detail": "Lista tem carregamento e vazio próprios; modelos incompatíveis permanecem visíveis e desabilitados."
+  },
+  {
+    "id": "model-fallback",
+    "title": "Contexto não informado pela API",
+    "group": "Modelos",
+    "kind": "models",
+    "assessment": "Revisado",
+    "priority": "F02, F07, F08",
+    "detail": "Fallback identificado como orçamento provisório; origem e janela manual acessíveis nos detalhes do modelo."
+  },
+  {
+    "id": "model-tools",
+    "title": "Diagnóstico de ferramentas",
+    "group": "Modelos",
+    "kind": "models",
+    "assessment": "Revisado",
+    "priority": "F02, F07, F08",
+    "detail": "Teste de catálogo separado de inferência; teste completo também no seletor, sem ativar o modelo nem salvar o perfil."
+  },
+  {
+    "id": "preferences",
+    "title": "Preferências",
+    "group": "Configuração",
+    "kind": "preferences",
+    "assessment": "Revisado",
+    "priority": "F09, F10, F12",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "mode",
+    "title": "Escolha do modo",
+    "group": "Configuração",
+    "kind": "mode",
+    "assessment": "Revisado",
+    "priority": "F09, F10, F12",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "edit-approval",
+    "title": "Aprovação de edições",
+    "group": "Configuração",
+    "kind": "mode",
+    "assessment": "Revisado",
+    "priority": "F09, F10, F12",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "status",
+    "title": "Detalhes da sessão e contexto",
+    "group": "Configuração",
+    "kind": "status",
+    "assessment": "Revisado",
+    "priority": "F09, F10, F12",
+    "detail": "Ajuda/status são modais com campos legíveis e diagnóstico em Avançado, sem adicionar mensagens ao chat."
+  },
+  {
+    "id": "help",
+    "title": "Ajuda e atalhos",
+    "group": "Configuração",
+    "kind": "help",
+    "assessment": "Revisado",
+    "priority": "F09, F10, F12",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "context-compacting",
+    "title": "Reorganização automática do contexto",
+    "group": "Recuperação",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F01, F11, F13",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "connection-error",
+    "title": "Conexão interrompida",
+    "group": "Recuperação",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F01, F11, F13",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "auth-error",
+    "title": "Credencial inválida",
+    "group": "Recuperação",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F01, F11, F13",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "cancelled",
+    "title": "Cancelamento com progresso preservado",
+    "group": "Recuperação",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F01, F11, F13",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "resumed",
+    "title": "Retomada da sessão",
+    "group": "Recuperação",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F01, F11, F13",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "no-results",
+    "title": "Busca sem resultados",
+    "group": "Recuperação",
+    "kind": "chat",
+    "assessment": "Revisado",
+    "priority": "F01, F11, F13",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  },
+  {
+    "id": "context-scope",
+    "title": "Escolha de escopo para continuar",
+    "group": "Recuperação",
+    "kind": "question",
+    "assessment": "Revisado",
+    "priority": "F01, F11, F13",
+    "detail": "Falha de capacidade oferece escopo no input, com uma nova tentativa delimitada; busca vazia oferece ações; compactação preserva o histórico completo salvo."
+  },
+  {
+    "id": "new-session",
+    "title": "Nova conversa sem perder rascunho",
+    "group": "Configuração",
+    "kind": "new-session",
+    "assessment": "Revisado",
+    "priority": "F09, F10, F12",
+    "detail": "Estado revisitado na implementação corrigida. Consulte a captura e os checks de interação."
+  }
+]

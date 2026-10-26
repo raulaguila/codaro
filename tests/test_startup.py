@@ -204,6 +204,9 @@ def test_first_start_guides_provider_then_model_without_running_inference(isolat
     async def scenario():
         async with app.run_test(size=(80, 24)) as pilot:
             await pilot.pause()
+            assert app.query_one("#configure-start").display
+            await pilot.click("#configure-start")
+            await pilot.pause()
             assert isinstance(app.screen, ProviderSetup)
             assert app.screen.onboarding
             app.screen.query_one("#provider-key", Input).value = "private-key"

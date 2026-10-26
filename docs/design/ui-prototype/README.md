@@ -1,6 +1,6 @@
 # Codaro — proposta consolidada de UI/UX
 
-Esta é a referência única para adotar a nova interface. As alternativas visuais anteriores foram removidas. Este diretório contém uma proposta navegável com dados fictícios; a aplicação de produção ainda não recebeu este layout.
+Esta é a referência única para adotar a nova interface. As alternativas visuais anteriores foram removidas. Este diretório contém uma proposta navegável com dados fictícios. A implementação nativa e suas verificações estão documentadas na [revisão de adoção](../../audits/2026-10-21-ui-parity-fixes/README.md); as imagens deste diretório continuam sendo maquetes.
 
 ## Abrir
 

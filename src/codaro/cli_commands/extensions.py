@@ -149,6 +149,30 @@ def use_session(identifier: str, repo: Path = Path(".")):
     typer.echo("Sessão ativa: " + identifier)
 
 
+@sessions_app.command("archive")
+def archive_session(identifier: str, repo: Path = Path(".")):
+    """Arquiva uma conversa inativa sem apagar seu histórico."""
+    from codaro.session_catalog import SessionCatalog
+
+    try:
+        SessionCatalog(Repository(repo).root).archive(identifier)
+    except (ValueError, OSError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo("Sessão arquivada: " + identifier)
+
+
+@sessions_app.command("restore")
+def restore_session(identifier: str, repo: Path = Path(".")):
+    """Devolve uma conversa arquivada à lista de sessões disponíveis."""
+    from codaro.session_catalog import SessionCatalog
+
+    try:
+        SessionCatalog(Repository(repo).root).archive(identifier, archived=False)
+    except (ValueError, OSError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo("Sessão restaurada: " + identifier)
+
+
 def reverse_interaction(repo: Path, redo: bool, run_id: str | None):
     from codaro.edits import EditManager
     from codaro.session_catalog import SessionCatalog

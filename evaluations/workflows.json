@@ -5,5 +5,19 @@
     "query": "Corrija can_edit em auth.py: usuários ausentes ou sem papel devem retornar False; admin e editor podem editar; outros papéis não podem. Preserve os testes existentes e valide com python -m unittest discover -s tests -v.",
     "expected_files": {"auth.py": []},
     "validation_commands": [["python", "-m", "unittest", "discover", "-s", "tests", "-v"]]
+  },
+  {
+    "id": "pagination-offset-validation",
+    "repo": "fixtures/pagination",
+    "query": "Corrija page em pagination.py: retorne até limit itens a partir de offset; aceite apenas inteiros (não bool), lançando TypeError para outros tipos e ValueError para negativos; limit=0 retorna []; não modifique a entrada. Preserve a API e os testes existentes e valide com python -m unittest discover -s tests -v.",
+    "expected_files": {"pagination.py": []},
+    "validation_commands": [["python", "-m", "unittest", "discover", "-s", "tests", "-v"]]
+  },
+  {
+    "id": "settings-preserve-falsy-and-inputs",
+    "repo": "fixtures/settings",
+    "query": "Corrija merge_settings em settings.py: overrides deve substituir defaults inclusive com False, 0 e string vazia; None significa manter o padrão; preserve campos novos e não modifique nenhum dos dois dicionários recebidos. Preserve a API e os testes existentes e valide com python -m unittest discover -s tests -v.",
+    "expected_files": {"settings.py": []},
+    "validation_commands": [["python", "-m", "unittest", "discover", "-s", "tests", "-v"]]
   }
 ]

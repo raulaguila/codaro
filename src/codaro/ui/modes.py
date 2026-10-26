@@ -3,10 +3,10 @@
 from rich.text import Text
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.screen import ModalScreen
 from textual.widgets import Button, Collapsible, OptionList, RadioButton, RadioSet, Static
 
 from codaro.policies import Mode
+from codaro.ui.screen import DialogScreen as ModalScreen
 
 DESCRIPTIONS = {
     Mode.ASK: "Entender e tirar dúvidas",
@@ -64,10 +64,16 @@ class ModePicker(ModalScreen[tuple[Mode, bool] | None]):
                 with Collapsible(title="Edições · permissões", collapsed=True, id="edit-policy"):
                     with RadioSet(id="edit-options"):
                         yield RadioButton(
-                            "Pedir autorização", value=not self.auto_edits, id="edit-ask"
+                            "Pedir autorização",
+                            value=not self.auto_edits,
+                            id="edit-ask",
+                            compact=True,
                         )
                         yield RadioButton(
-                            "Aprovar automaticamente", value=self.auto_edits, id="edit-auto"
+                            "Aprovar automaticamente",
+                            value=self.auto_edits,
+                            id="edit-auto",
+                            compact=True,
                         )
                     yield Static(
                         "Criar e editar arquivos permitidos nesta conversa. "

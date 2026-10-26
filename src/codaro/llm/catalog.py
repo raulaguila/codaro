@@ -146,6 +146,8 @@ class ModelCatalog:
                 parameters = row.get("supported_parameters")
                 capabilities = row.get("capabilities")
                 tools = "tools" in parameters if isinstance(parameters, list) else None
+                if isinstance(row.get("type"), str) and row["type"] in {"embedding", "embeddings"}:
+                    tools = False
                 if (
                     isinstance(capabilities, dict)
                     and type(capabilities.get("function_calling")) is bool

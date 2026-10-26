@@ -8,13 +8,14 @@ import threading
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.screen import ModalScreen
 from textual.widgets import Button, Checkbox, Collapsible, Input, Select, Static
 
 from codaro.llm import ModelError, RequestCancelled, Settings
 from codaro.llm.endpoints import PRESETS
 from codaro.llm.profiles import ProviderStore
 from codaro.ui.model_list import ModelList
+from codaro.ui.screen import DialogScreen as ModalScreen
+from codaro.ui.session_details import compact_tokens
 
 
 class ProviderSetup(ModalScreen[str | None]):
@@ -55,11 +56,12 @@ class ProviderSetup(ModalScreen[str | None]):
         profile = self.original or {}
         with Vertical(id="provider-form"):
             yield Static(
-                "Primeiro acesso · Configure um provedor"
+                "Conectar provedor"
                 if self.onboarding
                 else "Editar provedor"
                 if profile
-                else "Cadastrar provedor · BYOK",
+                else "Conectar provedor",
+                classes="dialog-title",
                 markup=False,
             )
             with VerticalScroll(id="provider-fields"):
@@ -69,60 +71,109 @@ class ProviderSetup(ModalScreen[str | None]):
                     value=self.last_kind,
                     allow_blank=False,
                     id="provider-kind",
+                    compact=True,
                 )
-                yield Static(
-                    "Nova API key · vazio mantém a atual"
-                    if profile
-                    else "API key · opcional para Ollama local",
-                    markup=False,
-                )
-                yield Input(password=True, id="provider-key")
+                with Vertical(id="provider-key-field"):
+                    yield Static(
+                        "Nova API key · vazio mantém a atual" if profile else "API key",
+                        markup=False,
+                    )
+                    yield Input(password=True, id="provider-key", compact=True)
+                with Vertical(id="provider-url-field"):
+                    yield Static("URL do provedor", markup=False)
+                    yield Input(
+                        profile.get("base_url", PRESETS[self.last_kind]),
+                        id="provider-url",
+                        compact=True,
+                    )
                 with Collapsible(
-                    title="Avançado · URL, TLS e teste do modelo",
-                    collapsed=not bool(profile),
+                    title="Avançado",
+                    collapsed=True,
                     id="provider-advanced",
                 ):
                     yield Static("Nome do perfil (opcional)", markup=False)
-                    yield Input(self.profile_name or "", id="provider-name")
-                    yield Static("URL base da API", markup=False)
-                    yield Input(profile.get("base_url", PRESETS["openai"]), id="provider-url")
+                    yield Input(self.profile_name or "", id="provider-name", compact=True)
+                    yield Checkbox(
+                        "Usar autenticação no Ollama",
+                        bool(profile.get("api_key")),
+                        id="provider-auth",
+                        compact=True,
+                    )
                     yield Checkbox(
                         "TLS Insecure · não verificar certificado",
                         profile.get("tls_insecure", False),
                         id="provider-tls",
+                        compact=True,
+                    )
+                    yield Static(
+                        "A identidade do servidor não será verificada.",
+                        id="provider-tls-warning",
+                        markup=False,
                     )
                     yield Static("Modelo para testar (opcional)", markup=False)
                     yield Select(
-                        [], id="provider-test-model", prompt="Selecione após testar o catálogo"
+                        [],
+                        id="provider-test-model",
+                        prompt="Selecione após testar o catálogo",
+                        compact=True,
                     )
                     yield Static(
-                        "Sem modelo: catálogo. Com modelo: ferramentas e resposta "
-                        "em duas chamadas curtas (pode haver custo).",
+                        "Teste completo: duas chamadas curtas. Pode consumir créditos.",
                         markup=False,
                     )
+                    yield Button("Testar ferramentas e resposta", id="provider-test-inference")
                 yield Static(
-                    "Credencial privada, fora do projeto. Role ou use Tab para outros campos.",
+                    "A credencial fica fora da conversa e do projeto.",
                     markup=False,
                 )
-            yield Static("", id="provider-error", markup=False)
+            yield Static(
+                "O teste consulta o catálogo, sem inferência.", id="provider-error", markup=False
+            )
             with Horizontal(id="provider-actions"):
                 yield Button("Testar conexão", id="provider-test")
                 yield Button("Cancelar", id="provider-back")
                 yield Button(
-                    "Testar e continuar"
-                    if self.onboarding
-                    else "Salvar e listar"
-                    if profile
-                    else "Cadastrar e listar",
+                    "Salvar e escolher",
                     id="provider-save",
                     variant="primary",
                 )
+
+    def on_mount(self):
+        self.update_fields()
+
+    def update_fields(self):
+        kind = str(self.query_one("#provider-kind", Select).value)
+        advanced = self.query_one("#provider-advanced", Collapsible)
+        self.query_one("#provider-url-field").display = (
+            kind in {"custom", "openai-compatible", "ollama"} or not advanced.collapsed
+        )
+        self.query_one("#provider-key-field").display = (
+            kind != "ollama" or self.query_one("#provider-auth", Checkbox).value
+        )
+        self.query_one("#provider-auth").display = kind == "ollama"
+        self.query_one("#provider-tls-warning").display = self.query_one(
+            "#provider-tls", Checkbox
+        ).value
+        self.query_one("#provider-test-inference", Button).disabled = self.saving or not isinstance(
+            self.query_one("#provider-test-model", Select).value, str
+        )
+
+    def on_collapsible_expanded(self):
+        self.update_fields()
+
+    def on_collapsible_collapsed(self):
+        self.update_fields()
+
+    def on_checkbox_changed(self):
+        self.update_fields()
 
     def on_unmount(self):
         self.cancel_event.set()
         self.generation += 1
 
     def form_key(self):
+        if self.last_kind == "ollama" and not self.query_one("#provider-auth", Checkbox).value:
+            return ""
         return self.query_one("#provider-key", Input).value.strip() or (self.original or {}).get(
             "api_key", ""
         )
@@ -134,13 +185,11 @@ class ProviderSetup(ModalScreen[str | None]):
                 self.last_kind = kind
                 self.query_one("#provider-url", Input).value = PRESETS[kind]
                 self.query_one("#provider-test-model", Select).set_options([])
-                self.query_one("#provider-advanced", Collapsible).collapsed = kind not in {
-                    "custom",
-                    "openai-compatible",
-                    "ollama",
-                }
+                self.update_fields()
+        elif event.select.id == "provider-test-model":
+            self.update_fields()
 
-    async def test_connection(self):
+    async def test_connection(self, *, inference=False):
         self.saving = True
         self.testing = True
         self.generation += 1
@@ -153,7 +202,7 @@ class ProviderSetup(ModalScreen[str | None]):
         self.query_one("#provider-back", Button).label = "Cancelar teste"
         status = self.query_one("#provider-error", Static)
         status.update("Testando conexão…")
-        model = self.query_one("#provider-test-model", Select).value
+        model = self.query_one("#provider-test-model", Select).value if inference else None
         try:
             models = await asyncio.to_thread(
                 self.store.test_connection,
@@ -170,18 +219,20 @@ class ProviderSetup(ModalScreen[str | None]):
             self.query_one("#provider-test-model", Select).set_options(
                 [(item["id"], item["id"]) for item in models if item["tools"] is not False]
             )
-            self.query_one("#provider-advanced", Collapsible).collapsed = False
             if isinstance(model, str):
                 self.query_one("#provider-test-model", Select).value = model
             status.update(
-                "Conexão, ferramentas e resposta do modelo verificadas. Nenhum perfil salvo."
+                "✓ Ferramentas e resposta verificadas. Nenhum perfil salvo."
                 if isinstance(model, str)
-                else f"Catálogo acessível: {len(models)} modelos. Selecione um modelo e teste "
-                "novamente para verificar ferramentas e resposta. Nenhum perfil salvo."
+                else f"✓ Conexão verificada · {len(models)} modelos disponíveis."
             )
+            status.set_class(False, "error")
+            status.set_class(True, "success")
         except (ValueError, OSError, ModelError) as exc:
             if generation == self.generation and self.is_attached:
                 status.update(str(exc))
+                status.set_class(True, "error")
+                status.set_class(False, "success")
                 if isinstance(exc, ValueError) and "API key" in str(exc):
                     focus = self.query_one("#provider-key")
                 elif isinstance(exc, ValueError) and "URL" in str(exc):
@@ -189,7 +240,7 @@ class ProviderSetup(ModalScreen[str | None]):
         except (asyncio.CancelledError, RequestCancelled):
             return
         finally:
-            if generation == self.generation and self.is_attached:
+            if generation == self.generation and self.is_attached and self.query("#provider-back"):
                 self.restore_controls(focus)
 
     def stage(self, generation, stage):
@@ -207,6 +258,7 @@ class ProviderSetup(ModalScreen[str | None]):
         for control in self.query("Input, Select, Checkbox, Button"):
             control.disabled = False
         self.query_one("#provider-back", Button).label = "Voltar"
+        self.update_fields()
         (
             focus if focus is not None and focus.is_attached else self.query_one("#provider-test")
         ).focus()
@@ -229,9 +281,11 @@ class ProviderSetup(ModalScreen[str | None]):
             self.dismiss(None)
 
     def on_button_pressed(self, event: Button.Pressed):
-        if event.button.id == "provider-test" and not self.saving:
+        if event.button.id in {"provider-test", "provider-test-inference"} and not self.saving:
             self.saving = True
-            self.test_worker = self.run_worker(self.test_connection())
+            self.test_worker = self.run_worker(
+                self.test_connection(inference=event.button.id == "provider-test-inference")
+            )
             return
         if event.button.id == "provider-back":
             self.action_back()
@@ -277,7 +331,7 @@ class ProviderSetup(ModalScreen[str | None]):
             if self.is_attached and generation == self.generation:
                 self.query_one("#provider-error", Static).update(str(exc))
         finally:
-            if self.is_attached and generation == self.generation:
+            if self.is_attached and generation == self.generation and self.query("#provider-back"):
                 self.restore_controls(focus)
 
 
@@ -318,9 +372,8 @@ class ModelPicker(ModalScreen[Settings | None]):
         selected = self.initial_profile or value["active"] or next(iter(value["profiles"]), None)
         with Vertical(id="model-form"):
             yield Static(
-                "Primeiro acesso · Escolha o modelo"
-                if self.onboarding
-                else "Selecionar provedor e modelo · catálogo da API",
+                "Primeiro acesso · Escolha o modelo" if self.onboarding else "Escolher modelo",
+                classes="dialog-title",
                 markup=False,
             )
             with VerticalScroll(id="model-fields"):
@@ -330,10 +383,26 @@ class ModelPicker(ModalScreen[Settings | None]):
                     value=selected or Select.BLANK,
                     id="model-provider",
                     allow_blank=False,
+                    compact=True,
                 )
-                yield Input(placeholder="Buscar modelo…", id="model-search")
+                yield Input(placeholder="Buscar modelo…", id="model-search", compact=True)
+                yield Static("", id="model-list-state", markup=False)
                 yield ModelList(id="model-id")
                 yield Static("", id="model-info", markup=False)
+                with Collapsible(title="Detalhes do modelo", collapsed=True, id="model-details"):
+                    yield Static("", id="model-metadata", markup=False)
+                    yield Static("Janela confirmada em tokens (opcional)", markup=False)
+                    yield Input(
+                        placeholder="Vazio mantém a configuração atual",
+                        id="model-context-override",
+                        compact=True,
+                    )
+                    yield Static(
+                        "Duas chamadas curtas. Pode consumir créditos.",
+                        classes="muted",
+                        markup=False,
+                    )
+                    yield Button("Testar ferramentas e resposta", id="model-test")
             yield Static("", id="model-error", markup=False)
             with Horizontal(id="model-actions"):
                 yield Button(
@@ -341,23 +410,16 @@ class ModelPicker(ModalScreen[Settings | None]):
                     id="model-use",
                     variant="primary",
                 )
-                yield Button("Atualizar API", id="model-refresh")
+                yield Button("Atualizar catálogo", id="model-refresh")
                 yield Button("Voltar", id="model-back")
 
     def populate(self, name):
         models = self.store.models(name)
-        compatible = [model for model in models if model["tools"] is not False]
-        self.catalogue = compatible
-        self.query_one(ModelList).set_models(
-            compatible, self.query_one("#model-search", Input).value
-        )
-        self.query_one("#model-error", Static).update(
-            f"{len(models) - len(compatible)} modelos sem ferramentas/chat ocultos."
-            if len(models) != len(compatible)
-            else ""
-        )
+        self.catalogue = models
+        self.query_one(ModelList).set_models(models, self.query_one("#model-search", Input).value)
+        self.query_one("#model-error", Static).update("")
         profile = self.store.profile(name)[1]
-        if any(model["id"] == profile["model"] for model in compatible):
+        if any(model["id"] == profile["model"] and model["tools"] is not False for model in models):
             if not self.query_one("#model-search", Input).value:
                 self.query_one(ModelList).value = profile["model"]
 
@@ -392,16 +454,41 @@ class ModelPicker(ModalScreen[Settings | None]):
         model = next((item for item in self.store.models(name) if item["id"] == value), None)
         info = self.query_one("#model-info", Static)
         self.query_one("#model-use", Button).disabled = self.fetching or model is None
+        self.query_one("#model-test", Button).disabled = self.fetching or model is None
+        empty = not self.query_one(ModelList).option_count
+        self.query_one(ModelList).display = not empty and not self.fetching
+        state = self.query_one("#model-list-state", Static)
+        state.display = empty or self.fetching
+        state.update(
+            "◌ Atualizando catálogo… · seleção preservada"
+            if self.fetching
+            else "Nenhum modelo encontrado. Ajuste a busca ou atualize o catálogo."
+        )
         if not model:
-            info.update("Nenhum modelo encontrado. Ajuste a busca.")
+            info.update("Nenhum modelo disponível para conversa." if not empty else "")
+            self.query_one("#model-metadata", Static).update("")
             return
         settings = self.store.settings_for(name, self.store.profile(name)[1], model)
+        selection = (name, value)
+        if getattr(self, "details_model", None) != selection:
+            self.details_model = selection
+            self.query_one("#model-context-override", Input).value = ""
         capability = (
             "Ferramentas confirmadas pela API"
             if model["tools"] is True
             else "Ferramentas: suporte não informado"
         )
-        info.update(f"Contexto: {settings.context_window:,} · {capability}")
+        provisional = settings.context_source.startswith("fallback")
+        info.update(
+            "Contexto não informado pela API · orçamento provisório: "
+            f"{compact_tokens(settings.context_window)}"
+            if provisional
+            else f"Contexto: {compact_tokens(settings.context_window)} · {capability}"
+        )
+        self.query_one("#model-metadata", Static).update(
+            f"Origem: {settings.context_source}\n{capability}\n"
+            f"Saída máxima informada: {model['max_output_tokens'] or 'Não informada'}"
+        )
         info.tooltip = (
             settings.context_source + f" · Saída: {model['max_output_tokens'] or 'não informada'}"
         )
@@ -429,13 +516,14 @@ class ModelPicker(ModalScreen[Settings | None]):
             control.disabled = False
         self.query_one("#model-back", Button).label = "Voltar"
         self.query_one("#model-use", Button).disabled = not bool(self.query_one(ModelList).value)
+        self.update_model(self.query_one(ModelList).value)
         (focus or self.query_one("#model-refresh")).focus()
 
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "model-back":
             self.action_back()
             return
-        if self.fetching or event.button.id not in {"model-use", "model-refresh"}:
+        if self.fetching or event.button.id not in {"model-use", "model-refresh", "model-test"}:
             return
         self.fetching = True
         self.operation_worker = self.run_worker(self.lookup(event.button))
@@ -455,15 +543,37 @@ class ModelPicker(ModalScreen[Settings | None]):
         back = self.query_one("#model-back", Button)
         back.disabled, back.label = False, "Cancelar consulta"
         self.query_one("#model-error", Static).update("Consultando catálogo…")
+        self.update_model(model)
         try:
             refresh = button.id == "model-refresh"
             if not refresh and not isinstance(model, str):
                 self.query_one("#model-error", Static).update("Selecione um modelo.")
                 return
+            if button.id == "model-test":
+                profile = self.store.profile(str(name))[1]
+                await asyncio.to_thread(
+                    self.store.test_connection,
+                    profile["kind"],
+                    profile["api_key"],
+                    base_url=profile["base_url"],
+                    tls_insecure=profile["tls_insecure"],
+                    model_id=model,
+                    cancelled=self.cancel_event,
+                )
+                if (
+                    self.is_attached
+                    and generation == self.generation
+                    and self.query("#model-error")
+                ):
+                    self.query_one("#model-error", Static).update(
+                        "✓ Chamada, resultado da ferramenta e resposta final verificados."
+                    )
+                return
             change = await asyncio.to_thread(
                 self.store.prepare_refresh if refresh else self.store.prepare_select,
                 *([name] if refresh else [name, model]),
                 cancelled=self.cancel_event,
+                **({} if refresh else self.context_override()),
             )
             if not self.is_attached or generation != self.generation:
                 return
@@ -479,5 +589,13 @@ class ModelPicker(ModalScreen[Settings | None]):
             if self.is_attached and generation == self.generation:
                 self.query_one("#model-error", Static).update(str(exc))
         finally:
-            if self.is_attached and generation == self.generation:
+            if self.is_attached and generation == self.generation and self.query("#model-back"):
                 self.restore_controls(button)
+
+    def context_override(self):
+        raw = self.query_one("#model-context-override", Input).value.strip()
+        if not raw:
+            return {}
+        if not raw.isascii() or not raw.isdigit() or not 4096 <= int(raw) <= 2_000_000:
+            raise ValueError("Informe uma janela confirmada entre 4.096 e 2.000.000 tokens.")
+        return {"context_window": int(raw)}

@@ -97,8 +97,9 @@ def test_macos_shortcuts_receive_command_and_keep_ctrl_fallback(tmp_path, monkey
             assert not agent.turns
             await app.local_command("/help")
             await pilot.pause()
-            help_text = str(app.query(".question").last().render())
+            help_text = "\n".join(str(item.render()) for item in app.screen.query(Static))
             assert "⌘" in help_text and "use Ctrl" in help_text
+            await pilot.press("escape")
             try:
                 await pilot.press("o", "i", "enter")
                 assert await asyncio.to_thread(model.started.wait, 10)
@@ -841,7 +842,11 @@ def test_local_commands_completion_and_history_restore_draft(tmp_path):
             await pilot.press("/", "s", "t", "tab")
             assert prompt.value == "/status "
             await pilot.press("enter")
-            assert "Último contexto enviado" in str(app.query_one(".question", Static).render())
+            await pilot.pause()
+            assert "Detalhes da sessão" in str(
+                app.screen.query_one(".dialog-title", Static).render()
+            )
+            await pilot.press("escape")
             assert not model.started.is_set()
             await pilot.press("o", "i", "enter")
             await wait_ready(app, pilot)
@@ -1166,6 +1171,12 @@ def test_modes_plan_transition_and_local_task_scope_review(tmp_path):
             assert app.query_one("#execution-plan").parent.id == "composer"
             assert agent.tasks.current()["state"] == "planned"
             await pilot.click("#execute-plan")
+            await pilot.pause()
+            from codaro.ui.plan import PlanProposal
+
+            assert app.query_one(PlanProposal)
+            await pilot.press("escape")
+            await app.local_command("/execute")
             assert agent.mode.value == "execute"
             assert "Execute o plano" in app.query_one(Prompt).value
             assert agent.policy.kind == "action"

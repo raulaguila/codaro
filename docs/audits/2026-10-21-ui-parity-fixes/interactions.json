@@ -1,0 +1,72 @@
+[
+  {
+    "name": "(120, 35)/slash-arrows",
+    "passed": true,
+    "detail": "Seta move o destaque"
+  },
+  {
+    "name": "(120, 35)/slash-escape",
+    "passed": true,
+    "detail": "Esc preserva o texto"
+  },
+  {
+    "name": "(120, 35)/question-literal-slash",
+    "passed": true,
+    "detail": "Resposta começando com / não abre comandos"
+  },
+  {
+    "name": "(120, 35)/question-pause-pending",
+    "passed": true,
+    "detail": "Esc mantém pergunta pendente"
+  },
+  {
+    "name": "(120, 35)/fallback-labelled",
+    "passed": true,
+    "detail": "Texto visível: Contexto não informado pela API · orçamento provisório: 16.4k"
+  },
+  {
+    "name": "(120, 35)/new-session-draft",
+    "passed": true,
+    "detail": "Cancelar nova conversa preserva rascunho e plano"
+  },
+  {
+    "name": "(80, 24)/slash-arrows",
+    "passed": true,
+    "detail": "Seta move o destaque"
+  },
+  {
+    "name": "(80, 24)/slash-escape",
+    "passed": true,
+    "detail": "Esc preserva o texto"
+  },
+  {
+    "name": "(80, 24)/question-literal-slash",
+    "passed": true,
+    "detail": "Resposta começando com / não abre comandos"
+  },
+  {
+    "name": "(80, 24)/question-pause-pending",
+    "passed": true,
+    "detail": "Esc mantém pergunta pendente"
+  },
+  {
+    "name": "(80, 24)/fallback-labelled",
+    "passed": true,
+    "detail": "Texto visível: Contexto não informado pela API · orçamento provisório: 16.4k"
+  },
+  {
+    "name": "(80, 24)/new-session-draft",
+    "passed": true,
+    "detail": "Cancelar nova conversa preserva rascunho e plano"
+  },
+  {
+    "name": "(120, 35)/slash-enter",
+    "passed": true,
+    "detail": "Enter em /mo abriu ModelPicker"
+  },
+  {
+    "name": "(80, 24)/slash-enter",
+    "passed": true,
+    "detail": "Enter em /mo abriu ModelPicker"
+  }
+]

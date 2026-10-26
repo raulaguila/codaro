@@ -5,8 +5,9 @@ import shlex
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Static
+from textual.widgets import Button, Static
+
+from codaro.ui.screen import DialogScreen as ModalScreen
 
 
 class NewConversation(ModalScreen[str | None]):
@@ -22,18 +23,16 @@ class NewConversation(ModalScreen[str | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="new-conversation"):
-            yield Static("Nova conversa e tarefa", markup=False)
+            yield Static("Começar outra conversa?", classes="dialog-title", markup=False)
             yield Static(
-                "Descarta propostas pendentes, limpa o contexto e revoga o escopo anterior. "
-                "Encerra o plano atual. Arquivos já alterados são mantidos. "
-                "A conversa anterior fica na memória.",
+                "A conversa atual continuará disponível para retomada. "
+                "Encerra o plano e descarta propostas pendentes. Arquivos alterados são mantidos.",
                 markup=False,
             )
-            yield Static("Objetivo da nova tarefa (opcional)", markup=False)
-            yield Input(id="new-objective")
+            yield Static("Seu rascunho será preservado ao voltar.", markup=False)
             with Horizontal():
-                yield Button("Começar", id="begin-conversation", variant="primary")
-                yield Button("Cancelar", id="cancel-conversation")
+                yield Button("Continuar aqui", id="cancel-conversation")
+                yield Button("Nova conversa", id="begin-conversation", variant="primary")
 
     def on_mount(self):
         self.query_one("#cancel-conversation").focus()
@@ -42,10 +41,7 @@ class NewConversation(ModalScreen[str | None]):
         self.dismiss(None)
 
     def on_button_pressed(self, event):
-        objective = self.query_one("#new-objective", Input).value.strip()
-        if event.button.id == "begin-conversation" and len(objective) > 8000:
-            return
-        self.dismiss(objective if event.button.id == "begin-conversation" else None)
+        self.dismiss("" if event.button.id == "begin-conversation" else None)
 
 
 class ScopeFields:

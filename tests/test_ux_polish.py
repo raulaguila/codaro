@@ -231,7 +231,11 @@ def test_compact_layout_keeps_setup_chat_and_completion_hint_visible(tmp_path, s
     "error,actions,neutral",
     [
         (ModelError("API retornou HTTP 401."), {"recover-provider"}, False),
-        (ModelError("API retornou HTTP 503."), {"retry-question", "recover-provider"}, False),
+        (
+            ModelError("API retornou HTTP 503."),
+            {"retry-question", "recover-provider", "recover-model"},
+            False,
+        ),
         (OutputLimitError("Limite de saída atingido."), {"retry-question", "recover-model"}, False),
         (
             ContextCapacityError("Podemos reduzir a pergunta."),
@@ -281,7 +285,7 @@ def test_cancel_is_neutral_and_context_details_stay_available(tmp_path):
             await pilot.pause()
             card = app.query_one(RecoveryCard)
             assert card.has_class("neutral")
-            assert {b.id for b in card.query(Button)} == {"retry-question"}
+            assert {b.id for b in card.query(Button)} == {"retry-question", "recover-changes"}
             assert not app.agent.turns
 
     run_ui(scenario())

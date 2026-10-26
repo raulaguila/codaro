@@ -18,6 +18,7 @@ class QuestionDock(Vertical):
         self.display = bool(question)
         if not question:
             return
+        self.set_paused(False)
         self.query_one("#question-title", Static).update(safe_preview(question["question"]))
         self.query_one("#question-why", Static).update(
             safe_preview(question.get("explanation", ""))
@@ -36,6 +37,12 @@ class QuestionDock(Vertical):
         if question["choices"]:
             options.highlighted = question.get("recommended", 0)
         self.set_free_answer(False)
+
+    def set_paused(self, paused):
+        self.query_one(".question-label", Static).update(
+            "Pergunta pendente · tarefa pausada" if paused else "? Pergunta"
+        )
+        self.set_class(paused, "paused")
 
     def set_free_answer(self, free):
         self.set_class(free, "free-answer")

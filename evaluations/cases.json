@@ -22,5 +22,29 @@
     "query": "can_edit",
     "expected_paths": ["auth.py"],
     "answer_contains": ["admin"]
+  },
+  {
+    "id": "codaro-session-decisions",
+    "repo": "..",
+    "question": "Como decisões confirmadas da conversa são preservadas e recuperadas pelo modelo?",
+    "query": "Conversation index_decisions",
+    "expected_paths": ["src/codaro/conversation.py"],
+    "answer_contains": ["decisões"]
+  },
+  {
+    "id": "codaro-context-tool-profiles",
+    "repo": "..",
+    "question": "Como as ferramentas são reduzidas quando o contexto disponível diminui?",
+    "query": "select_tools requested_tools micro",
+    "expected_paths": ["src/codaro/agent/capabilities.py"],
+    "answer_contains": ["request_tools"]
+  },
+  {
+    "id": "codaro-session-archive",
+    "repo": "..",
+    "question": "Como arquivar conversas libera a capacidade de sessões sem excluir o histórico?",
+    "query": "SessionCatalog archive",
+    "expected_paths": ["src/codaro/session_catalog.py"],
+    "answer_contains": ["archive"]
   }
 ]

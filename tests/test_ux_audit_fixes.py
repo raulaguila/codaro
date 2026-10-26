@@ -61,7 +61,7 @@ def test_provider_actions_and_mode_stay_visible_on_small_terminals(tmp_path, siz
             await pilot.press("escape")
             app.push_screen(ModelPicker(store))
             await pilot.pause()
-            for widget in app.screen.query(Button):
+            for widget in app.screen.query("#model-use, #model-refresh, #model-back"):
                 clip = app.screen._compositor.find_widget(widget).clip
                 assert widget.region.intersection(clip) == widget.region
             await pilot.press("escape")
@@ -99,10 +99,9 @@ def test_clear_preserves_proposal_and_grant_restore_and_new_task_reset(tmp_path)
             await pilot.pause()
             assert isinstance(app.screen, NewConversation)
             assert app.screen.focused.id == "cancel-conversation"
-            app.screen.query_one("#new-objective", Input).value = "nova atividade"
             await pilot.click("#begin-conversation")
             await pilot.pause(0.2)
-            assert agent.tasks.current()["objective"] == "nova atividade"
+            assert agent.tasks.current() is None
             assert agent.policy.kind == "action"
             assert proposal.state == "rejected"
             assert (tmp_path / "main.py").read_text() == "x = 1\n"
@@ -272,7 +271,7 @@ def test_incompatible_models_hidden_and_unknown_capability_explicit(tmp_path):
             screen = app.screen
             with pytest.raises(Exception, match="Modelo não disponível"):
                 screen.query_one("#model-id", ModelList).value = "embedding"
-            assert "ocultos" in str(screen.query_one("#model-error", Static).render())
+            assert screen.query_one(ModelList).get_option("embedding").disabled
             assert "confirmadas" in str(screen.query_one("#model-info", Static).render())
             await pilot.press("escape")
 
