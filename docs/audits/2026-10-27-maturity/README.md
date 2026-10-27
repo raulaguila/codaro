@@ -41,12 +41,15 @@ execução autônoma. JUnit registra os cenários em novas execuções do workfl
 
 ## Limites de verificação
 
-Windows/macOS foram incluídos na matriz de pacote instalado com testes nativos
-de edição, undo, conflito e processos; os resultados dependem do CI dessas máquinas.
+Os testes do pacote instalado, incluindo edição, undo, conflito e processos,
+passaram no CI nativo em Windows, macOS e Linux no commit `388120a`.
 Na primeira execução do CI, Linux/macOS passaram; o teste nativo Windows detectou
 separadores do ripgrep não normalizados na criação de subpastas. A comparação
 passou a normalizar os caminhos com `Path.as_posix()`, mantendo o teste que
 reproduziu a falha como verificação obrigatória.
+A matriz Python também detectou animação ainda em andamento ao usar início/fim
+da lista do plano. Esses saltos passaram a ser imediatos, preservando a escolha
+de rolagem manual após atualizações do plano.
 APIs pagas e cofres nativos não foram testados com credenciais nesta execução.
 A publicação PyPI continua desabilitada até configuração administrativa.
 Rollback gerenciado não promete recuperação automática após queda abrupta ou

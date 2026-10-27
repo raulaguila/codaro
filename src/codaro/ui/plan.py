@@ -36,11 +36,11 @@ class PlanSteps(VerticalScroll):
 
     def action_scroll_home(self):
         self.parent.manual_scroll()
-        super().action_scroll_home()
+        self.scroll_home(animate=False, immediate=True)
 
     def action_scroll_end(self):
         self.parent.manual_scroll()
-        super().action_scroll_end()
+        self.scroll_end(animate=False, immediate=True)
 
 
 class PlanContent(Static):

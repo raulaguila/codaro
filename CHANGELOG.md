@@ -16,6 +16,8 @@
   vinculado a outra verificação.
 - Edição nativa Windows com preservação de bytes e proteção de caminhos;
   processos Windows associados a Job Objects antes de executar código.
+- Caminhos de criação normalizados para Windows e saltos imediatos no plano,
+  preservando a rolagem manual em atualizações da interface.
 - Cofre nativo opcional para BYOK, migração explícita e exportação sem segredos.
 - Inventário de capacidades por linguagem, fixtures Go/Node e verificação nativa
   de edição/processos em três plataformas no CI.
