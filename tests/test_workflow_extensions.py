@@ -212,7 +212,7 @@ def test_tui_integration_registration_tests_and_saves_only_after_trust(tmp_path)
     import shlex
 
     from test_extensions import MCP_SERVER
-    from textual.widgets import Checkbox, Input, Static
+    from textual.widgets import Button, Checkbox, Input, SelectionList, Static
 
     from codaro.features import FeatureStore
 
@@ -230,12 +230,10 @@ def test_tui_integration_registration_tests_and_saves_only_after_trust(tmp_path)
             screen.query_one("#integration-command", Input).value = shlex.join(
                 [sys.executable, str(server)]
             )
-            await pilot.click("#integration-save")
-            await pilot.pause()
+            assert screen.query_one("#integration-save", Button).disabled
             assert not FeatureStore(tmp_path).load()["mcp"]
-            assert "confiança" in str(screen.query_one("#integration-status", Static).render())
             screen.query_one("#integration-trust", Checkbox).value = True
-            screen.query_one("#integration-readonly", Input).value = "echo"
+            await pilot.pause()
             await pilot.click("#integration-test")
             for _ in range(100):
                 await pilot.pause(0.02)
@@ -244,6 +242,7 @@ def test_tui_integration_registration_tests_and_saves_only_after_trust(tmp_path)
             assert "Conectado" in str(screen.query_one("#integration-status", Static).render())
             # Connection testing must not register the integration.
             assert not FeatureStore(tmp_path).load()["mcp"]
+            screen.query_one(SelectionList).select("echo")
             await pilot.click("#integration-save")
             await pilot.pause()
             assert not isinstance(ui.screen, IntegrationRegistration)

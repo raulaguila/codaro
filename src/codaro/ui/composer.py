@@ -5,6 +5,7 @@ from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import Button, Static, TextArea
 
+from codaro.ui.completions import CompletionMenu
 from codaro.ui.plan import ExecutionPlan
 from codaro.ui.questions import QuestionDock
 
@@ -14,7 +15,7 @@ class Composer(Vertical):
 
     def compose(self):
         yield ExecutionPlan()
-        yield Static("", id="completion", markup=False)
+        yield CompletionMenu("", id="completion", markup=False)
         with Vertical(id="response-card"):
             yield QuestionDock(id="question-dock")
             with Horizontal(id="entry"):

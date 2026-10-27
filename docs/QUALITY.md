@@ -28,7 +28,7 @@ a pré-release. A avaliação de busca contém seis casos; três fixtures de imp
 aprovações reais e execução dos testes nas cópias temporárias. Esse replay verifica
 o fluxo da aplicação; a qualidade do modelo é medida na aceitação opt-in.
 
-`python scripts/capture_ui.py` gera 84 capturas SVG e texto em `artifacts/ui`, em
+`python scripts/capture_ui.py` gera 124 capturas SVG e texto em `artifacts/ui`, em
 60×20, 80×24, 120×35 e 160×45, sem chamadas ao modelo e usando configuração temporária.
 Inclui geração com velocidade sintética, plano extenso, pergunta longa, detalhes,
 ações da resposta, leitura local, conversas, revisão de diff e seleção de modelos. O job
@@ -50,6 +50,14 @@ sem submenu, validação local do cadastro, reformulação de perguntas que repe
 pedido, decisões compactas, largura do texto e recibos baseados em evidências.
 As capturas também incluem seleção com contexto conhecido, aprovação automática,
 decisão registrada e conexão verificada por HTTP simulado.
+
+`tests/test_ui_navigation.py` cobre resumo e ações da retomada, preservação do
+histórico ao começar outra conversa, histórico vazio, menu com moldura e filtros,
+configuração transacional, tipos de integração, cancelamento, resultados tardios,
+escolha explícita de ferramentas de leitura e alteração do plugin após testar.
+O teste existente de MCP usa um servidor local sintético real para descobrir e
+salvar as permissões selecionadas. As capturas de integrações usam uma descoberta
+simulada e não iniciam processos nem conectam a servidores externos.
 
 Para proteger `develop`, configure nas regras do GitHub os checks `test (3.11)`,
 `test (3.12)`, `test (3.13)`, `retrieval-quality`, `installed-package (ubuntu-latest)`,

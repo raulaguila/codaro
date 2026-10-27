@@ -52,7 +52,9 @@ ModePicker { background: transparent; }
 #entry-mark { width: 2; height: 1; color: $accent; }
 #prompt { height: 2; max-height: 8; width: 1fr; margin: 0; border: none; padding: 0;
     background: $background; }
-#completion { display: none; height: auto; max-height: 7; color: $text-muted; }
+#completion { display: none; height: auto; max-height: 8; width: 76; max-width: 100%;
+    padding: 0 1; border: round $primary 40%; border-title-color: $text-muted;
+    background: $surface; color: $text-muted; }
 #completion { text-overflow: ellipsis; text-wrap: nowrap; }
 #prompt-hint { height: 1; color: $text-muted; }
 #composer-meta { height: 1; }
@@ -211,6 +213,36 @@ ModePicker { align: right top; background: transparent; }
 #resume-dialog { width: 90%; max-width: 76; height: auto; max-height: 90%;
     padding: 0 2 1 2; border: round $primary 35%; background: $surface; }
 #resume-dialog Static { height: auto; margin-bottom: 1; }
+#resume-title { color: $text; text-style: bold; }
+#resume-preview { max-height: 2; color: $text-muted; }
+#features-form, #integration-form { width: 90%; max-width: 84; height: 24;
+    max-height: 90%; padding: 0 2; border: round $primary 35%; background: $surface; }
+#features-fields, #integration-fields { height: 1fr; scrollbar-size: 1 1; }
+#features-fields Static, #integration-fields Static { height: auto; }
+#features-fields Checkbox, #integration-fields Checkbox { height: 1; margin: 0; }
+#features-fields Input, #integration-fields Input { height: 1; border: none;
+    border-left: solid $primary 50%; padding: 0 1; background: $primary 10%; margin: 0 0 1 0; }
+#features-fields Input:focus, #integration-fields Input:focus {
+    border-left: solid $accent; background: $primary 20%; }
+#integration-fields Select { margin: 0 0 1 0; }
+#integration-field-command, #integration-field-url, #integration-field-plugin,
+#integration-field-env, #integration-field-token, #integration-tools-group { height: auto; }
+#features-advanced, #integration-advanced { height: auto; border: none; padding: 0; }
+#features-advanced > Contents, #integration-advanced > Contents { padding: 0 1; }
+.feature-description { height: auto; color: $text-muted; margin: 0 0 1 2; }
+.feature-heading { color: $text; margin-top: 1; }
+#features-json { max-height: 8; overflow-y: auto; color: $text-muted; }
+#features-error, #integration-status { height: auto; max-height: 3; color: $text-muted; }
+#features-error { color: $warning; }
+#integration-status.error { color: $error; }
+#integration-status.success { color: $success; }
+#integration-tools { height: 4; border: none; padding: 0; scrollbar-size: 1 1; }
+#integration-tool-description { max-height: 2; color: $text-muted; }
+.short-terminal #features-form .dialog-title, .short-terminal #integration-form .dialog-title {
+    margin: 0 0 1 0; }
+.short-terminal #resume-dialog { padding: 0 2; }
+.short-terminal #resume-dialog Static { margin-bottom: 0; }
+.short-terminal .feature-description { margin: 0 0 0 2; }
 #new-conversation { max-width: 76; padding: 0 2; }
 #new-conversation Static { margin-bottom: 1; }
 #new-conversation Horizontal { height: 2; border-top: solid $primary 30%; padding-top: 0; }

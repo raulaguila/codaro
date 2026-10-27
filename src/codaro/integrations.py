@@ -239,6 +239,7 @@ class IntegrationHub:
                 read_only=readonly,
                 lazy=True,
                 handler=self.handler(source, item["name"], readonly),
+                external_name=item["name"],
             )
         )
 

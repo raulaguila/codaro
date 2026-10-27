@@ -220,6 +220,37 @@ respeita os arquivos permitidos e mascara credenciais reconhecidas, sem enviar u
 nova solicitação ao modelo nem autorizar edições. Copiar depende do suporte do
 terminal à área de transferência via OSC52. `/sessions` abre a lista pesquisável de
 conversas do projeto, com última atividade, retomada, arquivamento e restauração.
+
+A oferta de retomada identifica a conversa, sua última atividade e uma prévia.
+**Retomar conversa** recupera o histórico sem iniciar ações. **Começar nova** mantém
+o histórico anterior salvo, encerra a tarefa anterior e revoga suas permissões,
+preservando arquivos. Históricos vazios não interrompem a abertura. A confirmação
+de retomada fica no status; perguntas confirmadas aparecem como **Pergunta
+respondida**, com falas de Codaro e do usuário no mesmo bloco. Registros antigos
+mantêm o conteúdo original.
+
+O menu `/` tem moldura, seleção destacada e contador de resultados acima do input.
+Setas percorrem todas as opções, Enter abre e Tab completa. A busca também aceita
+comandos com hífen. Em terminais baixos, as linhas visíveis do plano se ajustam
+enquanto o menu está aberto, preservando o estado de recolhimento e espaço do chat.
+
+**Ctrl+P → Funcionalidades e integrações**, ou `/features`, abre os recursos do
+projeto com descrições e controles próprios. Limites e JSON somente leitura ficam
+em **Avançado**. Salvar aplica as opções aos próximos pedidos; cancelar descarta o
+rascunho. Resumo de contexto e exploração assistida podem gerar chamadas adicionais
+ao modelo. Os atalhos `/features nome on|off` continuam disponíveis e confirmam a
+alteração no status, sem despejar JSON no chat.
+
+`/integrations` usa rótulos permanentes e campos específicos para MCP local, MCP
+HTTP e plugins Python. Variáveis permitidas, nome da variável do token HTTP e TLS
+ficam em **Avançado**; informe nomes de variáveis, não seus valores. Autorizar a
+inicialização e clicar em **Testar** pode iniciar o processo ou conectar ao serviço;
+essa descoberta não chama a LLM nem executa as ferramentas listadas. Após o teste,
+marque explicitamente quais ferramentas considera confiáveis de leitura. As demais
+continuam exigindo aprovação por ação. O cadastro só é salvo com uma configuração
+testada. Alterações de comando, URL, variáveis ou conteúdo do plugin exigem novo
+teste. Cancelar libera o formulário e resultados atrasados não são aplicados; a
+interrupção remota do serviço depende de seu transporte. Testar não salva o cadastro.
 **Testar conexão** verifica a listagem do provedor, sem inferência; **Testar modelo** verifica
 geração e ferramentas e pode consumir créditos. O ID completo e os metadados do
 modelo ficam nos detalhes; a lista mostra uma linha por modelo, com contexto à direita.

@@ -137,9 +137,9 @@ class ExecutionPlan(Vertical):
             self.query_one("#follow-plan").display = False
             self.follow_active()
 
-    def fit(self, height, *, answering=False):
+    def fit(self, height, *, answering=False, completing=False):
         self.query_one("#plan-steps").styles.max_height = (
-            1 if answering and height < 25 else 3 if height < 25 or answering else 5
+            1 if (answering or completing) and height < 25 else 3 if height < 25 or answering else 5
         )
 
 

@@ -1,6 +1,7 @@
 """Conversation rendering and navigation, backed by the shared conversation writer."""
 
 import copy
+from datetime import datetime
 
 from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
@@ -12,6 +13,36 @@ from codaro.llm import ModelError
 from codaro.ui.composer import Prompt
 from codaro.ui.messages import AssistantMessage, UserMessage
 from codaro.ui.widgets import ProposalCard
+
+
+def resume_dialog(self):
+    from codaro.ui.details import ResumeDialog
+
+    turns = self.session.load()
+    self.session_turns = copy.deepcopy(turns)
+    self.session_decisions = copy.deepcopy(self.session.decisions)
+    self.current_decisions = copy.deepcopy(self.session.pending_decisions)
+    if not turns and not self.current_decisions:
+        return None
+    item = next(
+        (
+            item
+            for item in self.agent.sessions.load()["items"]
+            if item["id"] == self.agent.session_id
+        ),
+        {},
+    )
+    activity = datetime.fromtimestamp(
+        self.session.path.stat(follow_symlinks=False).st_mtime
+    ).astimezone()
+    preview = (
+        " ".join(turns[-1][0]["content"].split())[:160] if turns else "Respostas pendentes salvas"
+    )
+    return ResumeDialog(
+        self.agent.memory.redact(item.get("title", "Conversa anterior")),
+        "Última atividade · " + activity.strftime("%d/%m %H:%M"),
+        self.agent.memory.redact(preview),
+    )
 
 
 def save_session(self):
@@ -67,14 +98,9 @@ async def restore_session(self):
         self.mount_message(AssistantMessage(safe_preview(turn[-1]["content"])))
     for decision in self.current_decisions:
         self.mount_decision(decision)
-    self.mount_message(
-        Static(
-            "Sessão retomada. Revise os arquivos atuais; propostas anteriores não são reaplicadas.",
-            classes="notice",
-            markup=False,
-        )
-    )
-    self.query_one("#status", Static).update("Pronto · sessão retomada")
+    status = self.query_one("#status", Static)
+    status.update("Conversa retomada")
+    status.tooltip = "Histórico recuperado. Arquivos atuais e propostas devem ser revisados."
 
 
 async def action_clear_chat(self):

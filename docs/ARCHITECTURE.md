@@ -105,6 +105,9 @@ antigos de compatibilidade não devem virar novas dependências internas.
 | Retomada, limpeza e navegação das conversas | `ui/conversations.py` |
 | Comando do menu Ctrl+P | `ui/palette.py` |
 | Input e informações junto ao campo | `ui/composer.py` |
+| Menu de comandos e arquivos junto ao input | `ui/completions.py`, `interaction.py` |
+| Funcionalidades e limites do projeto na UI | `ui/features.py`, `features.py` |
+| Descoberta e cadastro de integrações na UI | `ui/integrations.py` |
 | Plano fixo e projeção do progresso | `ui/plan.py` |
 | Seletor de modo e confirmação de aprovação automática | `ui/modes.py` |
 | Paleta visual padrão | `ui/theme.py` |

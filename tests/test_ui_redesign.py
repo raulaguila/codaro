@@ -50,7 +50,7 @@ def test_plan_and_input_stay_visible_while_chat_scrolls(tmp_path, size):
                 clip = app.screen._compositor.find_widget(widget).clip
                 assert widget.region.intersection(clip) == widget.region
             assert plan.region.y >= conversation.region.bottom
-            assert before.height == plan.region.height
+            assert plan.expanded and plan.region.height <= before.height
             await pilot.press("escape")
             await pilot.click("#toggle-plan")
             assert not plan.expanded

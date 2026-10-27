@@ -48,8 +48,8 @@ class DecisionMessage(Static):
         colors = self.app.get_css_variables()
         self.update(
             Text.assemble(
-                ("Decisão\n", colors["text-muted"]),
-                safe_preview(self.question) + "\n",
+                ("Pergunta respondida\n", colors["text-muted"]),
+                "Codaro: " + safe_preview(self.question) + "\n",
                 ("Você: ", colors["accent"]),
                 safe_preview(self.answer),
             )

@@ -20,7 +20,7 @@ COMMANDS = {
     "/redo": "Revisar e refazer a última interação desfeita",
     "/sessions": "Listar sessões independentes",
     "/session": "Trocar sessão pelo ID ou criar com new título",
-    "/features": "Configurar artifacts, semantic_compaction, exploration ou lsp: on|off",
+    "/features": "Funcionalidades do projeto e opções avançadas",
     "/restore-clear": "Desfazer limpeza de mensagens",
     "/reasoning": "Expandir/recolher raciocínio durante geração",
     "/provider-manage": "Gerenciar perfis, credenciais e conexão",
@@ -84,11 +84,11 @@ class Completion:
 
 def completions(text: str, cursor: int, paths: list[str]) -> list[Completion]:
     prefix = text[:cursor]
-    if re.fullmatch(r"/[a-z]*", prefix):
+    if re.fullmatch(r"/[a-z-]*", prefix.casefold()):
         return [
             Completion(0, cursor, name + " ", name + " · " + description)
             for name, description in COMMANDS.items()
-            if name.startswith(prefix)
+            if name.startswith(prefix.casefold())
         ]
     match = re.search(r'(?:^|\s)(@(?:"([^"\n]*)|([^\s"]*)))$', prefix)
     if match is None:

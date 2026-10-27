@@ -262,17 +262,24 @@ class CodaroApp(App):
         if self.resume_requested and not self.offer_resume:
             await self.restore_session()
         elif self.offer_resume and self.session.path.exists():
-            from codaro.ui.details import ResumeDialog
-
-            self.push_screen(ResumeDialog(), self.resume_decision)
+            try:
+                dialog = conversation_ui.resume_dialog(self)
+                if dialog is not None:
+                    self.push_screen(dialog, self.resume_decision)
+            except (OSError, ValueError, ModelError) as exc:
+                self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
         try:
             self.show_plan()
         except (ValueError, OSError) as exc:
             self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
 
     def resume_decision(self, restore):
-        if restore:
+        if restore == "new":
+            self.run_worker(self.reset_conversation(""))
+        elif restore is True or restore == "resume":
             self.run_worker(self.restore_session())
+        else:
+            self.query_one("#status", Static).update("Conversa anterior disponível em /resume")
 
     def start_setup(self):
         from codaro.llm.profiles import ProviderStore
@@ -443,8 +450,10 @@ class CodaroApp(App):
         return completions(prompt.text, cursor, self.reference_paths)
 
     def update_completions(self):
+        from codaro.ui.completions import CompletionMenu
+
         options = self.completion_options()
-        menu = self.query_one("#completion", Static)
+        menu = self.query_one(CompletionMenu)
         prompt = self.query_one(Prompt)
         unread_row = int(self.query_one("#new-messages").display)
         reserved = self.query_one(ExecutionPlan).region.height
@@ -461,6 +470,9 @@ class CodaroApp(App):
             and not self.pending_user_question
         )
         self.query_one(Prompt).suggesting = menu.display
+        self.query_one(ExecutionPlan).fit(
+            self.size.height, answering=bool(self.pending_user_question), completing=menu.display
+        )
         if options and menu.display:
             self.completion_index %= len(options)
             # Reserve at least four rows of chat, even when the composer grows.
@@ -471,21 +483,19 @@ class CodaroApp(App):
                 + int(prompt.styles.height.value)
                 + self.query_one(ExecutionPlan).region.height
             )
-            count = max(1, min(5, self.size.height - fixed - 5))
+            count = max(1, min(5, self.size.height - fixed - 7))
             first = max(0, min(self.completion_index - count // 2, len(options) - count))
-            rows = []
-            width = max(10, self.size.width - 4)
-            for i in range(first, min(first + count, len(options))):
-                label = ("› " if i == self.completion_index else "  ") + safe_preview(
-                    options[i].label
-                )
-                row = Text(label, no_wrap=True, overflow="ellipsis")
-                row.truncate(width, overflow="ellipsis")
-                rows.append(row)
-            menu.styles.height = len(rows)
-            menu.update(Text("\n").join(rows))
+            menu.show_options(
+                options,
+                self.completion_index,
+                first,
+                count,
+                max(10, min(76, self.size.width - 4) - 4),
+                self.get_css_variables(),
+            )
         elif menu.display:
-            menu.styles.height = 1
+            menu.styles.height = 3
+            menu.border_title = "Comandos"
             menu.update("Nenhum comando encontrado. Esc fecha a lista.")
         self.update_prompt_hint()
 
@@ -642,12 +652,8 @@ class CodaroApp(App):
 
                     self.agent.features = FeatureStore(self.agent.repository.root).load()
                     self.agent.context.features = self.agent.features
-                    self.mount_message(
-                        Static(
-                            "Integração cadastrada; disponível na próxima atividade.",
-                            classes="notice",
-                            markup=False,
-                        )
+                    self.query_one("#status", Static).update(
+                        "Integração cadastrada · próximo pedido"
                     )
 
             self.push_screen(IntegrationRegistration(self.agent.repository.root), configured)
@@ -672,6 +678,7 @@ class CodaroApp(App):
                     raise ValueError("Aguarde a atividade e revise propostas primeiro.")
                 if name == "/features":
                     from codaro.features import FeatureStore
+                    from codaro.ui.features import FEATURE_LABELS, FeaturesDialog
 
                     store = FeatureStore(self.agent.repository.root)
                     if argument:
@@ -680,14 +687,14 @@ class CodaroApp(App):
                             raise ValueError("Use /features nome on|off.")
                         self.agent.features = store.toggle(feature, action == "on")
                         self.agent.context.features = self.agent.features
-                    content = json.dumps(store.load(), ensure_ascii=False, indent=2)
-                    self.mount_message(
-                        Static(
-                            "Funcionalidades (on/off) e integrações:\n" + content,
-                            classes="notice",
-                            markup=False,
+                        self.query_one("#status", Static).update(
+                            FEATURE_LABELS[feature]
+                            + (" · ativado" if action == "on" else " · desativado")
                         )
-                    )
+                    else:
+                        self.push_screen(
+                            FeaturesDialog(self.agent.repository.root), self.features_saved
+                        )
                     return
                 if name == "/sessions" or not argument:
                     from codaro.ui.sessions import SessionPicker
@@ -917,6 +924,14 @@ class CodaroApp(App):
 
     def manage_provider_decision(self, result):
         return provider_actions.manage_provider_decision(self, result)
+
+    def features_saved(self, changed):
+        if changed:
+            from codaro.features import FeatureStore
+
+            self.agent.features = FeatureStore(self.agent.repository.root).load()
+            self.agent.context.features = self.agent.features
+            self.query_one("#status", Static).update("Funcionalidades atualizadas · próximo pedido")
 
     def session_selected(self, identifier):
         if identifier == "new":

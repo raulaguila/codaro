@@ -1,5 +1,30 @@
 # Correções da auditoria de UI e UX do Codaro
 
+## Retomada, comandos e configuração de integrações
+
+- Oferta de retomada com título, última atividade e prévia; ações explícitas para
+  retomar ou começar outra conversa. A abertura continua limpa quando não existe
+  histórico. Começar outra conversa mantém os registros anteriores e arquivos,
+  encerra a tarefa antiga e revoga permissões. Esc fecha sem criar ou apagar sessões.
+- Confirmação de retomada no status e detalhes no tooltip, sem aviso amarelo no chat.
+  Perguntas confirmadas usam Pergunta respondida, Codaro e Você; conteúdo histórico
+  não é reescrito para corrigir respostas antigas do modelo.
+- Menu / com moldura, colunas e seleção de alto contraste, contador e janela móvel
+  de opções. Filtragem aceita hífens e maiúsculas. O plano mantém seu estado de
+  recolhimento e adapta as linhas visíveis ao menu em terminais pequenos.
+- Funcionalidades usam checkboxes, descrições e resumo das integrações. Limites e
+  JSON somente leitura ficam em Avançado. Cancelar preserva a configuração; salvar
+  aplica apenas os campos alterados, preservando cadastros concorrentes.
+- Cadastro MCP/plugin com campos condicionais, rótulos permanentes, entrada compacta,
+  foco visível, área rolável e rodapé fixo. Variáveis e TLS ficam em Avançado.
+- Confiança explícita antes da descoberta; salvar depende de teste concluído da
+  configuração atual. A lista descoberta começa sem ferramentas confiáveis de
+  leitura; o usuário marca cada uma. Nome original permanece separado do identificador
+  de protocolo. Alterações de configuração ou arquivo do plugin invalidam o teste.
+- Cancelamento e geração de operação impedem aplicar descobertas tardias. Cancelar
+  o teste mantém o formulário; um segundo Esc pode fechá-lo. A descoberta fecha os
+  clientes ao terminar e nunca grava a configuração automaticamente.
+
 ## Revisão dos prints de cadastro, modos, modelos e conversa
 
 - O cálculo da largura das opções desconta padding e scrollbar do componente.
@@ -48,7 +73,7 @@
   Voltar continua sendo o foco inicial: Enter não aprova uma edição por acidente.
 - Aprovação automática aparece como Executar · Auto no cabeçalho.
 
-O script `scripts/capture_ui.py` reproduz 21 estados em quatro tamanhos de terminal,
+O script `scripts/capture_ui.py` reproduz 31 estados em quatro tamanhos de terminal,
 com dados sintéticos e sem inferência. Os testes de interação e métricas ficam em
 `tests/test_ui_experience.py` e `tests/test_ui_generation_rate.py`.
 

@@ -37,25 +37,33 @@ class DetailsDialog(DialogScreen):
 
 
 class ResumeDialog(DialogScreen):
-    BINDINGS = [("escape", "close", "Agora não")]
+    BINDINGS = [("escape", "close", "Fechar")]
+
+    def __init__(self, title="Conversa anterior", activity="", preview=""):
+        super().__init__()
+        self.title_text, self.activity, self.preview = title, activity, preview
 
     def compose(self):
         with Vertical(id="resume-dialog"):
             yield Static("Retomar a última conversa?", classes="dialog-title", markup=False)
+            yield Static(safe_preview(self.title_text), id="resume-title", markup=False)
+            yield Static(safe_preview(self.activity), classes="muted", markup=False)
+            yield Static(safe_preview(self.preview), id="resume-preview", markup=False)
             yield Static(
-                "O histórico e as decisões serão recuperados. Nenhuma ação será executada.",
+                "Retomar recupera mensagens e respostas, sem iniciar ações.\n"
+                "Nova conversa encerra a tarefa atual; histórico e arquivos ficam salvos.",
                 markup=False,
             )
             with Horizontal(classes="dialog-actions"):
-                yield Button("Agora não", id="resume-back")
-                yield Button("Retomar", id="resume-use", variant="primary")
+                yield Button("Começar nova", id="resume-back")
+                yield Button("Retomar conversa", id="resume-use", variant="primary")
 
     def on_mount(self):
-        self.query_one("#resume-back").focus()
+        self.query_one("#resume-use").focus()
 
     def on_button_pressed(self, event):
         event.stop()
-        self.dismiss(event.button.id == "resume-use")
+        self.dismiss("resume" if event.button.id == "resume-use" else "new")
 
     def action_close(self):
-        self.dismiss(False)
+        self.dismiss(None)

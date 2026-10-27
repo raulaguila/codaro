@@ -29,6 +29,7 @@ class Tool:
     read_only: bool = True
     lazy: bool = False
     handler: object = None
+    external_name: str | None = None
 
     @property
     def name(self):

@@ -105,10 +105,42 @@ class FeatureStore:
     def toggle(self, feature, enabled):
         if feature not in {"artifacts", "semantic_compaction", "exploration", "lsp"}:
             raise ValueError("Funcionalidade desconhecida.")
-        data = self.load()
-        if feature == "lsp":
-            data["lsp"]["enabled"] = enabled
-        else:
-            data[feature] = enabled
-        self.save(data)
+        return self.update_options({feature: enabled})
+
+    def mutate(self, operation):
+        with private_lock(self.path.with_suffix(".lock")):
+            data = self.load()
+            operation(data)
+            self.validate(data)
+            raw = json.dumps(data, ensure_ascii=False).encode()
+            if len(raw) > 256_000:
+                raise ValueError("Configuração excede 256 KB.")
+            atomic_write(self.path, raw)
         return data
+
+    def update_options(self, options):
+        allowed = set(DEFAULTS) - {"version", "mcp", "plugins", "lsp"}
+        if set(options) - allowed - {"lsp"}:
+            raise ValueError("Opção de funcionalidade desconhecida.")
+
+        def update(data):
+            for key, value in options.items():
+                if key == "lsp":
+                    if type(value) is not bool:
+                        raise ValueError("LSP deve ser booleano.")
+                    data["lsp"]["enabled"] = value
+                else:
+                    data[key] = value
+
+        return self.mutate(update)
+
+    def register_integration(self, section, name, config):
+        if section not in {"mcp", "plugins"}:
+            raise ValueError("Tipo de integração inválido.")
+
+        def register(data):
+            if name in data[section]:
+                raise ValueError("Nome já cadastrado. Remova antes de renovar a confiança.")
+            data[section][name] = copy.deepcopy(config)
+
+        return self.mutate(register)

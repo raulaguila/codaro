@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 import httpx
-from textual.widgets import Input
+from textual.widgets import Checkbox, Input, Select, SelectionList
 
 from codaro.agent import Agent, AgentEvent
 from codaro.llm import Settings
@@ -19,6 +19,9 @@ from codaro.llm.profiles import ProviderStore
 from codaro.repository import Repository
 from codaro.ui.app import CodaroApp
 from codaro.ui.composer import Prompt
+from codaro.ui.details import ResumeDialog
+from codaro.ui.features import FeaturesDialog
+from codaro.ui.integrations import IntegrationRegistration
 from codaro.ui.message_actions import FilePreview, MessageActions
 from codaro.ui.messages import UserMessage
 from codaro.ui.model_list import ModelList
@@ -76,8 +79,19 @@ async def capture(output, root):
                 manifest.append({"state": state, "size": [width, height], "file": name + ".svg"})
 
             await save("welcome")
+            app.push_screen(
+                ResumeDialog(
+                    "Revisar o contrato da API",
+                    "Última atividade · hoje",
+                    "Explique os pontos de entrada do projeto.",
+                )
+            )
+            await save("resume-offer")
+            await pilot.press("escape")
             await pilot.press("/")
             await save("commands")
+            await pilot.press(*(["down"] * 8))
+            await save("commands-scrolled")
             await pilot.press("escape")
             app.query_one(Prompt).value = ""
             app.open_mode_picker()
@@ -131,6 +145,14 @@ async def capture(output, root):
             await pilot.pause()
             app.query_one("#conversation").scroll_end(animate=False, immediate=True)
             await save("decision")
+            app.current_decisions = [
+                {"question": "Qual contrato preservar?", "answer": "API atual"}
+            ]
+            app.save_session()
+            await app.restore_session()
+            await pilot.pause()
+            app.query_one("#conversation").scroll_end(animate=False, immediate=True)
+            await save("session-restored")
             app.push_screen(MessageActions(answer))
             await save("message-actions")
             await pilot.press("escape")
@@ -199,6 +221,49 @@ async def capture(output, root):
             await pilot.pause()
             await app.screen.test_connection()
             await save("provider-verified")
+            await pilot.press("escape")
+            app.push_screen(FeaturesDialog(project))
+            await save("features")
+            app.screen.query_one("#features-advanced").collapsed = False
+            app.screen.query_one("#feature-max_run_requests").focus()
+            await save("features-advanced")
+            await pilot.press("escape")
+            dialog = IntegrationRegistration(project)
+            dialog.probe = lambda *args: [
+                {
+                    "name": "read_code",
+                    "label": "read_code",
+                    "description": "Consulta arquivos do projeto.",
+                },
+                {
+                    "name": "write_code",
+                    "label": "write_code",
+                    "description": "Altera arquivos; requer aprovação.",
+                },
+            ]
+            app.push_screen(dialog)
+            await save("integration-stdio")
+            dialog.query_one("#integration-kind", Select).value = "http"
+            await save("integration-http")
+            dialog.query_one("#integration-kind", Select).value = "plugin"
+            await save("integration-plugin")
+            dialog.query_one("#integration-kind", Select).value = "stdio"
+            dialog.query_one("#integration-name", Input).value = "exemplo"
+            dialog.query_one("#integration-command", Input).value = "synthetic-server"
+            dialog.query_one("#integration-advanced").collapsed = False
+            dialog.query_one("#integration-env").focus()
+            await save("integration-advanced")
+            dialog.query_one("#integration-advanced").collapsed = True
+            dialog.query_one("#integration-trust", Checkbox).value = True
+            await pilot.pause()
+            # Only the synthetic probe runs; no process or HTTP MCP server is started.
+            await pilot.click("#integration-test")
+            for _ in range(100):
+                await pilot.pause(0.01)
+                if dialog.tested_signature:
+                    break
+            dialog.query_one(SelectionList).select("read_code")
+            await save("integration-tools")
             await pilot.press("escape")
     (output / "manifest.json").write_text(
         json.dumps({"synthetic": True, "screens": manifest}, indent=2)
