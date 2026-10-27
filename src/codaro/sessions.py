@@ -96,8 +96,10 @@ class SessionStore:
             if retained
             else []
         )
-        while True:
-            value = {
+        # Redact the complete snapshot once, including entries that may be dropped.
+        # Repeating masking for each discarded turn made large histories quadratic.
+        value = self.redact(
+            {
                 "schema_version": 1,
                 "repository_root": str(self.root),
                 "updated_at": timestamp(),
@@ -106,21 +108,31 @@ class SessionStore:
                 "decisions": groups,
                 "pending_decisions": pending,
             }
-            data = json.dumps(self.redact(value), ensure_ascii=False)
-            encoded = data.encode("utf-8")
-            if len(encoded) <= MAX_SESSION_BYTES:
-                if not self.ephemeral:
-                    atomic_write(self.path, encoded)
-                self.turns = self.redact(retained)
-                self.decisions = self.redact(groups)
-                self.pending_decisions = self.redact(pending)
-                return
-            if not retained:
+        )
+        retained, groups = value["turns"], value["decisions"]
+
+        def encode(start):
+            value["turns"], value["decisions"] = retained[start:], groups[start:]
+            return json.dumps(value, ensure_ascii=False).encode("utf-8")
+
+        encoded = encode(0)
+        if len(encoded) > MAX_SESSION_BYTES:
+            # Find the longest fitting suffix without serializing every suffix.
+            low, high = 1, len(retained)
+            while low < high:
+                middle = (low + high) // 2
+                if len(encode(middle)) <= MAX_SESSION_BYTES:
+                    high = middle
+                else:
+                    low = middle + 1
+            encoded = encode(low)
+            if len(encoded) > MAX_SESSION_BYTES:
                 raise ValueError("Sessão excede o limite de armazenamento.")
-            retained = retained[1:]
-            groups = groups[1:]
-            if not retained and pending and len(encoded) > MAX_SESSION_BYTES:
-                raise ValueError("Decisões pendentes excedem o limite de armazenamento.")
+        if not self.ephemeral:
+            atomic_write(self.path, encoded)
+        self.turns = value["turns"]
+        self.decisions = value["decisions"]
+        self.pending_decisions = value["pending_decisions"]
 
     def redact(self, value):
         forms = {self.secret}

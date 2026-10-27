@@ -316,8 +316,8 @@ class OpenAICompatible:
                 check_cancelled(cancelled)
         return message
 
-    @staticmethod
     def _read_stream(
+        self,
         response: httpx.Response,
         on_delta: Callable[[str], None],
         cancelled: threading.Event | None,
@@ -330,11 +330,11 @@ class OpenAICompatible:
         finished = False
         event_count = 0
         reasoning_chars = 0
-        for data in sse_events(response, cancelled):
+        for data in sse_events(response, cancelled, max_bytes=self.settings.max_stream_bytes):
             capture_wire("sse", data)
             check_cancelled(cancelled)
             event_count += 1
-            if event_count > 10_000:
+            if event_count > self.settings.max_stream_events:
                 raise ModelError("Stream contém eventos demais.")
             if data == "[DONE]":
                 finished = True

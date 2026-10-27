@@ -203,3 +203,39 @@ class Checkpoints:
             after_exists=item.get("before_exists", True),
             file_mode=item.get("file_mode", 0o644),
         )
+
+    def reconcile(self):
+        """Inspect interrupted intents; never write source or infer test success."""
+        results = []
+        for item in self.load():
+            if item["state"] != "ready" or item.get("session_id", "default") != self.session_id:
+                continue
+            try:
+                target = self.repository.resolve_destination(item["path"])
+                exists = target.exists()
+                current = digest(self.repository.read_bytes(target)) if exists else None
+
+                def matches(side, exists=exists, item=item, current=current):
+                    return exists == item.get(side + "_exists", True) and (
+                        not exists or current == item[side + "_hash"]
+                    )
+
+                state = (
+                    "matches_after"
+                    if matches("after")
+                    else "matches_before"
+                    if matches("before")
+                    else "conflict"
+                )
+            except (OSError, ValueError):
+                state = "unavailable"
+            results.append(
+                {
+                    "id": item["id"],
+                    "path": item["path"],
+                    "state": state,
+                    "validation_required": True,
+                    "automatic_replay": False,
+                }
+            )
+        return results

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import codecs
 import threading
 from collections.abc import Iterator
 
@@ -12,6 +11,7 @@ from codaro.llm.errors import (
 )
 from codaro.llm.protocol import (
     MAX_STREAM_BYTES,
+    MAX_STREAM_EVENT_BYTES,
 )
 from codaro.runtime import remaining_seconds
 
@@ -37,28 +37,51 @@ def merge_fragment(current: str, fragment: object, limit: int) -> str:
     return result
 
 
-def sse_events(response: httpx.Response, cancelled: threading.Event | None) -> Iterator[str]:
-    decoder = codecs.getincrementaldecoder("utf-8")("strict")
-    buffer = ""
+def sse_events(
+    response: httpx.Response, cancelled: threading.Event | None, *, max_bytes=MAX_STREAM_BYTES
+) -> Iterator[str]:
+    buffer = bytearray()
     fields: list[str] = []
-    total = 0
+    total = event_bytes = scan_from = 0
     for raw in response.iter_bytes():
         check_cancelled(cancelled)
         total += len(raw)
-        if total > MAX_STREAM_BYTES:
-            raise ModelError("Stream excede o limite de 2 MB.")
-        buffer += decoder.decode(raw)
-        while "\n" in buffer:
-            line, buffer = buffer.split("\n", 1)
-            line = line.removesuffix("\r")
+        if total > max_bytes:
+            raise ModelError(
+                f"Stream excede o limite de {max_bytes // (1024 * 1024)} MiB; "
+                "ajuste CODARO_MAX_STREAM_MB."
+            )
+        buffer.extend(raw)
+        cursor = 0
+        while True:
+            end = buffer.find(b"\n", scan_from)
+            if end < 0:
+                scan_from = len(buffer) - cursor
+                if cursor:
+                    del buffer[:cursor]
+                break
+            length = end - cursor
+            if length > MAX_STREAM_EVENT_BYTES:
+                raise ModelError("Evento do stream excede o limite de 1 MiB.")
+            line = buffer[cursor:end].decode("utf-8").removesuffix("\r")
+            cursor = scan_from = end + 1
             if not line:
                 if fields:
                     yield "\n".join(fields)
                     fields = []
+                event_bytes = 0
             elif line.startswith("data:"):
+                event_bytes += length + 1
+                if event_bytes > MAX_STREAM_EVENT_BYTES:
+                    raise ModelError("Evento do stream excede o limite de 1 MiB.")
                 fields.append(line[5:].removeprefix(" "))
-    buffer += decoder.decode(b"", final=True)
-    if buffer.startswith("data:"):
-        fields.append(buffer[5:].removeprefix(" ").removesuffix("\r"))
+        if len(buffer) > MAX_STREAM_EVENT_BYTES:
+            raise ModelError("Evento do stream excede o limite de 1 MiB.")
+    if buffer.startswith(b"data:"):
+        if event_bytes + len(buffer) > MAX_STREAM_EVENT_BYTES:
+            raise ModelError("Evento do stream excede o limite de 1 MiB.")
+        fields.append(buffer.decode("utf-8")[5:].removeprefix(" ").removesuffix("\r"))
+    elif buffer:
+        buffer.decode("utf-8")  # Reject a truncated UTF-8 sequence, even in a comment.
     if fields:
         yield "\n".join(fields)

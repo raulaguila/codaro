@@ -58,8 +58,10 @@ novos módulos devem usar os pacotes canônicos de `docs/ARCHITECTURE.md`.
    modelo/provedor que pretende recomendar. Guarde JUnit e métricas. O smoke do
    protocolo sozinho não qualifica um modelo para implementar tarefas.
 3. Execute o workflow `release` manualmente para revisar distribuições, checksums
-   e smoke instalado nas três plataformas. A gate de protocolo usa Ollama local,
-   sem API paga, e pode falhar por disponibilidade ou comportamento do modelo.
+   e smoke instalado nas três plataformas. A gate de modelos exige a bateria
+   completa com as cinco fixtures de implementação. Por padrão usa Ollama local;
+   `CODARO_QUALIFICATION_MODEL` e `CODARO_QUALIFICATION_API_STYLE` permitem escolher
+   outro modelo/protocolo. Um modelo que só passa no smoke bloqueia a release.
 4. Após revisão, uma tag `vVERSÃO` no commit validado aciona a pré-release no
    GitHub. Commit/push em `develop` não cria tag nem publica uma distribuição.
 
@@ -81,3 +83,12 @@ No Windows, leitura/edição usa handles Win32, recusa reparse points/hard links
 preserva bytes UTF-8/BOM/CRLF. Processos pertencem a Job Objects antes de começar;
 fechar/cancelar encerra descendentes. Essa propriedade não é sandbox de acesso.
 O isolamento opcional Bubblewrap continua restrito a Linux.
+
+## Candidato local e revisão externa
+
+Antes de publicar, construa wheel/sdist, valide com `twine check`, instale o wheel
+fora do checkout e execute `scripts/package_smoke.py` e os testes de portabilidade.
+O CI mantém a instalação nativa nos três sistemas; resultados locais Linux não
+comprovam execução em macOS/Windows. Uma rodada com usuários externos e com o
+provedor que será recomendado ainda é necessária para qualificar a distribuição.
+Os scripts de benchmark e relatórios de qualificação estão em [MATURITY.md](MATURITY.md).

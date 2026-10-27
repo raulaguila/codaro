@@ -5,6 +5,7 @@ import time
 
 from codaro.agent.change_sets import preflight, rollback
 from codaro.agent.events import AgentEvent, InvestigationCancelled
+from codaro.agent.progress import Phase, waiting
 from codaro.policies import Mode
 
 
@@ -21,11 +22,15 @@ def review_changes(agent, proposals, *, atomic=False):
     started = time.monotonic()
     try:
         automatic = agent.policy.auto_edits and all(proposal.after_exists for proposal in proposals)
-        approved = (
-            automatic
-            or agent.policy.permits_paths(task["id"], paths)
-            or (agent.approve_edit is not None and agent.approve_edit(proposals, agent._cancelled))
-        )
+        with waiting(Phase.APPROVAL):
+            approved = (
+                automatic
+                or agent.policy.permits_paths(task["id"], paths)
+                or (
+                    agent.approve_edit is not None
+                    and agent.approve_edit(proposals, agent._cancelled)
+                )
+            )
     finally:
         agent._deadline += time.monotonic() - started
     if agent._cancelled is not None and agent._cancelled.is_set():

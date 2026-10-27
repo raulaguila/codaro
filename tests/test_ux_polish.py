@@ -6,7 +6,7 @@ import httpx
 import pytest
 from test_tui import UIModel, run_ui, wait_ready
 from textual.containers import VerticalScroll
-from textual.widgets import Button, Collapsible, Input, Static
+from textual.widgets import Button, Input, Static
 
 from codaro.agent import Agent, AgentEvent
 from codaro.llm import ContextCapacityError, ModelError
@@ -35,7 +35,9 @@ def test_all_reasoning_steps_disappear_when_group_is_collapsed(tmp_path):
                 await pilot.pause()
                 if number != 2:
                     app.finish_preview("tools")
-            group = app.reasoning_group
+            group = app.activity_group
+            group.collapsed = True
+            await pilot.pause()
             assert group.collapsed
             assert "SEGREDO_ETAPA" not in rendered(app)
             assert "etapa encerrada" not in rendered(app)
@@ -43,10 +45,7 @@ def test_all_reasoning_steps_disappear_when_group_is_collapsed(tmp_path):
             group.collapsed = False
             await pilot.pause()
             assert "SEGREDO_ETAPA_2" in rendered(app)
-            assert all(
-                p.parent is group.query_one(Collapsible.Contents)
-                for p in group.query(".reasoning-preview")
-            )
+            assert len(group.query(".reasoning-preview")) == 3
             group.collapsed = True
             app.finish_preview("tools")
             app.append_reasoning("ETAPA_POSTERIOR")

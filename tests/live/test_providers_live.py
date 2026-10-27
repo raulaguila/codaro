@@ -81,6 +81,8 @@ def test_catalog_and_metadata(live_configuration, record_property):
     assert model["tools"] is not False
     record_property("context_window", model["context_window"])
     record_property("context_source", model["context_source"])
+    record_property("model_id", settings.model)
+    record_property("api_style", settings.api_style)
 
 
 def test_streaming_keeps_reasoning_separate(live_provider, record_property):
@@ -185,3 +187,40 @@ def test_implementation_and_validation(live_provider, request, record_property):
     )
     record_property("workflows", json.dumps(report))
     assert report["passed"] == report["total"], report
+
+
+def test_multiple_decisions_survive_compaction_and_restart(project, live_provider, record_property):
+    markers = ["decision_" + uuid.uuid4().hex[:10] for _ in range(3)]
+    agent = Agent(Repository(project), live_provider, mode="ask", history_budget=128)
+    try:
+        for i, marker in enumerate(markers):
+            agent.conversation.confirm(
+                f"Qual restrição {i + 1}?", marker, live_provider.settings.model
+            )
+        for i in range(12):
+            agent.conversation.complete(
+                [
+                    {"role": "user", "content": f"Etapa {i}: " + "contexto histórico " * 100},
+                    {"role": "assistant", "content": "Etapa registrada."},
+                ],
+                live_provider.settings.model,
+            )
+            agent.turns = list(agent.conversation.store.turns)
+            agent.trim_history()
+        assert len(agent.turns) < 12
+    finally:
+        agent.close()
+    resumed = Agent(
+        Repository(project), live_provider, mode="ask", history_budget=128, max_seconds=240
+    )
+    try:
+        resumed.activate_session("default")
+        resumed.turns.clear()
+        answer = resumed.ask(
+            "Recupere as três restrições que confirmei e liste seus valores completos."
+        )
+        assert all(marker in answer for marker in markers)
+        assert not resumed.policy.auto_edits
+        record_run(project, record_property)
+    finally:
+        resumed.close()

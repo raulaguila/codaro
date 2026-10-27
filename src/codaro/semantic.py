@@ -9,6 +9,8 @@ import os
 import threading
 from functools import wraps
 
+from codaro.languages import language_members
+
 MAX_VECTOR_CANDIDATES = 10000
 
 
@@ -45,14 +47,22 @@ class SemanticSearch:
             if self.encoder is None:
                 from fastembed import TextEmbedding
 
-                self.encoder = TextEmbedding(model_name=self.model)
+                # ONNX otherwise creates a host-sized thread pool, which can
+                # starve the terminal on machines/containers with many CPUs.
+                threads = int(os.getenv("CODARO_EMBEDDING_THREADS", "2"))
+                if not 1 <= threads <= 16:
+                    raise ValueError("CODARO_EMBEDDING_THREADS deve ficar entre 1 e 16.")
+                self.encoder = TextEmbedding(model_name=self.model, threads=threads)
             db = index.db
             db.execute(
                 "CREATE TABLE IF NOT EXISTS vectors(id INTEGER, model TEXT, digest TEXT, "
                 "vector TEXT, PRIMARY KEY(id,model))"
             )
-            clause = (" AND c.kind=?" if kind else "") + (" AND c.language=?" if language else "")
-            parameters = (*((kind,) if kind else ()), *((language,) if language else ()))
+            clause = " AND c.kind=?" if kind else ""
+            members = language_members(language) if language else ()
+            if members:
+                clause += " AND c.language IN (" + ",".join("?" for _ in members) + ")"
+            parameters = (*((kind,) if kind else ()), *members)
             rows = list(
                 db.execute(
                     "SELECT c.id,c.path,c.symbol,c.signature,substr(c.content,1,6000) AS content "

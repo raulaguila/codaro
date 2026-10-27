@@ -5,7 +5,7 @@ import asyncio
 import pytest
 from test_tui import UIModel, run_ui, wait_ready
 from textual.containers import VerticalScroll
-from textual.widgets import OptionList, RadioButton, Static
+from textual.widgets import Button, OptionList, RadioButton, Static
 
 from codaro.agent import Agent
 from codaro.index import CodeIndex
@@ -264,6 +264,9 @@ def test_model_selection_clears_onboarding_and_previous_context_meter(tmp_path):
             assert str(app.query_one("#context-meter", Static).render()) == ""
             assert "Janela:" in app.query_one("#context-meter", Static).tooltip
             assert not app.query(".notice")
-            assert "Modelo selecionado" in str(app.query_one("#status", Static).render())
+            assert str(app.query_one("#status", Static).render()) == "Pronto"
+            selector = app.query_one("#select-model", Button)
+            assert str(selector.label) == model.settings.model
+            assert selector.tooltip == model.settings.model
 
     run_ui(scenario())

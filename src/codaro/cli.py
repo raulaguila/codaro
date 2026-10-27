@@ -491,6 +491,8 @@ def doctor(
                 f"modelo: {model_label}\n"
                 f"provedor: {settings.provider_id or 'ambiente/local'} · API {settings.api_style}\n"
                 f"timeout: {settings.timeout:g}s\n"
+                f"stream: {settings.max_stream_bytes // (1024 * 1024)} MiB "
+                "(CODARO_MAX_STREAM_MB)\n"
                 f"janela configurada: {settings.context_window} tokens\n"
                 f"origem do limite: {settings.context_source}\n"
                 f"saída: {settings.max_output_tokens or 'Automático'}; "
@@ -575,12 +577,27 @@ def repository_map(
 
 
 @app.command("languages", hidden=True)
-def language_inventory(language: Annotated[str | None, typer.Option()] = None):
+def language_inventory(
+    language: Annotated[str | None, typer.Option()] = None,
+    offset: Annotated[int, typer.Option(min=0, max=10000)] = 0,
+    limit: Annotated[int, typer.Option(min=1, max=60)] = 20,
+    full: Annotated[
+        bool, typer.Option(help="Inclui aliases e disponibilidade local de LSP.")
+    ] = False,
+):
     """Mostra suporte de parser/fixtures e instalação local dos servidores LSP."""
     from codaro.language_support import language_support
 
     try:
-        typer.echo(json.dumps(language_support(language), ensure_ascii=False, indent=2))
+        typer.echo(
+            json.dumps(
+                language_support(
+                    language, offset=offset, limit=limit, detail="full" if full else "summary"
+                ),
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
     except ValueError as exc:
         fail(exc)
 

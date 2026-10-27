@@ -5,6 +5,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 from codaro.languages import BY_EXTENSION
@@ -94,6 +95,13 @@ class RepositoryError(ValueError):
     """A readable error for filesystem or repository policy failures."""
 
 
+def check_listing_cancelled(cancelled):
+    if cancelled is not None and cancelled.is_set():
+        from codaro.llm.errors import RequestCancelled
+
+        raise RequestCancelled("Listagem de arquivos cancelada.")
+
+
 class Repository:
     def __init__(self, root: Path):
         self.root = root.expanduser().resolve()
@@ -130,7 +138,7 @@ class Repository:
             return False
         return relative.suffix.lower() in SOURCE_EXTENSIONS or name in SOURCE_NAMES
 
-    def files(self) -> list[Path]:
+    def files(self, *, cancelled=None) -> list[Path]:
         args = ["rg", "--files", "--null", "--hidden", "--no-require-git"]
         for directory in sorted(EXCLUDED_DIRS):
             args.extend(["--glob", f"!**/{directory}/**"])
@@ -140,13 +148,16 @@ class Repository:
         if ignore.is_file():
             args.extend(["--ignore-file", str(ignore)])
         try:
-            result = subprocess.run(
-                args,
-                cwd=self.root,
-                capture_output=True,
-                timeout=20,
-                check=False,
-            )
+            if cancelled is None:
+                result = subprocess.run(
+                    args,
+                    cwd=self.root,
+                    capture_output=True,
+                    timeout=20,
+                    check=False,
+                )
+            else:
+                result = self._cancellable_listing(args, cancelled)
         except subprocess.TimeoutExpired as exc:
             raise RepositoryError(
                 "Listagem excedeu 20 segundos. Reduza o escopo do projeto."
@@ -157,6 +168,7 @@ class Repository:
             raise RepositoryError("Não foi possível listar arquivos. Confira permissões e ignores.")
         paths = []
         for raw_name in result.stdout.split(b"\0"):
+            check_listing_cancelled(cancelled)
             if not raw_name:
                 continue
             path = self.root / os.fsdecode(raw_name)
@@ -173,6 +185,28 @@ class Repository:
             except OSError:
                 continue
         return sorted(paths)
+
+    def _cancellable_listing(self, args, cancelled):
+        check_listing_cancelled(cancelled)
+        deadline = time.monotonic() + 20
+        with subprocess.Popen(
+            args, cwd=self.root, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        ) as process:
+            try:
+                while True:
+                    check_listing_cancelled(cancelled)
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(args, 20)
+                    try:
+                        stdout, stderr = process.communicate(timeout=min(0.05, remaining))
+                        return subprocess.CompletedProcess(args, process.returncode, stdout, stderr)
+                    except subprocess.TimeoutExpired:
+                        continue
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                process.communicate()
 
     def resolve_file(self, name: str) -> Path:
         path = self.root / self._relative(self.root / name)

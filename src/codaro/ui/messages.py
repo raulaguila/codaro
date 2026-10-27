@@ -1,5 +1,6 @@
 """Transcript elements shared by live, restored and diagnostic conversations."""
 
+from rich.markdown import Markdown as RichMarkdown
 from rich.text import Text
 from textual.widgets import Markdown, Static
 
@@ -18,13 +19,7 @@ class UserMessage(Static):
         self.update(Text.assemble((label, colors["text-muted"]), safe_preview(self.message)))
 
 
-class AssistantMessage(Markdown):
-    can_focus = True
-
-    def __init__(self, text):
-        self.message_text = text
-        super().__init__(text, classes="assistant", open_links=False)
-
+class ResponseActions:
     def on_mouse_down(self, event):
         if event.button == 3:
             event.stop()
@@ -37,6 +32,26 @@ class AssistantMessage(Markdown):
 
         if not isinstance(self.app.screen, ModalScreen):
             self.app.push_screen(MessageActions(self.message_text))
+
+
+class AssistantMessage(ResponseActions, Markdown):
+    can_focus = True
+
+    def __init__(self, text):
+        self.message_text = text
+        super().__init__(text, classes="assistant", open_links=False)
+
+
+class ArchivedAssistantMessage(ResponseActions, Static):
+    """Render saved Markdown without a separate widget for every block/list item."""
+
+    can_focus = True
+
+    def __init__(self, text):
+        self.message_text = text
+        super().__init__(
+            RichMarkdown(text, hyperlinks=False), classes="assistant archived-assistant"
+        )
 
 
 class DecisionMessage(Static):

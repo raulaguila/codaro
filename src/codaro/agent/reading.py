@@ -88,7 +88,8 @@ def initial_context(agent, index, question, detail, cancelled):
 def overview_context(agent, index, used, detail, cancelled):
     """Recover a project overview with bounded local discovery instead of guessed paths."""
     paths = [
-        path.relative_to(agent.repository.root).as_posix() for path in agent.repository.files()
+        path.relative_to(agent.repository.root).as_posix()
+        for path in agent.repository.files(cancelled=cancelled)
     ]
     manifests = {
         "pyproject.toml",

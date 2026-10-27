@@ -11,7 +11,12 @@ from codaro.index import safe_preview
 from codaro.interaction import InputHistory
 from codaro.llm import ModelError
 from codaro.ui.composer import Prompt
-from codaro.ui.messages import AssistantMessage, UserMessage
+from codaro.ui.messages import (
+    ArchivedAssistantMessage,
+    AssistantMessage,
+    DecisionMessage,
+    UserMessage,
+)
 from codaro.ui.widgets import ProposalCard
 
 
@@ -65,6 +70,15 @@ def save_session(self):
         return False
 
 
+async def compact_history(self):
+    """Keep recent interactive Markdown, flatten older settled replies in place."""
+    conversation = self.query_one("#conversation", VerticalScroll)
+    replies = [child for child in conversation.children if isinstance(child, AssistantMessage)]
+    for reply in replies[:-3]:
+        await conversation.mount(ArchivedAssistantMessage(reply.message_text), before=reply)
+        await reply.remove()
+
+
 async def restore_session(self):
     try:
         turns = self.session.load()
@@ -90,14 +104,17 @@ async def restore_session(self):
     self.reasoning_group = None
     conversation = self.query_one("#conversation", VerticalScroll)
     await conversation.remove_children()
+    messages = []
     for index, turn in enumerate(turns[-30:], max(0, len(turns) - 30)):
-        self.mount_message(UserMessage(turn[0]["content"]))
+        messages.append(UserMessage(turn[0]["content"]))
         for decision in self.session_decisions[index]:
-            self.mount_decision(decision)
-        self.mount_message(Static("Codaro", classes="speaker", markup=False))
-        self.mount_message(AssistantMessage(safe_preview(turn[-1]["content"])))
+            messages.append(DecisionMessage(decision["question"], decision["answer"]))
+        messages.append(Static("Codaro", classes="speaker", markup=False))
+        messages.append(ArchivedAssistantMessage(safe_preview(turn[-1]["content"])))
     for decision in self.current_decisions:
-        self.mount_decision(decision)
+        messages.append(DecisionMessage(decision["question"], decision["answer"]))
+    await conversation.mount(*messages)
+    self.call_after_refresh(conversation.scroll_end, animate=False)
     status = self.query_one("#status", Static)
     status.update("Conversa retomada")
     status.tooltip = "Histórico recuperado. Arquivos atuais e propostas devem ser revisados."

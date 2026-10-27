@@ -36,7 +36,7 @@ from codaro.ui import streaming as stream_ui
 from codaro.ui.composer import Composer, Prompt
 from codaro.ui.formatting import short_path, transport_label
 from codaro.ui.generation import GenerationRate
-from codaro.ui.messages import AssistantMessage, UserMessage
+from codaro.ui.messages import ArchivedAssistantMessage, AssistantMessage, UserMessage
 from codaro.ui.palette import system_commands
 from codaro.ui.plan import ExecutionPlan
 from codaro.ui.questions import QuestionDock
@@ -74,10 +74,12 @@ class CodaroApp(App):
         if isinstance(self.screen, ModalScreen):
             return
         message = self.focused
-        while message is not None and not isinstance(message, AssistantMessage):
+        while message is not None and not isinstance(
+            message, (AssistantMessage, ArchivedAssistantMessage)
+        ):
             message = message.parent
         if message is None:
-            messages = list(self.query(AssistantMessage))
+            messages = list(self.query("AssistantMessage, ArchivedAssistantMessage"))
             message = messages[-1] if messages else None
         if message is not None:
             message.show_actions()
@@ -145,6 +147,7 @@ class CodaroApp(App):
                     )
         self.agent = agent
         self.busy = False
+        self.tail_scroll_pending = False
         self.next_mode = None
         self.live_summaries = show_summaries
         self.session_decisions = copy.deepcopy(agent.conversation.store.decisions)
@@ -157,6 +160,7 @@ class CodaroApp(App):
         self.context_scope_requested = False
         self.empty_search = False
         self.cancelled = threading.Event()
+        self.shutdown_requested = threading.Event()
         self.response_text = ""
         self.rendered_text = ""
         self.draft_text = ""
@@ -195,7 +199,7 @@ class CodaroApp(App):
 
         register_questions(agent, self.ask_user_question)
         self.clear_backup = None
-        self.show_reasoning = False
+        self.show_reasoning = True
         self.reasoning_group: ReasoningGroup | None = None
         self.provider_available = not setup_required
         self.setup_required = setup_required
@@ -251,6 +255,7 @@ class CodaroApp(App):
         yield Composer(id="composer")
 
     async def on_mount(self):
+        self.agent.services.start_watch()
         self.update_session_header()
         if self.setup_required:
             self.query_one("#status", Static).update("Conecte um provedor para começar")
@@ -274,6 +279,29 @@ class CodaroApp(App):
             self.show_plan()
         except (ValueError, OSError) as exc:
             self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
+        self.check_recovery()
+
+    @work(thread=True, exclusive=True, group="recovery")
+    def check_recovery(self):
+        from codaro.recovery import recovery_report
+
+        agent, session_id = self.agent, self.agent.session_id
+        try:
+            report = recovery_report(agent)
+            if report["review_required"]:
+                self.deliver(self.show_recovery_notice, session_id)
+        except (OSError, ValueError):
+            return
+
+    def show_recovery_notice(self, session_id):
+        if self.agent.session_id == session_id:
+            self.mount_message(
+                Static(
+                    "Há operações anteriores a revisar · /recovery mostra os detalhes.",
+                    classes="notice neutral",
+                    markup=False,
+                )
+            )
 
     def resume_decision(self, restore):
         if restore == "new":
@@ -432,13 +460,14 @@ class CodaroApp(App):
 
     @work(thread=True, exclusive=True, group="files")
     def refresh_reference_paths(self):
+        self.agent.services.start_watch()
         try:
             paths = sorted(
                 path.relative_to(self.agent.repository.root).as_posix()
-                for path in self.agent.repository.files()
+                for path in self.agent.repository.files(cancelled=self.shutdown_requested)
             )
             self.deliver(self.set_reference_paths, paths)
-        except (ValueError, OSError):
+        except (ValueError, OSError, InvestigationCancelled):
             return
 
     def set_reference_paths(self, paths):
@@ -582,6 +611,18 @@ class CodaroApp(App):
 
     async def local_command(self, question: str):
         name, _, argument = question.partition(" ")
+        if name == "/recovery":
+            from codaro.recovery import recovery_report, recovery_text
+
+            report = await asyncio.to_thread(recovery_report, self.agent)
+            self.mount_message(
+                Static(
+                    safe_preview(self.agent.memory.redact(recovery_text(report))),
+                    markup=False,
+                    classes="notice neutral",
+                )
+            )
+            return
         argument = argument.strip()
         if name == "/jobs" and not argument:
             self.show_jobs()
@@ -1110,15 +1151,28 @@ class CodaroApp(App):
         if len(conversation.children) >= 100:
             for old in list(conversation.children)[:10]:
                 old.remove()
-        follow = conversation.is_vertical_scroll_end
+        self.transcript_updated()
         conversation.mount(widget)
-        if follow:
-            self.call_after_refresh(conversation.scroll_end, animate=False)
+
+    def transcript_updated(self):
+        conversation = self.query_one("#conversation", VerticalScroll)
+        if conversation.is_vertical_scroll_end:
+            if not self.tail_scroll_pending:
+                self.tail_scroll_pending = True
+                self.call_after_refresh(self.follow_transcript, conversation.scroll_y)
         else:
             button = self.query_one("#new-messages", Button)
             if not button.display:
                 button.display = True
                 self.update_completions()
+
+    def follow_transcript(self, requested_y):
+        self.tail_scroll_pending = False
+        if self.shutdown_requested.is_set():
+            return
+        conversation = self.query_one("#conversation", VerticalScroll)
+        if conversation.scroll_y >= requested_y:
+            conversation.scroll_end(animate=False, immediate=True)
 
     async def on_prompt_submitted(self, event: Prompt.Submitted):
         if self.pending_user_question:
@@ -1237,6 +1291,9 @@ class CodaroApp(App):
                 Static("Revise as edições pendentes antes de outra pergunta.", classes="notice")
             )
             return
+        await conversation_ui.compact_history(self)
+        if self.shutdown_requested.is_set():
+            return
         self.hide_welcome()
         if self.pending_recovery is not None:
             if preserve_draft:
@@ -1281,14 +1338,14 @@ class CodaroApp(App):
         self.investigate(question)
 
     def deliver(self, callback, *args):
-        if self.is_running:
+        if self.is_running and not self.shutdown_requested.is_set():
             try:
                 self.call_from_thread(self.deliver_if_mounted, callback, *args)
             except RuntimeError:
                 return
 
     def deliver_if_mounted(self, callback, *args):
-        if self.is_running and self.query("#status"):
+        if self.is_running and not self.shutdown_requested.is_set() and self.query("#status"):
             callback(*args)
 
     @work(thread=True, exclusive=True)
@@ -1584,9 +1641,11 @@ class CodaroApp(App):
             self.cancel_execution_plan()
             return
         if event.button.id == "new-messages":
-            self.query_one("#conversation", VerticalScroll).scroll_end(animate=False)
             event.button.display = False
             self.update_completions()
+            self.call_after_refresh(
+                self.query_one("#conversation", VerticalScroll).scroll_end, animate=False
+            )
             return
         if event.button.id == "retry-question" and not self.busy:
             self.run_worker(self.submit_question(self.active_question, preserve_draft=True))
@@ -1701,6 +1760,17 @@ class CodaroApp(App):
         if not isinstance(self.screen, ModalScreen):
             self.push_screen(JobsDialog(self.agent.jobs))
 
-    def on_unmount(self):
+    def request_shutdown(self):
+        """Signal owned work before Textual starts tearing down the transcript."""
+        self.shutdown_requested.set()
         self.cancelled.set()
+        self.agent.jobs.request_cancel()
+        self.agent.services.stop.set()
+
+    async def action_quit(self):
+        self.request_shutdown()
+        await super().action_quit()
+
+    def on_unmount(self):
+        self.request_shutdown()
         self.agent.close()

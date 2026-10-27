@@ -101,6 +101,7 @@ ModePicker { background: transparent; }
 .decision { height: auto; width: 100%; max-width: 100; margin: 1 0; padding: 0 1;
     background: $background; border-left: solid $primary 35%; }
 .assistant { margin: 0; padding: 0 1; background: $background; }
+.archived-assistant { height: auto; max-width: 102; }
 .assistant MarkdownParagraph, .assistant MarkdownH1, .assistant MarkdownH2,
 .assistant MarkdownH3, .assistant MarkdownList, .assistant MarkdownBlockQuote,
 .generation-text MarkdownParagraph, .generation-text MarkdownH1, .generation-text MarkdownH2,
@@ -136,6 +137,8 @@ ModePicker { background: transparent; }
 .live-steps { height: auto; max-height: 2; padding-left: 2; color: $text-muted; }
 .intermediate-step { height: auto; border: none; padding: 0; color: $text-muted; }
 .intermediate-step > Contents { max-height: 8; overflow-y: auto; }
+.timeline-tool { height: auto; color: $text-muted; margin: 0 0 1 0; }
+.timeline-tool.error { color: $warning; }
 
 .notice { height: auto; margin: 1; color: $warning; }
 .notice.neutral { color: $text-muted; }

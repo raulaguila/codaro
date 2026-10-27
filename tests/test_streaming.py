@@ -175,7 +175,7 @@ def test_stream_bounds_content_and_transport_bytes():
     with pytest.raises(ModelError, match="limite"):
         provider.stream([])
     provider, _ = model([b":" * (MAX_STREAM_BYTES + 1)])
-    with pytest.raises(ModelError, match="2 MB"):
+    with pytest.raises(ModelError, match="16 MiB"):
         provider.stream([])
 
 

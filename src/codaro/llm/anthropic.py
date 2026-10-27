@@ -229,8 +229,10 @@ class Anthropic(OpenAICompatible):
     def read_stream(self, response, on_delta, cancelled, on_reasoning):
         blocks, usage, closed = {}, {}, set()
         reason, finished, size, thinking_size = None, False, 0, 0
-        for number, raw in enumerate(sse_events(response, cancelled)):
-            if number >= 10000:
+        for number, raw in enumerate(
+            sse_events(response, cancelled, max_bytes=self.settings.max_stream_bytes)
+        ):
+            if number >= self.settings.max_stream_events:
                 raise ModelError("Stream Anthropic contém eventos demais.")
             capture_wire("sse", raw)
             event = json.loads(raw)

@@ -129,7 +129,7 @@ def test_preview_keeps_specific_retry_reason_in_expandable_details():
     assert preview.title == "Revisando resposta…"
     assert preview.tooltip == "Limite de resposta atingido · Gerando uma versão mais curta"
     assert "Limite de resposta atingido" in str(preview.content.render())
-    assert preview.collapsed
+    assert not preview.collapsed
 
 
 def test_ui_consultation_does_not_report_old_task_as_blocked(tmp_path):

@@ -123,9 +123,24 @@ async def capture(output, root):
             app.append_reasoning(
                 "Vou consultar o contrato e verificar o tratamento de nomes vazios."
             )
+            app.finish_preview("tools")
             app.activity(AgentEvent("tool_start", "Ler arquivo", "main.py", state="running"))
+            await save("tool-running")
             app.activity(
                 AgentEvent("tool_end", "Ler arquivo", "main.py:1–2", state="success", elapsed_ms=12)
+            )
+            app.append_reasoning("A leitura confirmou a API; vou conferir seus consumidores.")
+            await save("process-live")
+            app.finish_preview("tools")
+            app.activity(AgentEvent("tool_start", "Buscar referências", "greet", state="running"))
+            app.activity(
+                AgentEvent(
+                    "tool_end",
+                    "Buscar referências",
+                    "tests/test_main.py",
+                    state="success",
+                    elapsed_ms=9,
+                )
             )
             await save("thinking")
             app.append_delta("O contrato de `main.py` pode preservar o retorno atual.\n\n")
@@ -143,6 +158,9 @@ async def capture(output, root):
             )
             app.finish(answer)
             await save("chat-final")
+            app.activity_group.collapsed = False
+            await save("process-expanded")
+            app.activity_group.collapsed = True
             app.mount_decision({"question": "Qual contrato preservar?", "answer": "API atual"})
             await pilot.pause()
             app.query_one("#conversation").scroll_end(animate=False, immediate=True)

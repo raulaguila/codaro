@@ -40,6 +40,7 @@ COMMANDS = {
     "/changes": "Alterações e checkpoints locais",
     "/undo": "Revisar diff para desfazer a última edição ou um checkpoint",
     "/jobs": "Acompanhar comandos e consultar suas saídas",
+    "/recovery": "Revisar operações interrompidas sem reexecutá-las",
 }
 
 

@@ -6,6 +6,7 @@ import hashlib
 import json
 import time
 from collections import deque
+from contextlib import contextmanager
 from contextvars import ContextVar
 from enum import StrEnum
 from functools import wraps
@@ -18,6 +19,8 @@ class Phase(StrEnum):
     REQUESTING = "requesting_model"
     TOOLS = "executing_tools"
     COMPACTING = "compacting"
+    APPROVAL = "awaiting_approval"
+    USER = "awaiting_user"
     COMPLETED = "completed"
     INTERRUPTED = "interrupted"
 
@@ -31,8 +34,16 @@ class TurnProgress:
         self.flat = 0
 
     def transition(self, phase):
+        if not isinstance(phase, Phase):
+            raise ValueError("Fase de execução inválida.")
         if self.phase == phase:
             return
+        if self.phase in {Phase.COMPLETED, Phase.INTERRUPTED}:
+            raise ValueError("Uma execução encerrada não pode reiniciar.")
+        if self.phase is None and phase != Phase.PREPARING:
+            raise ValueError("A execução deve começar em preparação.")
+        if phase == Phase.PREPARING and self.phase not in {None, Phase.APPROVAL, Phase.USER}:
+            raise ValueError("Preparação não pode reiniciar no meio da execução.")
         self.phase = phase
         if flow := current_flow.get():
             flow.append_event(
@@ -108,6 +119,20 @@ class TurnProgress:
 
 
 active_progress = ContextVar("codaro_progress", default=None)
+
+
+@contextmanager
+def waiting(phase):
+    """Approval/question waits are explicit and always restore the previous phase."""
+    state = active_progress.get()
+    previous = state.phase if state else None
+    if state:
+        state.transition(phase)
+    try:
+        yield
+    finally:
+        if state and state.phase not in {Phase.COMPLETED, Phase.INTERRUPTED}:
+            state.transition(previous)
 
 
 def tracked_run(function):

@@ -46,6 +46,14 @@ OCaml, R, Julia, Perl, PowerShell, Clojure, F#, Fortran, Zig, Solidity, Protobuf
 GraphQL, Vue e Svelte. Há ainda gramáticas para formatos de configuração,
 infraestrutura, documentação e outras linguagens populares.
 
+Os filtros usam um registro único de extensões, nomes e aliases em
+`codaro.languages`. Dockerfile/Containerfile e Makefile/GNUmakefile são
+reconhecidos por nome, além dos 78 registros por extensão; `text` cobre formatos
+permitidos sem gramática. O catálogo completo, aliases e paginação de
+`get_language_support` estão em [TOOLS.md](TOOLS.md#catálogo-de-linguagens-e-aliases).
+O filtro `ocaml` inclui `.ml` e `.mli`, mantendo a gramática de interface
+`ocaml_interface`; essa regra também vale para a busca semântica.
+
 Os níveis são diferentes:
 
 1. **Texto:** indexação e busca dos arquivos permitidos, mesmo sem símbolos.

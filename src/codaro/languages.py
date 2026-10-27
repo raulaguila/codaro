@@ -39,7 +39,7 @@ EXTENSIONS = {
     "elixir": (".ex", ".exs"),
     "erlang": (".erl", ".hrl"),
     "haskell": (".hs",),
-    "ocaml": (".ml", ".mli"),
+    "ocaml": (".ml",),
     "r": (".r",),
     "julia": (".jl",),
     "perl": (".pl", ".pm"),
@@ -114,6 +114,43 @@ ALIASES = {
     "c-sharp": "csharp",
     "objective-c": "objc",
 }
+FILENAMES = {
+    "dockerfile": ("Dockerfile", "Containerfile"),
+    "make": ("Makefile", "GNUmakefile"),
+    "cmake": ("CMakeLists.txt",),
+}
+BY_FILENAME = {name.casefold(): language for language, names in FILENAMES.items() for name in names}
+_SUPPORTED_LANGUAGE_SET = frozenset(EXTENSIONS) | frozenset(FILENAMES) | {"text"}
+SUPPORTED_LANGUAGES = tuple(sorted(_SUPPORTED_LANGUAGE_SET))
+LANGUAGE_FAMILIES = {"ocaml": ("ocaml", "ocaml_interface")}
+
+
+def normalize_language(language: str) -> str:
+    """Resolve filter aliases without changing the grammar used for a source file."""
+    if not isinstance(language, str):
+        raise ValueError("Linguagem deve ser texto.")
+    canonical = language.strip().casefold()
+    canonical = ALIASES.get(canonical, canonical)
+    if canonical not in _SUPPORTED_LANGUAGE_SET:
+        raise ValueError(
+            "Linguagem desconhecida; consulte get_language_support ou use extensão/glob."
+        )
+    return canonical
+
+
+def language_members(language: str) -> tuple[str, ...]:
+    canonical = normalize_language(language)
+    return LANGUAGE_FAMILIES.get(canonical, (canonical,))
+
+
+def language_matches(actual: str, requested: str) -> bool:
+    return actual in language_members(requested)
+
+
+def language_for_extension(extension: str) -> str:
+    return BY_EXTENSION.get("." + extension.casefold().lstrip("."), "text")
+
+
 DECLARATIONS = {
     "function_definition": "function",
     "function_declaration": "function",
@@ -176,20 +213,16 @@ DECLARATIONS = {
 
 def language_for(path: str | Path, text: str = "") -> str:
     path = Path(path)
-    if path.name.lower() in {"dockerfile", "containerfile"}:
-        return "dockerfile"
-    if path.name.lower() in {"makefile", "gnumakefile"}:
-        return "make"
-    if path.name.lower() == "cmakelists.txt":
-        return "cmake"
+    if named := BY_FILENAME.get(path.name.casefold()):
+        return named
     if path.suffix.lower() == ".h" and re.search(
         r"(?m)^\s*(?:namespace\s+\w|class\s+\w|template\s*<)", text
     ):
         return "cpp"
-    return BY_EXTENSION.get(path.suffix.lower(), "text")
+    return language_for_extension(path.suffix)
 
 
-@lru_cache(maxsize=64)
+@lru_cache(maxsize=128)
 def parser_available(language: str) -> bool:
     try:
         get_parser(language)

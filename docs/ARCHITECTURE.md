@@ -179,3 +179,17 @@ As fases `preparing`, `requesting_model`, `executing_tools`, `compacting`,
 nem comprovante de conclusão funcional; somente recibos de ferramentas comprovam
 efeitos e validações. A extração do loop reduz o controlador, mas o loop continua
 um ponto de orquestração complexo e merece decomposição incremental com testes.
+
+## Componentes de maturidade
+
+- `project_watcher.py`: eventos nativos agrupados, atualização de caminhos alterados
+  e reconciliação periódica; consultas mantêm suas verificações de atualidade.
+- `checkpoints.py:reconcile` e `recovery.py`: leitura dos registros duráveis existentes,
+  comparação de hashes/existência e identificação de comandos sem recibo de término.
+- `qualification.py`: avaliação de evidências JUnit; execução de modelos exige
+  consentimento explícito nos runners de benchmark.
+- `ui/sections.py`: adapta o recolhimento do Textual sem mover a posição de leitura.
+  `ActivityGroup` mantém uma sequência de etapas, inclusive eventos recebidos antes
+  de montar o componente. A resposta final é montada diretamente na conversa.
+- `agent/progress.py`: fases tipadas, esperas explícitas por decisão/aprovação e
+  proteção contra reabrir uma execução terminal. As fases não substituem recibos.

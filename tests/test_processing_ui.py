@@ -25,7 +25,7 @@ def test_activity_updates_preserve_manual_collapse_after_error(tmp_path):
     run_ui(scenario())
 
 
-def test_reasoning_steps_share_one_group_and_respect_collapse(tmp_path):
+def test_reasoning_steps_are_chronological_and_keep_manual_collapse(tmp_path):
     app = CodaroApp(Agent(Repository(tmp_path), UIModel()))
 
     async def scenario():
@@ -33,19 +33,20 @@ def test_reasoning_steps_share_one_group_and_respect_collapse(tmp_path):
             app.append_reasoning("Primeira etapa.")
             await pilot.pause()
             group = app.reasoning_group
-            assert group.collapsed
-            group.collapsed = False
-            app.finish_preview("tools")
-            app.append_reasoning("Segunda etapa.")
-            await pilot.pause()
             assert not group.collapsed
             group.collapsed = True
             app.finish_preview("tools")
-            app.append_reasoning("Terceira etapa.")
+            app.activity(AgentEvent("tool_end", "Ler arquivo", "main.py", state="success"))
+            app.append_reasoning("Segunda etapa.")
             await pilot.pause()
             assert group.collapsed
-            assert len(app.query(ReasoningGroup)) == 1
-            assert group.steps == 3
-            assert len(group.query(".reasoning-preview")) == 3
+            assert app.reasoning_group is not group
+            assert not app.reasoning_group.collapsed
+            assert len(app.query(ReasoningGroup)) == 2
+            assert len(app.query(".reasoning-preview")) == 2
+            sequence = app.activity_group.sequence
+            assert sequence[0] is group
+            assert "Ler arquivo" in str(sequence[1].render())
+            assert sequence[2] is app.reasoning_group
 
     run_ui(scenario())

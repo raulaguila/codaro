@@ -52,6 +52,14 @@ class RetrievalServices:
         self.stop = threading.Event()
         self.worker = None
         self.warmup_status = "idle"
+        self.watcher = None
+
+    def start_watch(self):
+        from codaro.project_watcher import ProjectWatcher
+
+        if self.watcher is None and not self.stop.is_set():
+            self.watcher = ProjectWatcher(self.repository, self.stop)
+            self.watcher.start()
 
     def semantic(self):
         if self._semantic is None:
@@ -108,3 +116,5 @@ class RetrievalServices:
         self.lsp.close()
         if self.worker:
             self.worker.join(timeout=3)
+        if self.watcher:
+            self.watcher.close()

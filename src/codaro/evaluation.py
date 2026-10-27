@@ -111,7 +111,7 @@ def answer_metrics(answer: str, evidence: list, expected: list[str], contains: l
     }
 
 
-def evaluate(path: Path, *, provider=None, mode="retrieval"):
+def evaluate(path: Path, *, provider=None, mode="retrieval", semantic=None):
     if mode not in {"retrieval", "agent"} or mode == "agent" and provider is None:
         raise ValueError("Modo de avaliação inválido.")
     cases = load_cases(path)
@@ -126,6 +126,7 @@ def evaluate(path: Path, *, provider=None, mode="retrieval"):
             result["repository_root"] = str(repository.root)
             if mode == "retrieval":
                 with CodeIndex(repository) as index:
+                    index.semantic = semantic
                     matches = index.search(case["query"], limit=6, **case.get("search_options", {}))
                     diagnostics = dict(index.last_search)
                 found = {item["path"] for item in matches}

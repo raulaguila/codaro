@@ -90,8 +90,6 @@ def activate_provider(app, settings: Settings | None, *, preserve_session=True):
         app.query_one(
             "#context-meter", Static
         ).tooltip = f"Janela: {settings.context_window:,} tokens · {settings.context_source}"
-        app.query_one("#status", Static).update(
-            safe_preview("Modelo selecionado · " + settings.model)
-        )
+        app.query_one("#status", Static).update("Pronto")
     except (ValueError, OSError) as exc:
         app.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))

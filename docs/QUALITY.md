@@ -41,7 +41,7 @@ a pré-release. A avaliação de busca contém 19 casos; cinco fixtures de imple
 aprovações reais e execução dos testes nas cópias temporárias. Esse replay verifica
 o fluxo da aplicação; a qualidade do modelo é medida na aceitação opt-in.
 
-`python scripts/capture_ui.py` gera 132 capturas SVG e texto em `artifacts/ui`, em
+`python scripts/capture_ui.py` gera 144 capturas SVG e texto em `artifacts/ui`, em
 60×20, 80×24, 120×35 e 160×45, sem chamadas ao modelo e usando configuração temporária.
 Inclui geração com velocidade sintética, plano extenso, pergunta longa, detalhes,
 ações da resposta, leitura local, conversas, revisão de diff e seleção de modelos. O job
@@ -126,7 +126,7 @@ conclusão técnica e correspondência textual não substituem revisão semânti
 
 O workflow `Live provider acceptance` aceita execução manual e reutilização,
 e agenda um smoke semanal com Ollama local na branch padrão do GitHub. Não
-recebe credenciais por eventos de PR; o smoke também é gate de release. O ambiente
+recebe credenciais por eventos de PR; a release exige aceitação completa com implementação e validação. O ambiente
 `live-providers` pode exigir revisores antes da execução. Há duas opções:
 
 - `ollama`: inicia Ollama em contêiner local descartável e baixa o modelo informado.
@@ -223,3 +223,11 @@ perguntas e aprovações pendentes, saída paginada sem inferência, cofre bloqu
 rótulos HTTP/HTTPS, resumo de escopo e decisões em 60×20/80×24/120×35. O contraste
 do placeholder é medido nas cores do SVG nos temas claro e escuro; isso não
 substitui avaliação com terminais e tecnologias assistivas reais.
+
+## Qualificação de modelos e processo da interface
+
+`python scripts/qualify_models.py --profile PERFIL --allow-model-calls --allow-execution --output artifacts/qualification.json` executa toda a aceitação em fixtures descartáveis. O relatório exige catálogo, streaming, ferramentas, recuperação de histórico/decisões após descarte e reinício, leitura paginada e as cinco implementações validadas. Testes ignorados ou falhos impedem qualificação. O custo permanece desconhecido quando não há dados para calculá-lo.
+
+O mesmo script aceita `--junit ARQUIVO` sem novas chamadas. No workflow de release, `CODARO_QUALIFICATION_MODEL` e `CODARO_QUALIFICATION_API_STYLE` escolhem modelo e protocolo; sem configuração usa Ollama local com Qwen 2.5 3B. A versão só passa se esse modelo concluir a bateria inteira. Os limites históricos desse modelo continuam válidos: não se presume aprovação da bateria completa. Para endpoints remotos, configure o environment `live-providers` e seus secrets antes de selecionar o protocolo.
+
+`python scripts/capture_process.py` registra pensamento, ferramenta em andamento, nova análise, resposta final e processo expandido em quatro tamanhos. As 20 capturas são sintéticas, geradas da aplicação real e não fazem inferência. Os testes verificam eventos anteriores ao primeiro refresh, ordenação, recolhimento, resposta final como irmã do processo e preservação da rolagem manual.

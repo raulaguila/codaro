@@ -186,13 +186,14 @@ A nova interface segue a [proposta consolidada de UI/UX](docs/design/ui-prototyp
 - `codaro chat` exibe a resposta final após o agente concluir e validar o turno, em Markdown, com títulos, listas, tabelas e destaque de sintaxe em blocos de código. Durante a geração, a barra de status e as ferramentas mostram o progresso.
 - A abertura fica limpa quando já existe um modelo configurado. Sem provedor, o cadastro guiado continua disponível. Enter envia; Alt+Enter insere uma nova linha (Shift+Enter também funciona quando reconhecido pelo terminal). A entrada cresce até oito linhas, adaptando-se à altura do terminal, e preserva rascunhos acima de 8.000 caracteres. Ao digitar `/`, setas navegam e Enter abre o comando destacado; Tab completa sem executar e Esc fecha a lista. A lista limita sua altura para preservar espaço para o chat.
 - O plano ativo fica fixo junto ao input, aberto inicialmente, com progresso e rolagem própria. Recolher mantém o resumo visível; atualizações não reabrem a lista. Mensagens, configurações, falhas e interrupções da geração preservam o plano. **Cancelar plano** encerra a tarefa e revoga permissões, preservando arquivos já alterados. Concluir a tarefa remove o plano do composer; `/task` mantém os detalhes disponíveis. `Ctrl+X` interrompe a geração e deixa a tarefa bloqueada para retomada, sem cancelar seu plano.
+- O modelo ativo aparece no seletor do cabeçalho. Selecioná-lo atualiza esse controle e devolve o rodapé ao estado da tarefa, sem repetir o nome abaixo do input.
 - Clique no modo do cabeçalho ou use `/mode` / **Ctrl+P → Modo de trabalho**. Setas destacam; Enter ou Aplicar confirma; Esc cancela. Durante a execução, a seleção vale para o próximo pedido. **Edições → Aprovar automaticamente** permite criar/editar arquivos autorizados nesta conversa; ações destrutivas e comandos exigem confirmação. O cabeçalho identifica **Executar · Auto**; a autorização é revogada em nova conversa ou troca efetiva de modo/sessão/provedor.
 - Quando precisar de uma decisão, o agente pode chamar `ask_user_question`. Pergunta, sugestões verticais e resposta livre compartilham o mesmo input. Setas e Enter escolhem; digitar substitui a sugestão, incluindo texto iniciado com `/`. Pausar/Esc mantém a pergunta pendente. A resposta real volta ao modelo como resultado da ferramenta, sem conceder aprovação de edição/comandos.
 - Cada turno tem uma seção **Etapas** com ações, leituras e buscas. Os detalhes mostram consulta, arquivo, resultados e leitura parcial. Novos eventos e erros respeitam a escolha de manter o grupo recolhido.
 - As atividades aparecem uma única vez na conversa. A barra de status informa o arquivo ou consulta durante a execução.
 - O cabeçalho mostra projeto, modelo e modo. TLS sem verificação permanece identificado. O status informa a etapa atual; `/status` abre os detalhes e `/pwd` mostra o caminho completo.
-- O streaming aparece com o rótulo **Codaro**, fora das etapas, e a resposta final permanece nessa área. Se a etapa terminar em ferramentas, nova tentativa ou interrupção, a prévia é arquivada nos detalhes. A geração acompanha até 16.000 caracteres; etapas arquivadas mostram até 4.000, com fluxo completo em `.codaro/prompt.json`. Somente a resposta aceita é salva como resposta final.
-- Quando o servidor envia `reasoning_content` ou `reasoning` textual separado, ele aparece em **Raciocínio enviado pelo modelo · provisório**, em um bloco próprio com até 4.000 caracteres. Ao terminar a etapa, fica recolhido. Esse texto não é misturado à resposta, reenviado como conversa nem salvo na sessão; o dump HTTP continua disponível para diagnóstico. Modelos que não expõem esse campo mostram apenas geração e atividades. Não inferimos raciocínio a partir de texto comum.
+- Durante a execução, a seção **Etapas** mostra os textos intermediários do modelo e as atividades em ordem: pensamento → ferramenta em execução → resultado → novo pensamento. Uma chamada de ferramenta não apaga o texto anterior. Ao concluir, o processo fica recolhido em **Concluído em Ns · N ações · Ver processo**, e a resposta final aparece separada. Expandir essa linha recupera as etapas exibidas. A geração acompanha até 16.000 caracteres e as prévias de pensamento até 4.000; omissões são sinalizadas. O diagnóstico tem retenção própria, sem promessa de captura integral após atingir suas cotas.
+- Quando o servidor envia raciocínio textual separado, ele aparece com menor destaque dentro do processo. A escolha de recolher o processo ou uma seção é respeitada durante a execução. `/reasoning` controla a exibição de novos blocos de raciocínio. Esse texto não é misturado à resposta final, reenviado como conversa nem salvo na sessão. Modelos que não expõem esse campo mostram apenas seus textos intermediários e atividades; não inferimos raciocínio a partir de texto comum.
 - `codaro ask`, `plan` e `execute` mostram progresso no terminal e enviam atividade para stderr; o texto final aparece após o retorno do agente. O conteúdo provisório fica no JSON de diagnóstico.
 - O provedor solicita SSE da API OpenAI-compatible e entrega fragmentos conforme chegam. Se o servidor responder com JSON comum ou acumular o conteúdo antes de enviar, a resposta chega de uma vez; a interface não simula streaming. Confira os eventos SSE e o corpo da resposta em `.codaro/prompt.json` para distinguir esse caso.
 - Uma resposta interrompida ou cancelada não é salva como resposta final. O chat conserva a prévia recolhida naquela tela. Decisões já enviadas pelo usuário são salvas imediatamente e restauradas, mesmo que a geração seja interrompida depois. Essa apresentação fica separada das mensagens do protocolo de ferramentas.
@@ -360,6 +361,8 @@ codaro --resume
 
 A conversa original é salva automaticamente em `.codaro/session.json`, com até 50 turnos e 512 KB; conversas adicionais usam arquivos por identificador. Ao retomar, o chat mostra até 30 turnos recentes. O contexto enviado à IA mantém seu próprio limite e pode descartar turnos antigos sem apagar a conversa salva. Agente e UI compartilham a mesma gravação, incluindo decisões confirmadas e respostas pendentes. As respostas reais do usuário ficam pesquisáveis e voltam ao contexto de forma limitada; decisões maiores são recuperadas com `search_conversation` e `read_conversation`. Elas não concedem permissões de execução.
 
+O histórico retomado usa renderização leve de Markdown; em conversas abertas, respostas anteriores às três mais recentes passam para essa mesma renderização ao enviar outra pergunta. O texto completo, blocos de código e ações de copiar/consultar continuam disponíveis. Ctrl+Q sinaliza o cancelamento da investigação, dos comandos e da listagem de arquivos antes de desmontar a interface.
+
 `/clear` e Ctrl+L limpam as mensagens e salvam essa limpeza, preservando a tarefa e as propostas atuais. `/restore-clear` desfaz a última limpeza enquanto a aplicação estiver aberta. `/new` abre outra conversa; se a criação ou preparação falhar, a tarefa, as propostas e as permissões atuais são preservadas. Propostas antigas não são reaplicadas ao retomar e permissões são revogadas na troca de sessão.
 
 Use `/sessions` para listar conversas, `/session ID` para trocar e `/session archive ID` para arquivar uma conversa inativa sem apagar seus dados. `/session restore ID` a devolve à lista. Há até 30 sessões disponíveis e 300 entradas armazenadas, incluindo arquivadas. Na CLI, use `codaro sessions list`, `codaro sessions use ID`, `codaro sessions archive ID` e `codaro sessions restore ID`.
@@ -483,6 +486,14 @@ codaro doctor --check-tools --tls-insecure
 Esse diagnóstico faz duas chamadas reais ao provedor: pede uma ferramenta de teste sem argumentos, devolve um resultado com um identificador aleatório usando `role: tool` e verifica se a resposta final contém esse identificador. A segunda chamada usa o caminho de streaming, incluindo o fallback JSON. Nenhuma ferramenta de arquivo é executada. Um resultado positivo confirma esse ciclo, não garante a qualidade de toda investigação. `codaro doctor` sem a flag continua sem chamar a API.
 
 Resultados de ferramentas incluem `name` e o `tool_call_id`, inclusive nos casos de erro. Um erro em qualquer ferramenta do lote mantém a recuperação de protocolo ativa. Respostas com `function_call` legado ou conclusão `tool_calls` sem chamadas são rejeitadas explicitamente.
+
+O transporte incremental aceita **16 MiB por chamada** por padrão, incluindo os envelopes SSE/NDJSON, e pode ser ajustado sem aumentar a janela de contexto:
+
+```bash
+CODARO_MAX_STREAM_MB=32 codaro .
+```
+
+O intervalo permitido é 1–128 MiB. A configuração vale também ao selecionar outro modelo/provedor. `codaro doctor` mostra o limite efetivo. Cada evento continua limitado a 1 MiB e argumentos de ferramentas a 64.000 bytes; os limites de texto e de diagnóstico são independentes. Um fluxo malformado continua sendo encerrado com a conexão fechada.
 
 ## JSON da última investigação
 
@@ -658,6 +669,10 @@ Argumentos de ferramentas têm teto de 64.000 bytes UTF-8 de JSON serializado, a
 
 Detalhamento dos 13 achados corrigidos e critérios de regressão: [correções do fluxo do modelo](docs/MODEL_FLOW_FIXES.md).
 
+## Maturidade e aceitação
+
+Veja [qualificação de modelos, reconciliação e atualização incremental](docs/MATURITY.md) para os novos testes, ferramentas de benchmark e limites de validação.
+
 ## Desenvolvimento
 
 Veja a [estrutura do projeto e os limites dos módulos](docs/ARCHITECTURE.md)
@@ -671,6 +686,14 @@ pytest -q
 ruff check .
 ruff format --check .
 ```
+
+Para medir retomada de histórico, saída e gravação de sessão sem chamar IA:
+
+```bash
+python scripts/benchmark_ui.py --output artifacts/performance/report.json
+```
+
+O benchmark usa dados temporários, gera medições e capturas SVG, e não altera conversas reais. Veja os [resultados e limites da análise de performance](docs/PERFORMANCE.md).
 
 Os testes verificam recuperação, atualização e migração do índice, rollback, restrições de arquivos, limites do agente, contratos HTTP, CLI, propostas de edição, conflitos, aplicação atômica e interação real com a interface Textual em modo headless. Por padrão, os modelos são simulados e não há chamadas pagas; o cancelamento também é exercitado com HTTP local quando sockets estão disponíveis. O CI executa a suíte em Python 3.11, 3.12 e 3.13 no Linux, publica cobertura em Python 3.12 e executa os casos de recuperação versionados como verificação de qualidade. Em Linux, macOS e Windows, também constrói e instala o wheel e verifica imports, CLI, estilos, agente, diagnóstico e UI fora do checkout. Esses smoke tests não equivalem à suíte completa nos três sistemas. Testes reais exigem `--live-provider PERFIL` ou execução manual do workflow de aceitação. A auditoria local usa Python 3.12/Linux.
 
@@ -697,7 +720,7 @@ Versões do `pyproject.toml` e `codaro.__version__` devem coincidir. O workflow
 instalado e capturas da UI), constrói wheel e sdist, executa `twine check`, gera `SHA256SUMS` e valida
 o pacote instalado nos três sistemas. Uma execução manual gera artefatos para
 revisão. Uma tag `v0.2.0`, criada no commit revisado e enviada ao GitHub, publica
-uma **pré-release** apenas depois dessas verificações e do smoke real com Ollama.
+uma **pré-release** apenas depois dessas verificações e da aceitação completa com implementação e validação.
 A publicação PyPI opcional exige configuração administrativa e está desabilitada
 por padrão. Veja [Distribuição e migrações](docs/RELEASES.md) e [Changelog](CHANGELOG.md).
 
@@ -709,8 +732,7 @@ Veja os achados e as limitações em [AUDIT.md](AUDIT.md).
 - Ampliar o conjunto de avaliações com projetos e perguntas reais do usuário.
 - Avaliar rerankers neurais além da reordenação lexical já disponível.
 - Ampliar cobertura de construções/dialetos dos parsers e integração LSP por linguagem.
-- Interrupção imediata de conexões que estejam sem enviar fragmentos.
-- Recuperação de lotes após interrupções abruptas e adaptadores de sandbox para outros sistemas.
+- Ampliar a reconciliação de operações interrompidas e os adaptadores de sandbox para outros sistemas.
 
 
 ## Diagnóstico e recuperação

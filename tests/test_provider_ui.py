@@ -61,6 +61,9 @@ def test_chat_registration_and_model_selection_updates_live_budgets(tmp_path, mo
                     break
             assert not isinstance(app.screen, ModelPicker)
             assert app.agent.provider.settings.model == "small-test"
+            assert str(app.query_one("#select-model").label) == "small-test"
+            assert "small-test" not in str(app.query_one("#status", Static).render())
+            assert "Pronto" in str(app.query_one("#status", Static).render())
             assert app.agent.provider.settings.tls_insecure
             assert app.agent.context_window == 8192 and app.agent.input_limit == 7168
             assert store.active_settings().model == "small-test"

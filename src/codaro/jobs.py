@@ -184,11 +184,10 @@ class JobManager:
             return [job.id for job in active]
 
     def close(self):
+        self.request_cancel()
+        deadline = time.monotonic() + 3
         for job in list(self.jobs.values()):
-            if not job.done.is_set():
-                job.cancelled.set()
-        for job in list(self.jobs.values()):
-            job.done.wait(3)
+            job.done.wait(max(0, deadline - time.monotonic()))
 
     def active(self, *, purpose=None):
         return [

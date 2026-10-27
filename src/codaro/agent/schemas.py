@@ -405,8 +405,14 @@ CHANGES_TOOL = schema(
 COMMAND_READ_TOOLS = [
     schema(
         "get_language_support",
-        "Consulta gramáticas, nível de verificação e LSP instalado por linguagem.",
-        {"language": {"type": "string", "maxLength": 80}},
+        "Consulta linguagens e parsers em páginas com next_offset. "
+        "Use detail=full para aliases e LSP; language filtra uma linguagem/família.",
+        {
+            "language": {"type": "string", "maxLength": 80},
+            "offset": {"type": "integer", "minimum": 0, "maximum": 10000},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 60},
+            "detail": {"type": "string", "maxLength": 7, "enum": ["summary", "full"]},
+        },
         [],
     ),
     schema(

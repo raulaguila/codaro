@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from textual.containers import VerticalScroll
 from textual.widgets import Static
 
 from codaro.agent import AgentEvent
@@ -72,6 +71,7 @@ def activity(app, event: AgentEvent):
             app.answer_preview.finish("retry", event.title)
             app.answer_preview = None
     elif event.kind == "tool_start":
+        ensure_stages(app).start(event)
         if event.title == "Perguntar ao usuário":
             progress(app, "Aguardando sua decisão")
             app.set_generation_status("Aguardando sua resposta")
@@ -113,6 +113,7 @@ def append_delta(app, delta: str):
 
 
 def append_reasoning(app, delta: str):
+    app.transcript_updated()
     details = ensure_stages(app)
     details.has_reasoning = True
     if not details.events:
@@ -126,18 +127,7 @@ def append_reasoning(app, delta: str):
             app.reasoning_group = ReasoningGroup(
                 app.reasoning_preview, collapsed=not app.show_reasoning
             )
-            group = app.reasoning_group
-
-            def mount_reasoning():
-                from textual.widgets import Collapsible
-
-                contents = list(details.query(Collapsible.Contents))
-                if details.is_attached and contents and app.is_running:
-                    contents[0].mount(group)
-                    if app.show_reasoning:
-                        details.collapsed = False
-
-            app.call_after_refresh(mount_reasoning)
+            details.append_step(app.reasoning_group)
         else:
             app.reasoning_group.add_preview(app.reasoning_preview)
     app.reasoning_preview.update_text((app.reasoning_preview.text + safe_preview(delta))[:4001])
@@ -147,16 +137,12 @@ def append_reasoning(app, delta: str):
 def flush_preview(app):
     if not app.draft_text or app.draft_text == app.draft_rendered:
         return
-    conversation = app.query_one("#conversation", VerticalScroll)
-    follow = conversation.is_vertical_scroll_end
+    app.transcript_updated()
     if app.generation_preview is None:
         app.generation_preview = GenerationPreview()
         ensure_stages(app).add_preview(app.generation_preview)
-        app.mount_message(app.generation_preview)
     app.generation_preview.update_text(app.draft_text)
     app.draft_rendered = app.draft_text
-    if follow:
-        app.call_after_refresh(conversation.scroll_end, animate=False)
 
 
 def finish_preview(app, state: str, reason: str = ""):
@@ -170,6 +156,7 @@ def finish_preview(app, state: str, reason: str = ""):
     if app.reasoning_preview is not None:
         app.reasoning_preview.finish(state)
         app.reasoning_preview = None
+        app.reasoning_group = None
     app.draft_text = app.draft_rendered = ""
     app.generation_preview = None
 
@@ -177,8 +164,7 @@ def finish_preview(app, state: str, reason: str = ""):
 def flush_response(app):
     if not app.response_text or app.response_text == app.rendered_text:
         return
-    conversation = app.query_one("#conversation", VerticalScroll)
-    follow = conversation.is_vertical_scroll_end
+    app.transcript_updated()
     if app.reply is None:
         app.speaker = Static("Codaro", classes="speaker", markup=False)
         app.mount_message(app.speaker)
@@ -188,8 +174,6 @@ def flush_response(app):
         app.reply.message_text = app.response_text
         app.reply.update(app.response_text)
     app.rendered_text = app.response_text
-    if follow:
-        app.call_after_refresh(conversation.scroll_end, animate=False)
 
 
 def discard_response(app):

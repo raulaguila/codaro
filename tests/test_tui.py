@@ -213,7 +213,7 @@ def test_chat_keeps_streaming_preview_separate_from_final_markdown(tmp_path):
             assert preview.title == "Respondendo…"
             assert "provisório" in preview.tooltip
             assert not preview.collapsed
-            assert app.activity_group.collapsed
+            assert not app.activity_group.collapsed
             # Live generation is visible without expanding the activity summary.
             await pilot.pause()
             assert preview.content.visible
@@ -299,7 +299,7 @@ def test_chat_cancel_removes_partial_response(tmp_path):
             assert not agent.turns
             assert not app.session_turns
             assert "interrompida" in preview.title
-            assert preview.collapsed
+            assert not preview.collapsed
 
     run_ui(scenario())
 
@@ -343,7 +343,7 @@ def test_streamed_tool_iteration_never_becomes_a_chat_answer(tmp_path):
                 assert await asyncio.to_thread(model.final_started.wait, 10)
                 await pilot.pause()
                 assert "intermediária" in first.title
-                assert first.collapsed
+                assert not first.collapsed
                 assert "Vou listar" in first.text
                 assert len(app.query(GenerationPreview)) == 2
                 assert not app.query("Markdown, .speaker")
@@ -358,7 +358,7 @@ def test_streamed_tool_iteration_never_becomes_a_chat_answer(tmp_path):
             assert len(app.query(".speaker")) == 1
             assert len(app.query(GenerationPreview)) == 2
             previews = list(app.query(GenerationPreview))
-            assert previews[0].collapsed
+            assert not previews[0].collapsed
             assert not previews[1].collapsed
             assert previews[1].state == "accepted"
             assert "Vou listar" not in app.session_turns[-1][-1]["content"]
@@ -383,7 +383,7 @@ def test_failed_stream_retains_only_an_interrupted_preview(tmp_path):
             await pilot.pause()
             preview = app.query_one(GenerationPreview)
             assert "interrompida" in preview.title
-            assert preview.collapsed
+            assert not preview.collapsed
             assert "Texto incompleto" in preview.text
             assert not app.query("Markdown, .speaker")
             assert not app.session_turns
@@ -507,7 +507,7 @@ def test_reasoning_and_live_answer_have_distinct_visible_blocks(tmp_path):
                 answer = app.generation_preview
                 assert reasoning is not None and answer is not None
                 assert "Raciocínio" in reasoning.title
-                assert app.reasoning_group.collapsed
+                assert not app.reasoning_group.collapsed
                 app.activity_group.collapsed = False
                 app.reasoning_group.collapsed = False
                 await pilot.pause()
@@ -519,7 +519,7 @@ def test_reasoning_and_live_answer_have_distinct_visible_blocks(tmp_path):
                 model.release.set()
             await wait_ready(app, pilot)
             await pilot.pause()
-            assert reasoning.collapsed
+            assert not reasoning.collapsed
             assert reasoning.has_class("reasoning-preview")
             assert reasoning.content.styles.color != answer.content.styles.color
             assert app.reply.parent is app.query_one("#conversation")
@@ -736,11 +736,13 @@ def test_tool_details_are_collapsed_and_can_be_expanded(tmp_path):
             )
             await pilot.pause()
             card = app.query_one(".tool-card", Collapsible)
-            assert card.collapsed
+            assert not card.collapsed
             assert len(app.query(".tool-card")) == 1
             assert "Ler linhas · 12 ms" in str(app.query_one("#status", Static).render())
             card.scroll_visible(animate=False)
             await pilot.pause()
+            await pilot.click("CollapsibleTitle")
+            assert card.collapsed
             await pilot.click("CollapsibleTitle")
             assert not card.collapsed
 
@@ -906,13 +908,13 @@ def test_activity_group_summarizes_multiple_tools_and_marks_errors(tmp_path):
             )
             await pilot.pause()
             group = app.query_one(ActivityGroup)
-            assert group.collapsed
+            assert not group.collapsed
             assert "2 ações" in group.title
             app.activity(
                 AgentEvent("tool_end", "Ler linhas", "missing.py\nInexistente", "error", 1)
             )
             await pilot.pause()
-            assert group.collapsed
+            assert not group.collapsed
             assert len(app.query(ActivityGroup)) == 1
             assert "Inexistente" in str(group.details.render())
 
@@ -939,7 +941,7 @@ def test_session_resume_restores_conversation_without_calling_model(tmp_path):
         async with app.run_test(size=(100, 35)) as pilot:
             await pilot.pause()
             assert len(app.agent.turns) == 1
-            assert len(app.query("Markdown")) == 1
+            assert len(app.query("ArchivedAssistantMessage")) == 1
             assert not model.started.is_set()
             await pilot.press("o", "i", "enter")
             await wait_ready(app, pilot)

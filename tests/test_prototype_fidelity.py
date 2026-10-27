@@ -108,9 +108,11 @@ def test_one_stage_group_contains_tools_and_reasoning_without_hiding_answer(tmp_
             await pilot.pause()
             assert len(app.query(TurnStages)) == 1
             assert app.reasoning_group.parent is app.activity_group.query_one(Collapsible.Contents)
-            assert app.generation_preview.parent is app.query_one("#conversation")
+            assert app.generation_preview.parent is app.activity_group.query_one(
+                Collapsible.Contents
+            )
             assert app.generation_preview.query_one(".live-speaker").display
-            assert app.activity_group.collapsed and app.reasoning_group.collapsed
+            assert not app.activity_group.collapsed and not app.reasoning_group.collapsed
             app.activity_group.collapsed = False
             await pilot.pause()
             assert not app.query_one(".live-steps", Static).display

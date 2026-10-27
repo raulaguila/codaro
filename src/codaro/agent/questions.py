@@ -2,6 +2,7 @@
 
 import time
 
+from codaro.agent.progress import Phase, waiting
 from codaro.intent import normalized
 from codaro.tool_registry import Tool, definition
 from codaro.trace import current_flow
@@ -29,7 +30,8 @@ def register_questions(agent, callback):
             raise ValueError("Opção recomendada não existe.")
         started = time.monotonic()
         try:
-            result = callback(arguments, agent._cancelled)
+            with waiting(Phase.USER):
+                result = callback(arguments, agent._cancelled)
             answer = result.get("user_response") if isinstance(result, dict) else result
             if isinstance(answer, str) and answer.strip():
                 model = getattr(getattr(agent.provider, "settings", None), "model", "")

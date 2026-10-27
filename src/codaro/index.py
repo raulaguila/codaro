@@ -8,6 +8,7 @@ from pathlib import Path
 
 from codaro.chunks import chunks_for, terms
 from codaro.dependencies import imports_for
+from codaro.languages import language_members
 from codaro.repository import Repository
 from codaro.retrieval import matches_scope, query_terms, scope_options
 
@@ -79,9 +80,9 @@ class CodeIndex:
     def close(self):
         self.db.close()
 
-    def update(self, *, force=False, cancelled=None) -> dict:
+    def update(self, *, force=False, cancelled=None, changed_paths=None) -> dict:
         cancelled = cancelled if cancelled is not None else self.cancelled
-        paths = self.repository.files()
+        paths = self.repository.files(cancelled=cancelled)
         existing = {row["path"]: dict(row) for row in self.db.execute("SELECT * FROM files")}
         seen: set[str] = set()
         changed = skipped = removed = reused = 0
@@ -93,6 +94,15 @@ class CodeIndex:
 
                     raise RequestCancelled("Indexação cancelada.")
                 name = path.relative_to(self.repository.root).as_posix()
+                if (
+                    changed_paths is not None
+                    and not force
+                    and name in existing
+                    and name not in changed_paths
+                ):
+                    seen.add(name)
+                    reused += 1
+                    continue
                 try:
                     info = path.stat(follow_symlinks=False)
                     stamp = repr(
@@ -212,8 +222,9 @@ class CodeIndex:
         scope = "c.path IN (SELECT path FROM scope_paths)" + (" AND c.kind=?" if kind else "")
         scope_params = (kind,) if kind else ()
         if filters.get("language"):
-            scope += " AND c.language=?"
-            scope_params = (*scope_params, filters["language"])
+            members = language_members(filters["language"])
+            scope += " AND c.language IN (" + ",".join("?" for _ in members) + ")"
+            scope_params = (*scope_params, *members)
         tokens = query_terms(query)
         if not tokens:
             self.last_search = {

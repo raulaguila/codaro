@@ -134,6 +134,10 @@ def resolve_configuration(**overrides):
         else provider_source
     )
     timeout = number("CODARO_TIMEOUT", preferences.timeout, float)
+    stream_mb = number("CODARO_MAX_STREAM_MB", base.max_stream_bytes // (1024 * 1024), int)
+    sources["max_stream_bytes"] = (
+        "CODARO_MAX_STREAM_MB" if os.getenv("CODARO_MAX_STREAM_MB") else "padrão"
+    )
     if os.getenv("CODARO_TIMEOUT"):
         sources["timeout"] = "CODARO_TIMEOUT"
     ignored = tuple(
@@ -147,6 +151,7 @@ def resolve_configuration(**overrides):
         context_window=window,
         max_output_tokens=output,
         timeout=timeout,
+        max_stream_bytes=stream_mb * 1024 * 1024,
         token_encoding=os.getenv("CODARO_TOKEN_ENCODING", "").strip() or None,
         context_source="configuração do usuário"
         if "context_window" in options or os.getenv("CODARO_CONTEXT_WINDOW")

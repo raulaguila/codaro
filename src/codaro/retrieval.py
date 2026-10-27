@@ -10,7 +10,7 @@ import time
 from pathlib import PurePosixPath
 
 from codaro.chunks import terms
-from codaro.languages import ALIASES, EXTENSIONS, language_for
+from codaro.languages import language_for, language_matches, normalize_language
 
 STOP_WORDS = set(
     (
@@ -71,10 +71,7 @@ def scope_options(path=None, glob=None, language=None, extension=None):
             raise ValueError("Escopo deve ser relativo ao projeto.")
         options["path"] = path.replace("\\", "/").rstrip("/") or "."
     if language is not None:
-        canonical = ALIASES.get(language.casefold(), language.casefold())
-        if canonical not in EXTENSIONS and canonical not in {"text", "dockerfile", "make"}:
-            raise ValueError("Linguagem desconhecida; use extensão ou glob.")
-        options["language"] = canonical
+        options["language"] = normalize_language(language)
     if extension is not None:
         options["extension"] = "." + extension.lower().lstrip(".")
     return options
@@ -89,7 +86,7 @@ def matches_scope(name, options):
         return False
     if options.get("language"):
         actual, requested = language_for(name), options["language"]
-        if actual != requested and not (
+        if not language_matches(actual, requested) and not (
             PurePosixPath(name).suffix.lower() == ".h" and requested in {"c", "cpp"}
         ):
             return False

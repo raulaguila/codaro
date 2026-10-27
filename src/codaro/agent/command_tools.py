@@ -3,6 +3,7 @@
 import inspect
 import time
 
+from codaro.agent.progress import Phase, waiting
 from codaro.commands import run_command, validate_command
 from codaro.jobs import command_directory
 from codaro.policies import Mode
@@ -136,7 +137,8 @@ def execute_command(agent, index, name, args):
         agent.tasks.state("awaiting_approval")
     started = time.monotonic()
     try:
-        approved = approval(agent, argv, timeout, cwd)
+        with waiting(Phase.APPROVAL):
+            approved = approval(agent, argv, timeout, cwd)
     finally:
         agent._deadline += time.monotonic() - started
     if agent._cancelled is not None and agent._cancelled.is_set():

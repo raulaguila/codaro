@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from rich.markdown import Markdown as RichMarkdown
 from textual.app import ComposeResult
@@ -14,12 +15,13 @@ from codaro.llm import (
     MAX_MESSAGE_CHARS,
 )
 from codaro.ui.messages import AssistantMessage
+from codaro.ui.sections import ProcessSection
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
-class GenerationPreview(Collapsible):
+class GenerationPreview(ProcessSection):
     """Visible live text, promoted only after the agent accepts an answer."""
 
     def __init__(self, *, reasoning: bool = False):
@@ -73,7 +75,6 @@ class GenerationPreview(Collapsible):
                 if state in {"retry", "cancelled"}
                 else "Raciocínio · etapa encerrada"
             )
-            self.collapsed = True
             return
         self.title = {
             "tools": "Etapa intermediária · chamada de ferramentas",
@@ -84,7 +85,6 @@ class GenerationPreview(Collapsible):
         }.get(state, "Prévia interrompida · sem resposta concluída")
         if state != "answer":
             self.update_text(self.text)
-            self.collapsed = True
             self.remove_class("live-answer")
 
     def accept(self, answer: str) -> Markdown:
@@ -94,13 +94,13 @@ class GenerationPreview(Collapsible):
         reply = AssistantMessage(answer)
 
         async def mount_answer():
-            parent = self.parent
+            parent = self.app.query_one("#conversation") if self.is_attached else None
             if not self.is_attached or parent is None:
                 return
             speaker = Static("Codaro", classes="speaker", markup=False)
             # The final answer is a sibling in the conversation, never a child
             # of a reasoning or provisional-generation card.
-            await parent.mount(speaker, reply, before=self)
+            await parent.mount(speaker, reply)
             # Clear/new conversation may remove widgets while mounting yields.
             if not all(widget.is_attached for widget in (self, reply, speaker)):
                 return
@@ -111,7 +111,7 @@ class GenerationPreview(Collapsible):
         return reply
 
 
-class ReasoningGroup(Collapsible):
+class ReasoningGroup(ProcessSection):
     """One quiet reasoning archive per interaction; updates respect manual toggles."""
 
     def __init__(self, preview, *, collapsed=True):
@@ -137,7 +137,7 @@ class ReasoningGroup(Collapsible):
         self.call_after_refresh(mount_step)
 
 
-class ActivityGroup(Collapsible):
+class ActivityGroup(ProcessSection):
     """One expandable activity summary per turn; errors remain visible."""
 
     def __init__(self):
@@ -145,46 +145,87 @@ class ActivityGroup(Collapsible):
         self.generations: list[GenerationPreview] = []
         self.details = Static("", markup=False)
         self.has_reasoning = False
+        self.sequence = []
+        self.mounted_steps = 0
+        self.mounting_steps = False
+        self.running_tool = None
         super().__init__(
             self.details,
             title="Etapas · detalhes",
             classes="tool-card",
-            collapsed=True,
+            collapsed=False,
             collapsed_symbol="▸",
             expanded_symbol="▾",
         )
 
     def archive(self, preview):
-        archived = Collapsible(
-            Static(preview.text[:4000], markup=False),
-            title=preview.title,
-            collapsed=True,
-            classes="intermediate-step",
-            collapsed_symbol="▸",
-            expanded_symbol="▾",
-        )
+        # The same widget remains at its original chronological position.
+        # Only successful completion folds the whole process below one summary.
+        preview.add_class("intermediate-step")
 
-        def mount_archive():
-            contents = list(self.query(Collapsible.Contents))
-            if self.is_attached and contents:
-                contents[0].mount(archived)
+    def append_step(self, widget):
+        self.sequence.append(widget)
+        self.app.transcript_updated()
+        if self.is_mounted:
+            self.call_later(self.mount_pending_steps)
 
-        self.call_after_refresh(mount_archive)
-        preview.display = False
+    async def on_mount(self):
+        await self.mount_pending_steps()
+
+    async def mount_pending_steps(self):
+        if self.mounting_steps or not self.is_attached:
+            return
+        contents = list(self.query(Collapsible.Contents))
+        if not contents or not contents[0].is_running:
+            return
+        self.mounting_steps = True
+        try:
+            while self.is_attached and contents[0].is_running:
+                pending = self.sequence[self.mounted_steps :]
+                if not pending:
+                    break
+                self.mounted_steps += len(pending)
+                await contents[0].mount(*pending)
+        finally:
+            self.mounting_steps = False
 
     def add_preview(self, preview: GenerationPreview):
         self.generations.append(preview)
+        self.append_step(preview)
+
+    def start(self, event):
+        self.running_tool = Static(
+            safe_preview(f"◌ {event.title}\n{event.detail}"),
+            markup=False,
+            classes="timeline-tool",
+        )
+        self.append_step(self.running_tool)
 
     def finish(self, successful: bool):
-        if not self.events and not self.has_reasoning:
+        if not self.events and not self.has_reasoning and len(self.generations) <= 1:
             self.title = "Geração concluída" if successful else "Geração interrompida"
             self.display = False
         parent = self.parent
         if hasattr(parent, "finish"):
             parent.finish()
+        self.collapsed = True
+        elapsed = max(1, round(time.monotonic() - getattr(parent, "started", time.monotonic())))
+        self.title = (
+            "Concluído" if successful else "Interrompido"
+        ) + f" em {elapsed}s · {len(self.events)} ações · Ver processo"
 
     def add(self, event: AgentEvent):
         self.events.append(event)
+        text = safe_preview(
+            f"{'✗' if event.state == 'error' else '✓'} {event.title} · "
+            f"{event.elapsed_ms or 0:.0f} ms\n{event.detail}"
+        )
+        if self.running_tool is not None:
+            self.running_tool.update(text)
+            self.running_tool.set_class(event.state == "error", "error")
+            self.running_tool = None
+        else:
+            self.append_step(Static(text, markup=False, classes="timeline-tool"))
         reads = {
             item.detail.split("\n", 1)[0] for item in self.events if item.title.startswith("Ler ")
         }
@@ -210,6 +251,7 @@ class ActivityGroup(Collapsible):
         if len(text) > 48_000:
             text = "… detalhes anteriores em .codaro/prompt.json\n" + text[-48_000:]
         self.details.update("FERRAMENTAS\n" + text)
+        self.details.display = False
 
 
 class ProposalCard(Vertical):

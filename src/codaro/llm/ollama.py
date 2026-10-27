@@ -17,7 +17,7 @@ from codaro.llm.openai import OpenAICompatible
 from codaro.llm.protocol import (
     MAX_MESSAGE_CHARS,
     MAX_RESPONSE_BYTES,
-    MAX_STREAM_BYTES,
+    MAX_STREAM_EVENT_BYTES,
     capture_wire,
     check_finish_reason,
     validate_message,
@@ -185,18 +185,25 @@ class Ollama(OpenAICompatible):
         for part in response.iter_bytes():
             check_cancelled(cancelled)
             total += len(part)
-            if total > MAX_STREAM_BYTES:
-                raise ModelError("Stream excede o limite permitido.")
+            if total > self.settings.max_stream_bytes:
+                raise ModelError(
+                    f"Stream excede {self.settings.max_stream_bytes // (1024 * 1024)} MiB; "
+                    "ajuste CODARO_MAX_STREAM_MB."
+                )
             pending.extend(part)
             while b"\n" in pending:
                 line, _, rest = pending.partition(b"\n")
                 pending = bytearray(rest)
+                if len(line) > MAX_STREAM_EVENT_BYTES:
+                    raise ModelError("Evento do stream excede o limite de 1 MiB.")
                 if line.strip():
                     consume(line)
                 if finished:
                     break
             if finished:
                 break
+            if len(pending) > MAX_STREAM_EVENT_BYTES:
+                raise ModelError("Evento do stream excede o limite de 1 MiB.")
         if pending.strip() and not finished:
             consume(pending)
         if not finished:

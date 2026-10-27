@@ -1,7 +1,20 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
+
+from codaro.llm.protocol import MAX_STREAM_BYTES
+
+
+def stream_limit():
+    try:
+        value = int(os.getenv("CODARO_MAX_STREAM_MB", str(MAX_STREAM_BYTES // (1024 * 1024))))
+    except ValueError as exc:
+        raise ValueError("CODARO_MAX_STREAM_MB deve ser inteiro entre 1 e 128.") from exc
+    if not 1 <= value <= 128:
+        raise ValueError("CODARO_MAX_STREAM_MB deve ficar entre 1 e 128.")
+    return value * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -19,8 +32,18 @@ class Settings:
     api_style: str = "openai"
     model_max_output_tokens: int | None = None
     include_stream_usage: bool = False
+    max_stream_bytes: int = field(default_factory=stream_limit)
+
+    @property
+    def max_stream_events(self):
+        return min(200_000, self.max_stream_bytes // 64)
 
     def __post_init__(self):
+        if (
+            type(self.max_stream_bytes) is not int
+            or not 1024 * 1024 <= self.max_stream_bytes <= 128 * 1024 * 1024
+        ):
+            raise ValueError("Limite do stream deve ficar entre 1 e 128 MiB.")
         if self.api_style not in {"openai", "anthropic", "ollama"}:
             raise ValueError("API do provedor inválida.")
         if len(self.api_key) > 16384:

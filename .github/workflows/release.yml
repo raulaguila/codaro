@@ -11,9 +11,10 @@ jobs:
   live-protocol:
     uses: ./.github/workflows/live-providers.yml
     with:
-      api_style: ollama
-      model: qwen2.5:3b
-      suite: smoke
+      api_style: ${{ vars.CODARO_QUALIFICATION_API_STYLE || 'ollama' }}
+      model: ${{ vars.CODARO_QUALIFICATION_MODEL || 'qwen2.5:3b' }}
+      suite: full
+      implementation: true
   build:
     needs: [quality, live-protocol]
     runs-on: ubuntu-latest
