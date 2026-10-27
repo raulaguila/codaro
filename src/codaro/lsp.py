@@ -4,6 +4,7 @@ import hashlib
 import time
 
 from codaro.languages import language_for
+from codaro.llm import RequestCancelled
 from codaro.rpc import StdioRPC, check
 from codaro.tool_registry import Tool, definition
 
@@ -36,22 +37,27 @@ DEFAULT_SERVERS = {
 }
 
 
-def diagnostics(repository, path, config, cancelled=None):
+def diagnostics(repository, path, config, cancelled=None, *, pool=None):
     if not config.get("enabled"):
         raise ValueError("Diagnósticos LSP desativados.")
     target = repository.resolve_file(path)
     language = language_for(target)
     if language not in DEFAULT_SERVERS and language not in config.get("servers", {}):
         return {"available": False, "reason": "Linguagem sem servidor configurado."}
-    argv = config.get("servers", {}).get(language, DEFAULT_SERVERS[language])
+    argv = config.get("servers", {}).get(language) or DEFAULT_SERVERS.get(language)
     raw = repository.read_bytes(target)
     if len(raw) > 200_000:
         return {"available": False, "reason": "Arquivo excede 200 KB para diagnóstico interativo."}
     version = hashlib.sha256(raw).hexdigest()
     client = None
     try:
-        client = StdioRPC(argv, repository.root, framing="headers")
-        result = client.request(
+        client = (
+            pool.acquire(argv, repository.root)
+            if pool
+            else StdioRPC(argv, repository.root, framing="headers")
+        )
+        result = initialize(
+            client,
             "initialize",
             {
                 "processId": None,
@@ -68,18 +74,8 @@ def diagnostics(repository, path, config, cancelled=None):
         )
         if not isinstance(result, dict):
             raise ValueError("Resposta de inicialização LSP inválida.")
-        client.notify("initialized")
-        client.notify(
-            "textDocument/didOpen",
-            {
-                "textDocument": {
-                    "uri": target.as_uri(),
-                    "languageId": language,
-                    "version": 1,
-                    "text": raw.decode("utf-8-sig"),
-                }
-            },
-        )
+        client.notifications.clear()
+        document_version = open_document(client, target, language, raw, force=True)
         deadline = time.monotonic() + 3
         items = None
         while time.monotonic() < deadline:
@@ -91,7 +87,7 @@ def diagnostics(repository, path, config, cancelled=None):
                     notification.get("method") == "textDocument/publishDiagnostics"
                     and isinstance(params, dict)
                     and params.get("uri") == target.as_uri()
-                    and params.get("version", 1) == 1
+                    and params.get("version", document_version) == document_version
                 ):
                     items = params.get("diagnostics")
             client.notifications.clear()
@@ -144,20 +140,35 @@ def diagnostics(repository, path, config, cancelled=None):
             "validation_passed": False,
         }
     except (FileNotFoundError, OSError, ValueError) as exc:
+        if pool and client:
+            client.close()
         return {"available": False, "reason": str(exc)[:200], "validation_passed": False}
-    finally:
+    except RequestCancelled:
         if client:
             client.close()
+        raise
+    finally:
+        if client:
+            if pool:
+                pool.release(client)
+            else:
+                client.close()
 
 
 def register_lsp(agent):
     def run(args):
-        return diagnostics(agent.repository, args["path"], agent.features["lsp"], agent._cancelled)
+        return diagnostics(
+            agent.repository,
+            args["path"],
+            agent.features["lsp"],
+            agent._cancelled,
+            pool=agent.services.lsp,
+        )
 
     agent.registry.register(Tool(DIAGNOSTICS_TOOL, source="lsp", lazy=True, handler=run))
 
 
-def navigate(repository, path, line, column, operation, config, cancelled=None):
+def navigate(repository, path, line, column, operation, config, cancelled=None, *, pool=None):
     """Resolve a position with an explicitly enabled, installed language server.
 
     Line is one-based; column is a zero-based LSP UTF-16 character offset.
@@ -182,8 +193,13 @@ def navigate(repository, path, line, column, operation, config, cancelled=None):
         raise ValueError("Posição fora do arquivo.")
     client = None
     try:
-        client = StdioRPC(argv, repository.root, framing="headers")
-        response = client.request(
+        client = (
+            pool.acquire(argv, repository.root)
+            if pool
+            else StdioRPC(argv, repository.root, framing="headers")
+        )
+        response = initialize(
+            client,
             "initialize",
             {
                 "processId": None,
@@ -201,18 +217,7 @@ def navigate(repository, path, line, column, operation, config, cancelled=None):
         capabilities = response.get("capabilities", {})
         if not capabilities.get(operation + "Provider"):
             return None
-        client.notify("initialized")
-        client.notify(
-            "textDocument/didOpen",
-            {
-                "textDocument": {
-                    "uri": target.as_uri(),
-                    "languageId": language,
-                    "version": 1,
-                    "text": raw.decode("utf-8-sig"),
-                }
-            },
-        )
+        open_document(client, target, language, raw)
         params = {
             "textDocument": {"uri": target.as_uri()},
             "position": {"line": line - 1, "character": column},
@@ -260,7 +265,62 @@ def navigate(repository, path, line, column, operation, config, cancelled=None):
             "truncated": len(locations) > 120,
         }
     except (OSError, ValueError):
+        if pool and client:
+            client.close()
         return None
-    finally:
+    except RequestCancelled:
         if client:
             client.close()
+        raise
+    finally:
+        if client:
+            if pool:
+                pool.release(client)
+            else:
+                client.close()
+
+
+def initialize(client, method, params, *, cancelled=None, timeout=10):
+    cached = getattr(client, "_codaro_initialize", None)
+    if cached is None:
+        cached = client.request(method, params, cancelled=cancelled, timeout=timeout)
+        if isinstance(cached, dict):
+            client._codaro_initialize = cached
+            client.notify("initialized")
+    return cached
+
+
+def open_document(client, target, language, raw, *, force=False):
+    documents = getattr(client, "_codaro_documents", {})
+    client._codaro_documents = documents
+    uri = target.as_uri()
+    previous = documents.get(uri)
+    version = previous[0] if previous else 0
+    if previous is None:
+        version = 1
+        client.notify(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": uri,
+                    "languageId": language,
+                    "version": version,
+                    "text": raw.decode("utf-8-sig"),
+                }
+            },
+        )
+    elif force or previous[1] != raw:
+        version += 1
+        client.notify(
+            "textDocument/didChange",
+            {
+                "textDocument": {"uri": uri, "version": version},
+                "contentChanges": [{"text": raw.decode("utf-8-sig")}],
+            },
+        )
+    documents[uri] = (version, raw)
+    while len(documents) > 128:
+        oldest = next(iter(documents))
+        del documents[oldest]
+        client.notify("textDocument/didClose", {"textDocument": {"uri": oldest}})
+    return version

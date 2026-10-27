@@ -107,11 +107,21 @@ def compact_batch(turn: list[dict]) -> dict | None:
                 value = result.get(key, args.get(key))
                 if isinstance(value, str):
                     item[key] = value[:160]
-            for key in ("exit_code", "timed_out", "proposal_id", "status", "state", "artifact_id"):
+            for key in (
+                "exit_code",
+                "timed_out",
+                "proposal_id",
+                "status",
+                "state",
+                "artifact_id",
+                "job_id",
+                "cwd",
+                "check_id",
+            ):
                 if key in result:
                     value = result[key]
                     item[key] = value[:120] if isinstance(value, str) else value
-            if function["name"] == "run_command":
+            if function["name"] in {"run_command", "start_command", "run_check"}:
                 argv = args.get("argv")
                 item["argv"] = encode(argv)[:240]
             if "error" in result:

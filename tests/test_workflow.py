@@ -253,6 +253,7 @@ def test_partial_set_failure_is_explicit_and_preserves_external_file(tmp_path):
             index,
             "apply_changes",
             {
+                "atomic": False,
                 "reason": "Criar",
                 "operations": [
                     {"kind": "create", "path": "first.py", "content": "x=1"},

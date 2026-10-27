@@ -48,6 +48,10 @@ def validate_arguments(name: str, args: dict):
         validate_command(args["argv"], args.get("timeout", 60))
     if name == "update_plan":
         TaskStore.validate_plan(args["steps"], args["criteria"])
+        if "criterion_checks" in args:
+            from codaro.validation import validate_bindings
+
+            validate_bindings(args["criteria"], args["criterion_checks"])
         if "validation_commands" in args:
             TaskStore.validate_checks(args["validation_commands"])
     if name == "apply_changes":
@@ -58,6 +62,13 @@ def validate_arguments(name: str, args: dict):
             if not isinstance(operation, dict):
                 raise ValueError("Operação inválida.")
             for key, value in operation.items():
+                if key == "replacements":
+                    from codaro.tool_registry import validate_schema
+
+                    validate_schema(
+                        parameters["operations"]["items"]["properties"]["replacements"], value
+                    )
+                    continue
                 if not isinstance(value, str) or len(value) > (12000 if key == "content" else 3000):
                     raise ValueError("Campo da operação inválido ou grande demais.")
     if name == "request_tools":

@@ -68,6 +68,8 @@ def _fit_result(result: dict, budget: int) -> dict:
             else:
                 high = middle - 1
         result["output"] = content[:low]
+        if "next_offset" in result:
+            result["next_offset"] = result.get("offset", 0) + len(result["output"])
     elif "text" in result:
         result = dict(result)
         content = result["text"]
@@ -127,6 +129,16 @@ def _fit_result(result: dict, budget: int) -> dict:
         if not result["files"]:
             return {"error": "Sem espaço para listar caminhos. Reduza o escopo da pergunta."}
     if len(serialize(result)) > budget:
+        if "job_id" in result:
+            receipt = {
+                key: result[key]
+                for key in ("job_id", "state", "exit_code", "timed_out", "offset")
+                if key in result
+            }
+            receipt["next_offset"] = result.get("offset", 0)
+            receipt["truncated"] = True
+            if len(serialize(receipt)) <= budget:
+                return receipt
         if "artifact_id" in result:
             receipt = {
                 "artifact_id": result["artifact_id"],

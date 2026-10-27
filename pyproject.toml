@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "codaro"
-version = "0.1.1"
+version = "0.2.0"
 description = "A terminal development agent with BYOK, bounded context and reviewed changes."
 license = "MIT"
 license-files = ["LICENSE"]
@@ -24,6 +24,7 @@ dependencies = [
 dev = ["pytest>=8,<10", "pytest-cov>=7,<8", "ruff>=0.11,<1"]
 tokenizer = ["tiktoken>=0.8,<1"]
 semantic = ["fastembed>=0.7,<0.8"]
+credentials = ["keyring>=25,<26"]
 
 [project.scripts]
 codaro = "codaro.cli:app"
@@ -36,7 +37,7 @@ Issues = "https://github.com/raulaguila/codaro/issues"
 packages = ["src/codaro"]
 
 [tool.hatch.build.targets.sdist]
-include = ["/src", "/tests", "/scripts", "/evaluations", "/docs/*.md", "/examples/demo/auth.py", "/examples/plugins/math.py", "/README.md", "/SECURITY.md", "/LICENSE", "/pyproject.toml", "/requirements-dev.lock"]
+include = ["/src", "/tests", "/scripts", "/evaluations", "/docs/*.md", "/examples/demo/auth.py", "/examples/plugins/math.py", "/README.md", "/SECURITY.md", "/LICENSE", "/pyproject.toml", "/requirements-dev.lock", "/CHANGELOG.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

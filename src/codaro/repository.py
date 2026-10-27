@@ -238,6 +238,10 @@ class Repository:
         relative = self._relative(path)
         if not self.allowed(path):
             raise RepositoryError("Arquivo não permitido.")
+        if os.name == "nt":
+            from codaro.windows_files import read
+
+            return read(self, path)
         directory_fd = file_fd = None
         try:
             if os.open in os.supports_dir_fd and hasattr(os, "O_NOFOLLOW"):

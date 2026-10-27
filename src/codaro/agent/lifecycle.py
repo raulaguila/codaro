@@ -27,6 +27,7 @@ def reset_calibration(agent):
 def set_mode(agent, mode):
     if agent._lock.locked() or agent.edits.pending:
         raise ValueError("Conclua/cancele a ação atual antes de trocar de modo.")
+    agent.jobs.close()
     agent.mode = Mode(mode)
     agent.allow_edits = agent.mode == Mode.EXECUTE
     agent._pending_text_continuation = False
@@ -85,6 +86,7 @@ def set_provider(agent, provider):
 def activate_session(agent, identifier, *, discard_pending=False):
     if agent._lock.locked() or (agent.edits.pending and not discard_pending):
         raise ValueError("Aguarde a execução e revise propostas antes de trocar sessão.")
+    agent.jobs.close()
     secret = getattr(getattr(agent.provider, "settings", None), "api_key", "")
     store = agent.sessions.store(identifier, secret)
     store.redact = agent.memory.redact
@@ -114,6 +116,12 @@ def activate_session(agent, identifier, *, discard_pending=False):
     tasks.load()
     agent.sessions.activate(identifier)
     agent.memory, agent.tasks, agent.conversation = memory, tasks, conversation
+    from codaro.jobs import JobManager
+    from codaro.retrieval_services import RetrievalServices
+
+    agent.services.close()
+    agent.services = RetrievalServices(agent.repository)
+    agent.jobs = JobManager(agent.repository, redact=lambda value: agent.memory.redact(value))
     agent._pending_text_continuation = False
     agent.edits.checkpoints.session_id = identifier
     agent.session_id = agent.artifacts.session_id = identifier

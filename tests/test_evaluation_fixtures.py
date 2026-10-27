@@ -5,6 +5,8 @@ The same datasets run against real models in the opt-in acceptance suite.
 """
 
 import json
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -15,6 +17,14 @@ from codaro.workflow_evaluation import evaluate_workflows, load_workflows
 ROOT = Path(__file__).resolve().parents[1]
 CASES = load_workflows(ROOT / "evaluations/workflows.json")
 SOLUTIONS = {
+    "go-clamp-bounds": (
+        "package bounds\n\nfunc Clamp(value, low, high int) int {\n"
+        "    if value < low { return low }; if value > high { return high }; return value\n}\n"
+    ),
+    "node-slug-whitespace": (
+        "export function slug(value) {\n"
+        "    return value.trim().toLowerCase().replace(/\\s+/g, '-');\n}\n"
+    ),
     "authorization-null-and-editor": (
         "def can_edit(user):\n"
         "    return isinstance(user, dict) and user.get('role') in {'admin', 'editor'}\n"
@@ -36,6 +46,12 @@ SOLUTIONS = {
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case["id"])
 def test_benchmark_contracts_execute_through_agent_in_disposable_copy(tmp_path, case):
+    if shutil.which(case["validation_commands"][0][0]) is None:
+        pytest.skip("Runtime da fixture não instalado.")
+    if case["validation_commands"][0][0] == "go":
+        result = subprocess.run(["go", "version"], capture_output=True, text=True, timeout=10)
+        if result.returncode or not result.stdout.startswith("go version go"):
+            pytest.skip("Go SDK não instalado (outro programa chamado go no PATH).")
     source = ROOT / "evaluations" / case["repo"]
     path = next(iter(case["expected_files"]))
     original = (source / path).read_text()

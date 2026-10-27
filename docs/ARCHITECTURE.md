@@ -9,7 +9,11 @@ src/codaro/
 ├── cli.py                 # Entrada Typer e comandos centrais
 ├── cli_commands/          # Grupos de provedores, modelos e integrações
 ├── agent/
-│   ├── controller.py      # Estado da sessão, permissões e loop com o modelo
+│   ├── controller.py      # Estado da sessão e fachada pública do agente
+│   ├── loop.py            # Orquestração das chamadas ao modelo e ferramentas
+│   ├── progress.py        # Fases observáveis e repetição de evidências
+│   ├── command_tools.py   # Aprovação, jobs e recibos de validação
+│   ├── change_sets.py     # Preflight e rollback com preservação de conflitos
 │   ├── requests.py        # Payload canônico para orçamento, trace e transporte
 │   ├── excerpts.py        # Recortes explícitos com linhas e fim de logs
 │   ├── prompts.py         # Instruções compartilhadas e dos modos
@@ -36,6 +40,7 @@ src/codaro/
 │   └── errors.py          # Erros normalizados dos provedores
 └── ui/
     ├── app.py             # Ciclo de vida e coordenação da interface
+    ├── approvals.py       # Espera e callbacks de revisões/autorizações
     ├── composer.py        # Campo de entrada e atalhos de edição
     ├── widgets.py         # Geração, atividades e propostas
     ├── streaming.py       # Renderização de eventos e streaming do chat
@@ -149,3 +154,28 @@ python -m pip wheel . --no-deps -w /tmp/codaro-wheels
 Os testes de arquitetura protegem as fronteiras de dependência. Os testes funcionais
 cobrem o agente, os contratos HTTP, persistência, CLI e interação Textual headless.
 Ao verificar uma distribuição instalada, confira também a inclusão de `styles.tcss`.
+
+## Serviços e contratos de execução
+
+`jobs.py` possui somente os processos iniciados pela sessão. O worker captura um
+ambiente filtrado, não recebe o prazo/trace da requisição que o iniciou e mantém
+saída limitada. A consulta não inicia processos; o término registra validação
+na tarefa original e na revisão em que o comando começou. Trocar sessão/modo
+encerra os processos e descarta IDs antigos. `validation.py` descobre scripts e
+associa critérios a recibos, sem executar conteúdo durante a descoberta.
+
+`retrieval_services.py` mantém servidores LSP por raiz/argv e um encoder semântico
+por sessão. Documentos LSP mudam de versão quando os bytes mudam. Aquecimento
+vetorial usa conexão SQLite própria, lotes limitados e cancelamento no fechamento.
+`language_support.py` expõe diferenças entre gramática, fixture e LSP instalado.
+
+`windows_files.py` e `windows_process.py` isolam as APIs nativas do Windows; POSIX
+mantém operações relativas a descritores e grupos de processos. `credentials.py`
+isola o cofre opcional; `llm/profiles.py` gerencia referências e persistência
+transacional de perfis. Metadados podem ser listados sem desbloquear o cofre.
+
+As fases `preparing`, `requesting_model`, `executing_tools`, `compacting`,
+`completed` e `interrupted` são eventos diagnósticos. Não são raciocínio do modelo
+nem comprovante de conclusão funcional; somente recibos de ferramentas comprovam
+efeitos e validações. A extração do loop reduz o controlador, mas o loop continua
+um ponto de orquestração complexo e merece decomposição incremental com testes.

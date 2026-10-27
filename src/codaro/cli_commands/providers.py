@@ -15,6 +15,31 @@ providers_app = typer.Typer(help="Cadastre seus provedores e credenciais BYOK.")
 models_app = typer.Typer(help="Consulte modelos da API e selecione o modelo ativo.")
 
 
+@providers_app.command("credentials")
+def provider_credentials(name: str, storage: Annotated[str, typer.Option(help="file ou keyring.")]):
+    """Move explicitamente a chave entre arquivo privado e cofre nativo do sistema."""
+    from codaro.llm.profiles import ProviderStore
+
+    try:
+        ProviderStore().credential_storage(name, storage)
+        console.print("Armazenamento atualizado: " + storage)
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@providers_app.command("export")
+def provider_export():
+    """Exporta perfis e catálogos sem API keys ou referências do cofre."""
+    import json
+
+    from codaro.llm.profiles import ProviderStore
+
+    try:
+        typer.echo(json.dumps(ProviderStore().export_profiles(), ensure_ascii=False, indent=2))
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
 def model_table(models):
     table = Table("Modelo", "Contexto", "Origem", "Saída máxima", "Ferramentas")
     for model in models:
@@ -97,7 +122,7 @@ def provider_list():
     from codaro.llm.profiles import ProviderStore
 
     try:
-        value = ProviderStore().load()
+        value = ProviderStore().load(resolve_secrets=False)
         table = Table("Perfil", "Provedor", "Modelo", "Ativo", "TLS")
         for name, profile in value["profiles"].items():
             table.add_row(

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import codaro
 from codaro.agent import Agent
+from codaro.edits import EditManager
 from codaro.index import CodeIndex
 from codaro.llm import Settings
 from codaro.navigation import file_outline
@@ -35,6 +36,24 @@ async def scenario():
         (root / "main.go").write_text("package main\nfunc main() {}\n", encoding="utf-8")
         (root / "schema.sql").write_text("CREATE TABLE users (id INTEGER);\n", encoding="utf-8")
         repository = Repository(root)
+        edit_path = root / "edited.py"
+        original = b"\xef\xbb\xbfx = 1\r\ny = 2\r\n"
+        edit_path.write_bytes(original)
+        edits = EditManager(repository)
+        edits.observe(repository.read_lines("edited.py", 1, 2), original)
+        proposal = edits.propose_many(
+            "edited.py",
+            [
+                {"old_text": "x = 1", "new_text": "x = 3"},
+                {"old_text": "y = 2", "new_text": "y = 4"},
+            ],
+            "Installed package edit",
+        )
+        edits.apply(proposal.id)
+        assert b"x = 3\r\ny = 4" in edit_path.read_bytes()
+        undo = edits.propose_undo(proposal.checkpoint_id)
+        edits.apply(undo.id)
+        assert edit_path.read_bytes() == original
         with CodeIndex(repository) as index:
             assert index.search("main", language="go")[0]["symbol"] == "main"
             assert index.search("users", kind="table")[0]["path"] == "schema.sql"

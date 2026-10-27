@@ -75,6 +75,9 @@ class TaskStore:
                 raise ValueError("Tarefa persistida inválida.")
             ids.add(task["id"])
             self.validate_plan(task["plan"], task.get("criteria", []))
+            from codaro.validation import validate_bindings
+
+            validate_bindings(task.get("criteria", []), task.get("criterion_checks", []))
             if "validation_commands" in task:
                 self.validate_checks(task["validation_commands"])
             if task.get("workspace_digest") is not None and not re.fullmatch(
@@ -223,15 +226,28 @@ class TaskStore:
         for argv in commands:
             validate_command(argv, 60)
 
-    def plan(self, steps, criteria, validation_commands=None):
+    def plan(self, steps, criteria, validation_commands=None, criterion_checks=None):
         self.validate_plan(steps, criteria)
         if validation_commands is not None:
             self.validate_checks(validation_commands)
+        from codaro.validation import validate_bindings
+
+        if criterion_checks is not None:
+            validate_bindings(criteria, criterion_checks)
 
         def change(task):
             task["plan"], task["criteria"] = steps, criteria
             task["plan_revision"] += 1
             task["state"] = "planning"
+            task["criterion_checks"] = (
+                criterion_checks
+                if criterion_checks is not None
+                else [
+                    item
+                    for item in task.get("criterion_checks", [])
+                    if item["criterion"] in criteria
+                ]
+            )
             if validation_commands is not None:
                 task["validation_commands"] = validation_commands
 
@@ -261,8 +277,9 @@ class TaskStore:
                 "argv": result["argv"],
                 "exit_code": result["exit_code"],
                 "timed_out": result["timed_out"],
-                "revision": task["revision"],
+                "revision": result.get("validated_revision", task["revision"]),
                 "at": timestamp(),
+                **{key: result[key] for key in ("cwd", "check_id", "job_id") if key in result},
             }
             task["validations"] = [*task["validations"], entry][-32:]
             task["state"] = "validating"
@@ -271,6 +288,11 @@ class TaskStore:
 
     def validation_ready(self):
         task = self.current()
+        if task and task.get("criterion_checks"):
+            from codaro.validation import validation_report
+
+            if validation_report(task)["status"] != "validated":
+                return False
         if (
             task
             and task.get("requires_changes")

@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 
-def sandbox_command(root, argv, environ):
+def sandbox_command(root, argv, environ, *, cwd=None):
     mode = os.environ.get("CODARO_SANDBOX", "off").strip().lower()
     if mode not in {"off", "required"}:
         raise ValueError("CODARO_SANDBOX deve ser off ou required.")
@@ -16,6 +16,9 @@ def sandbox_command(root, argv, environ):
     if executable is None:
         raise ValueError("Sandbox obrigatória indisponível: requer Linux e bubblewrap instalado.")
     root = Path(root).resolve()
+    cwd = Path(cwd or root).resolve()
+    if cwd != root and root not in cwd.parents:
+        raise ValueError("Diretório de execução fora da sandbox do projeto.")
     home = Path.home().resolve()
     if root == Path(root.anchor) or root == home or root in home.parents:
         raise ValueError(
@@ -58,7 +61,7 @@ def sandbox_command(root, argv, environ):
             str(root),
             str(root),
             "--chdir",
-            str(root),
+            str(cwd),
             "--",
             *argv,
         ]

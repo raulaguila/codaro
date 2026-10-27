@@ -14,6 +14,13 @@ jobs:
         python-version: ['3.11', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -76,6 +83,15 @@ jobs:
           script = Path(os.environ['RUNNER_TEMP']) / 'codaro-package-smoke.py'
           shutil.copyfile('scripts/package_smoke.py', script)
           subprocess.run([sys.executable, str(script)], cwd=script.parent, check=True)
+      - name: Native edit, undo, conflict and process checks outside checkout
+        shell: python
+        run: |
+          import os, shutil, subprocess, sys
+          from pathlib import Path
+          subprocess.run([sys.executable, '-m', 'pip', 'install', 'pytest>=8,<10'], check=True)
+          script = Path(os.environ['RUNNER_TEMP']) / 'test_codaro_portability.py'
+          shutil.copyfile('tests/test_portability.py', script)
+          subprocess.run([sys.executable, '-m', 'pytest', '-q', str(script)], cwd=script.parent, check=True)
   ui-evidence:
     runs-on: ubuntu-latest
     timeout-minutes: 10

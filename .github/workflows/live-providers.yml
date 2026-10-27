@@ -1,6 +1,22 @@
-name: Live provider acceptance (manual)
+name: Live provider acceptance
 
 on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_call:
+    inputs:
+      api_style:
+        type: string
+        default: ollama
+      model:
+        type: string
+        default: qwen2.5:3b
+      implementation:
+        type: boolean
+        default: false
+      suite:
+        type: string
+        default: smoke
   workflow_dispatch:
     inputs:
       api_style:
@@ -11,8 +27,13 @@ on:
       model:
         description: Exact model ID on the provider
         required: true
-        default: llama3.2:3b
+        default: qwen2.5:3b
         type: string
+      suite:
+        description: Smoke covers catalog, streaming and native tool roundtrip; full adds agent scenarios
+        type: choice
+        options: [smoke, full]
+        default: full
       implementation:
         description: Also run implementation and validation in disposable fixtures
         type: boolean
@@ -26,17 +47,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     # Configure required reviewers here for credentials that need approval.
-    environment: live-providers
+    environment: ${{ (inputs.api_style == 'openai' || inputs.api_style == 'anthropic') && 'live-providers' || 'local-models' }}
     env:
-      CODARO_BASE_URL: ${{ inputs.api_style == 'ollama' && 'http://127.0.0.1:11434' || secrets.CODARO_LIVE_BASE_URL }}
-      CODARO_MODEL: ${{ inputs.model }}
-      CODARO_API_KEY: ${{ inputs.api_style != 'ollama' && secrets.CODARO_LIVE_API_KEY || '' }}
+      CODARO_BASE_URL: ${{ (inputs.api_style == 'ollama' || !inputs.api_style) && 'http://127.0.0.1:11434' || secrets.CODARO_LIVE_BASE_URL }}
+      CODARO_MODEL: ${{ inputs.model || 'qwen2.5:3b' }}
+      CODARO_API_KEY: ${{ (inputs.api_style == 'openai' || inputs.api_style == 'anthropic') && secrets.CODARO_LIVE_API_KEY || '' }}
       CODARO_CONTEXT_WINDOW: '16384'
       CODARO_TIMEOUT: '300'
-      CODARO_TEST_API_STYLE: ${{ inputs.api_style }}
+      CODARO_TEST_API_STYLE: ${{ inputs.api_style || 'ollama' }}
       OLLAMA_HOST: '127.0.0.1:11434'
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -44,13 +72,13 @@ jobs:
       - run: python -m pip install -r requirements-dev.lock
       - run: python -m pip install -e '.[dev]'
       - name: Check remote configuration
-        if: inputs.api_style != 'ollama'
+        if: env.CODARO_TEST_API_STYLE != 'ollama'
         shell: bash
         run: |
           test -n "$CODARO_BASE_URL" || { echo 'Configure CODARO_LIVE_BASE_URL in the live-providers environment.'; exit 1; }
           test -n "$CODARO_API_KEY" || { echo 'Configure CODARO_LIVE_API_KEY in the live-providers environment.'; exit 1; }
       - name: Start isolated Ollama and pull selected model
-        if: inputs.api_style == 'ollama'
+        if: env.CODARO_TEST_API_STYLE == 'ollama'
         shell: bash
         run: |
           docker run --detach --name codaro-ollama --publish 127.0.0.1:11434:11434 ollama/ollama:0.12.3
@@ -59,12 +87,15 @@ jobs:
             sleep 1
           done
           curl --fail --silent http://127.0.0.1:11434/api/tags > /dev/null
-          docker exec codaro-ollama ollama pull "$CODARO_MODEL"
+          docker exec --env OLLAMA_HOST=127.0.0.1:11434 codaro-ollama ollama pull "$CODARO_MODEL"
+      - name: Protocol smoke (scheduled and release gate; no paid provider by default)
+        if: inputs.suite == 'smoke' || github.event_name == 'schedule'
+        run: pytest tests/live -q --tb=short --live-provider env -k 'catalog_and_metadata or native_tool_roundtrip or streaming_keeps' --junitxml=.codaro/quality/live.xml -o junit_family=legacy
       - name: Read-only model acceptance
-        if: '!inputs.implementation'
+        if: inputs.suite != 'smoke' && github.event_name != 'schedule' && !inputs.implementation
         run: pytest tests/live -q --tb=short --live-provider env --junitxml=.codaro/quality/live.xml -o junit_family=legacy
       - name: Model acceptance with implementation
-        if: inputs.implementation
+        if: inputs.suite != 'smoke' && github.event_name != 'schedule' && inputs.implementation
         run: pytest tests/live -q --tb=short --live-provider env --live-execution --junitxml=.codaro/quality/live.xml -o junit_family=legacy
       - uses: actions/upload-artifact@v4
         if: always()
@@ -73,5 +104,5 @@ jobs:
           path: .codaro/quality/live.xml
           retention-days: 7
       - name: Stop disposable Ollama
-        if: always() && inputs.api_style == 'ollama'
+        if: always() && env.CODARO_TEST_API_STYLE == 'ollama'
         run: docker rm --force codaro-ollama

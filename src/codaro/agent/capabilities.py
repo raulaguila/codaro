@@ -3,6 +3,8 @@
 from codaro.agent.messages import serialize
 from codaro.agent.schemas import (
     CHANGES_TOOL,
+    COMMAND_EXTRA_TOOLS,
+    COMMAND_READ_TOOLS,
     COMMAND_TOOL,
     CONTEXT_TOOLS,
     EDIT_TOOL,
@@ -14,11 +16,82 @@ from codaro.artifacts import ARTIFACT_TOOLS
 from codaro.policies import Mode
 
 
+def catalog(agent, args):
+    from codaro.chunks import terms
+
+    query, category = args.get("query", ""), args.get("category")
+    if not isinstance(query, str) or len(query) > 500:
+        raise ValueError("Consulta do catálogo inválida.")
+    entries = []
+    for definition in available_tools(agent):
+        spec = definition["function"]
+        name = spec["name"]
+        tool = agent.registry.tools[name]
+        group = (
+            "integration"
+            if tool.source.startswith(("mcp:", "plugin:"))
+            else "execution"
+            if name
+            in {"run_command", "start_command", "run_check", "cancel_command", "get_command_output"}
+            else "validation"
+            if name in {"get_diagnostics", "discover_checks", "get_validation_report"}
+            else "memory"
+            if "conversation" in name or "finding" in name or name == "remember_task"
+            else "editing"
+            if name in {"propose_edit", "apply_changes"}
+            else "context"
+            if "context" in name or name in {"request_tools", "get_tools_catalog"}
+            else "task"
+            if name in {"update_plan", "get_task", "finish_task", "ask_user_question"}
+            else "code"
+        )
+        if category and category != group:
+            continue
+        searchable = set(terms(name + " " + spec["description"], None))
+        if query and not set(terms(query)) & searchable:
+            continue
+        entries.append(
+            {
+                "name": name,
+                "description": spec["description"][:150],
+                "read_only": tool.read_only,
+                "category": group,
+                "source": tool.source,
+            }
+        )
+    entries.sort(key=lambda item: not agent.registry.tools[item["name"]].lazy)
+    offset, limit = args.get("offset", 0), args.get("limit", 8)
+    return {
+        "offset": offset,
+        "tools": entries[offset : offset + limit],
+        "total": len(entries),
+        "next_offset": offset + limit if offset + limit < len(entries) else None,
+    }
+
+
+def prefetch(agent, question):
+    if agent.adaptive_input_limit < 12000:
+        return set()
+    question = question.casefold()
+    names = set()
+    if any(
+        word in question
+        for word in ("arquitetura", "estrutura do projeto", "architecture", "project structure")
+    ):
+        names.update({"get_project_map", "get_file_outline"})
+    if agent.mode == Mode.EXECUTE and any(word in question for word in ("valid", "teste", "test")):
+        names.update({"discover_checks", "get_validation_report"})
+    if "regex" in question or "grep" in question:
+        names.add("grep_code")
+    return names
+
+
 def available_tools(agent):
     return [
         *TOOLS,
         *MEMORY_TOOLS,
         *CONTEXT_TOOLS,
+        *COMMAND_READ_TOOLS,
         agent.registry.tools["get_tools_catalog"].schema,
         *(ARTIFACT_TOOLS if agent.features["artifacts"] else []),
         *([agent.registry.tools["explore_code"].schema] if agent.features["exploration"] else []),
@@ -36,11 +109,21 @@ def available_tools(agent):
         *([] if agent.mode == Mode.ASK else TASK_TOOLS),
         *([EDIT_TOOL, CHANGES_TOOL] if agent.allow_edits else []),
         *([COMMAND_TOOL] if agent.commands_available else []),
+        *(COMMAND_EXTRA_TOOLS if agent.commands_available and agent.mode == Mode.EXECUTE else []),
     ]
 
 
 def select_tools(agent, requested_tools, *, slim=False, micro=False):
     definitions = available_tools(agent)
+    if agent.adaptive_input_limit < 12000 and "apply_changes" not in requested_tools:
+        import copy
+
+        definitions = copy.deepcopy(definitions)
+        for definition in definitions:
+            if definition["function"]["name"] == "apply_changes":
+                properties = definition["function"]["parameters"]["properties"]
+                properties.pop("atomic", None)
+                properties["operations"]["items"]["properties"].pop("replacements", None)
     if not slim:
         return [
             tool

@@ -77,7 +77,7 @@ class ProviderManager(ModalScreen[str | None]):
         with Vertical(id="provider-manager"):
             yield Static("Gerenciar provedores · credenciais mascaradas", markup=False)
             with VerticalScroll(id="profile-list"):
-                configured = self.store.load()
+                configured = self.store.load(resolve_secrets=False)
                 for name, profile in configured["profiles"].items():
                     with Vertical(classes="profile-row"):
                         yield Static(

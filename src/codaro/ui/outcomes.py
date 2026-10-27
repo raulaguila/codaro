@@ -33,6 +33,21 @@ class TaskReceipt(Vertical):
             if checks
             else "Validação não registrada"
         )
+        if self.record.get("criterion_checks"):
+            from codaro.validation import validation_report
+
+            report = validation_report(self.record)
+            label = {
+                "validated": "✓ Critérios validados",
+                "partial": "Validação parcial",
+                "failed": "! Verificação falhou",
+                "unavailable": "Validação indisponível",
+            }[report["status"]]
+            self.tooltip = "\n".join(
+                item["criterion"] + ": " + item["status"] for item in report["criteria"]
+            )
+            checks = [item for item in checks if item.get("check_id")]
+            passed = len(checks) if report["status"] == "validated" else -1
         self.set_class(bool(checks) and passed == len(checks), "verified")
         self.set_class(bool(checks) and passed != len(checks), "failed")
         if files:

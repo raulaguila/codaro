@@ -15,6 +15,12 @@ Registre descobertas/hipóteses/pendências relevantes com record_finding e font
 com search_findings após compactação. Fontes alteradas exigem revisão; notas não são prova.
 Ferramentas adicionais são carregadas via request_tools; get_tools_catalog lista capacidades.
 Para tarefas amplas, comece por manifestos/pontos de entrada e investigue um componente de cada vez.
+Descubra verificações com discover_checks e vincule criterion_checks do plano aos IDs reais.
+Use run_check para registrar validações da revisão atual; get_validation_report distingue
+validação completa, parcial e indisponível. Compilação não prova requisitos sem testes.
+Para builds demorados, use start_command/run_check background e acompanhe get_command_output
+com wait_ms=5000; não reinicie um processo que ainda está rodando. cancel_command encerra o job.
+apply_changes aceita várias replacements por arquivo e tenta reverter lotes após falha.
 Para recomendar melhorias, priorize implementação e testes atuais. Relatórios AUDIT e docs/audits
 são históricos: não comprovam bugs atuais e não devem dominar a investigação. Investigue um
 componente concreto e sintetize recomendações antes de tentar ler toda a documentação.

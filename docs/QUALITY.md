@@ -36,8 +36,8 @@ intencional e necessário para executar nos três sistemas.
 
 O workflow de checks também aceita `workflow_call`: o build de uma release depende
 dele, e a publicação depende dos checks e da validação do pacote. Uma falha bloqueia
-a pré-release. A avaliação de busca contém seis casos; três fixtures de implementação
-(autorização, paginação e configuração) também são exercitadas com respostas simuladas,
+a pré-release. A avaliação de busca contém 19 casos; cinco fixtures de implementação
+(autorização, paginação, configuração, Go e Node) também são exercitadas com respostas simuladas,
 aprovações reais e execução dos testes nas cópias temporárias. Esse replay verifica
 o fluxo da aplicação; a qualidade do modelo é medida na aceitação opt-in.
 
@@ -124,12 +124,13 @@ conclusão técnica e correspondência textual não substituem revisão semânti
 
 ### Execução manual no GitHub
 
-O workflow `Live provider acceptance (manual)` só é iniciado por
-`workflow_dispatch`; não recebe credenciais por eventos de PR. O ambiente
+O workflow `Live provider acceptance` aceita execução manual e reutilização,
+e agenda um smoke semanal com Ollama local na branch padrão do GitHub. Não
+recebe credenciais por eventos de PR; o smoke também é gate de release. O ambiente
 `live-providers` pode exigir revisores antes da execução. Há duas opções:
 
 - `ollama`: inicia Ollama em contêiner local descartável e baixa o modelo informado.
-  O padrão é `llama3.2:3b`; não exige chave, mas utiliza CPU, rede e tempo do runner.
+  O padrão é `qwen2.5:3b`; não exige chave, mas utiliza CPU, rede e tempo do runner.
 - `openai` ou `anthropic`: utiliza os secrets `CODARO_LIVE_BASE_URL` e
   `CODARO_LIVE_API_KEY` do ambiente. Informe o ID exato do modelo. Para compatíveis,
   use `openai` e a URL completa, incluindo `/v1` quando necessário.
@@ -189,3 +190,30 @@ verbos de mudança, incluindo remoção, renomeação, otimização e migração
 com o mesmo critério no roteamento e no registro das tarefas. Perguntas gerais
 continuam aceitas sem citações obrigatórias. Digests, aprovações e resultados de
 validação permanecem as verificações estruturais para conclusão de mudanças.
+
+## Qualificação da versão 0.2
+
+A suíte adiciona edição/undo/conflito e processos nativos no pacote instalado em
+três sistemas. Há testes de lotes com rollback, saída incremental/cancelamento,
+permissão por diretório, recibos por revisão, cofre indisponível, rotação sem
+persistência bem-sucedida, reutilização LSP e 20 turnos com compactações repetidas.
+A matriz de qualidade instala Node 22 e Go 1.23 para executar as fixtures; no
+ambiente local, a ausência do SDK é registrada como skip, não sucesso.
+
+No smoke real feito em CPU limitada, Qwen 2.5 3B passou em catálogo, streaming e
+ciclo nativo de ferramentas. Llama 3.2 1B passou em catálogo e streaming, mas falhou
+no ciclo completo da ferramenta. A bateria completa com Qwen revelou falhas de
+recuperação de decisões e prazos. Esses resultados não qualificam esses modelos
+pequenos para tarefas autônomas de produção. Consulte os relatórios JUnit de cada
+execução; não confunda o replay determinístico aprovado com qualidade de inferência.
+
+Na execução manual escolha `suite=full` e `implementation=true` para testar todos
+os cenários e cinco fixtures. `suite=smoke` cobre somente protocolo, catálogo e
+streaming. A agenda semanal executa esse smoke sem chave paga; configurar proteção
+de branch e revisores continua sendo responsabilidade administrativa do mantenedor.
+
+O benchmark de sessão também aceita `--baseline caminho.json`: compara somente
+relatórios com as mesmas perguntas e publica diferenças de duração, chamadas,
+compactações e tokens. Os totais reportados pelo provedor podem ter cobertura
+parcial; cada turno preserva os contadores de cobertura. Para comparar versões,
+use o mesmo projeto, modelo, configuração e conjunto de turnos e revise as respostas.

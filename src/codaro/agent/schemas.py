@@ -255,6 +255,11 @@ COMMAND_TOOL = schema(
     "Executa argumentos separados na raiz do projeto após aprovação humana. "
     "Retorna saída, exit_code e timeout. Use para testes e validação; sem shell implícito.",
     {
+        "cwd": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Diretório relativo ao projeto; padrão .; requer aprovação por escopo.",
+        },
         "argv": {
             "type": "array",
             "items": {"type": "string", "maxLength": 2000},
@@ -281,6 +286,24 @@ TASK_TOOLS = [
         "update_plan",
         "Registra/revisa o plano; não concede permissões.",
         {
+            "criterion_checks": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "criterion": {"type": "string", "maxLength": 300},
+                        "check_ids": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 8,
+                            "items": {"type": "string", "maxLength": 16},
+                        },
+                    },
+                    "required": ["criterion", "check_ids"],
+                    "additionalProperties": False,
+                },
+            },
             "steps": {
                 "type": "array",
                 "maxItems": 24,
@@ -337,6 +360,11 @@ CHANGES_TOOL = schema(
     "Resultados podem ser parciais. Argumentos JSON: máximo 64.000 bytes UTF-8; "
     "divida arquivos/conjuntos maiores em chamadas menores.",
     {
+        "atomic": {
+            "type": "boolean",
+            "description": "Padrão true: tenta reverter o lote após falha. "
+            "Preserva conflitos externos.",
+        },
         "reason": {"type": "string", "maxLength": 500},
         "operations": {
             "type": "array",
@@ -345,6 +373,20 @@ CHANGES_TOOL = schema(
             "items": {
                 "type": "object",
                 "properties": {
+                    "replacements": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 16,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "old_text": {"type": "string", "minLength": 1, "maxLength": 3000},
+                                "new_text": {"type": "string", "maxLength": 3000},
+                            },
+                            "required": ["old_text", "new_text"],
+                            "additionalProperties": False,
+                        },
+                    },
                     "kind": {"type": "string", "enum": ["edit", "create", "delete", "rename"]},
                     "path": {"type": "string", "maxLength": 2000},
                     "old_text": {"type": "string", "maxLength": 3000},
@@ -360,7 +402,72 @@ CHANGES_TOOL = schema(
     ["reason", "operations"],
 )
 
+COMMAND_READ_TOOLS = [
+    schema(
+        "get_language_support",
+        "Consulta gramáticas, nível de verificação e LSP instalado por linguagem.",
+        {"language": {"type": "string", "maxLength": 80}},
+        [],
+    ),
+    schema(
+        "discover_checks",
+        "Descobre comandos declarados de teste/lint/build; não os executa.",
+        {"path": SCOPE["path"]},
+        [],
+    ),
+    schema(
+        "get_validation_report",
+        "Critérios, resultados da revisão atual e verificações em execução.",
+        {},
+        [],
+    ),
+    schema(
+        "get_command_output",
+        "Consulta saída incremental de comando desta sessão. Não reexecuta comandos antigos.",
+        {
+            "job_id": {"type": "string", "maxLength": 16},
+            "offset": {"type": "integer", "minimum": 0},
+            "limit": {"type": "integer", "minimum": 200, "maximum": 8000},
+            "wait_ms": {"type": "integer", "minimum": 0, "maximum": 5000},
+        },
+        ["job_id"],
+    ),
+    schema(
+        "cancel_command",
+        "Interrompe somente um comando pertencente a esta sessão.",
+        {"job_id": {"type": "string", "maxLength": 16}},
+        ["job_id"],
+    ),
+]
+COMMAND_EXTRA_TOOLS = [
+    schema(
+        "start_command",
+        "Inicia comando aprovado em segundo plano. Consulte get_command_output "
+        "e encerre com cancel_command.",
+        {
+            **COMMAND_TOOL["function"]["parameters"]["properties"],
+            "timeout": {"type": "integer", "minimum": 1, "maximum": 3600},
+        },
+        ["argv"],
+    ),
+    schema(
+        "run_check",
+        "Executa uma checagem do catálogo atual com aprovação; resultado vinculado à revisão.",
+        {
+            "check_id": {"type": "string", "maxLength": 16},
+            "background": {"type": "boolean"},
+            "timeout": {"type": "integer", "minimum": 1, "maximum": 3600},
+        },
+        ["check_id"],
+    ),
+]
+COMMAND_EXTRA_NAMES = {
+    item["function"]["name"] for item in [*COMMAND_READ_TOOLS, *COMMAND_EXTRA_TOOLS]
+}
+
 ALL_DEFINITIONS = [
+    *COMMAND_READ_TOOLS,
+    *COMMAND_EXTRA_TOOLS,
     *TOOLS,
     *MEMORY_TOOLS,
     *CONTEXT_TOOLS,

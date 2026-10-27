@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import hashlib
-import time
 
 from codaro.agent.events import AgentEvent
 from codaro.agent.messages import serialize
 from codaro.artifacts import ARTIFACT_TOOLS
-from codaro.commands import run_command
 from codaro.index import CodeIndex
 from codaro.navigation import file_outline, find_definition, find_references
 from codaro.policies import Mode
@@ -39,7 +37,10 @@ def execute_tool(agent, index: CodeIndex, name: str, args: dict) -> dict:
         agent.tasks.start("Atividade atual")
         if name == "update_plan":
             task = agent.tasks.plan(
-                args["steps"], args["criteria"], args.get("validation_commands")
+                args["steps"],
+                args["criteria"],
+                args.get("validation_commands"),
+                args.get("criterion_checks"),
             )
             agent._detail(AgentEvent("plan", "Plano atualizado", serialize(task["plan"])))
             return agent.tasks.projection()
@@ -64,18 +65,26 @@ def execute_tool(agent, index: CodeIndex, name: str, args: dict) -> dict:
                 lambda item: item.update(verified_no_change_digest=task.get("workspace_digest"))
             )
             task = agent.tasks.current()
+        if status == "completed" and agent.jobs.active(purpose="validation"):
+            raise ValueError("Verificações ainda estão em execução; consulte get_command_output.")
         if status == "completed" and (
             not agent.tasks.validation_ready()
             or any(step["state"] != "done" for step in task["plan"])
         ):
             raise ValueError("Etapas ou validação da revisão atual ainda estão pendentes.")
         agent.tasks.state(status, args["summary"])
-        return {"state": status, "summary": args["summary"]}
+        from codaro.validation import validation_report
+
+        return {
+            "state": status,
+            "summary": args["summary"],
+            "validation": validation_report(agent.tasks.current()),
+        }
     if name == "apply_changes":
         if not agent.allow_edits:
             raise ValueError("Alterações disponíveis somente no modo Executar.")
         proposals = agent.edits.prepare_operations(args["operations"], args["reason"])
-        result = agent.review_changes(proposals)
+        result = agent.review_changes(proposals, atomic=args.get("atomic", True))
         agent.sync_workspace(index)
         return result
     if name == "search_conversation":
@@ -93,14 +102,15 @@ def execute_tool(agent, index: CodeIndex, name: str, args: dict) -> dict:
             if key in args
         }
         if agent.features.get("semantic_search") and index.semantic is None:
-            from codaro.semantic import SemanticSearch
-
-            index.semantic = SemanticSearch()
+            index.semantic = agent.services.semantic()
         result = {"results": index.search(args["query"], args.get("limit", 6), **filters)}
         flow = current_flow.get()
         if flow is not None:
             flow.data.setdefault("retrieval_metrics", []).append(index.last_search)
         result["retrieval"] = index.last_search
+        if agent.features.get("semantic_search"):
+            agent.services.warm(filters)
+            result["retrieval"]["warmup"] = agent.services.warmup_status
         return result
     if name == "get_project_map":
         return agent.project_map.page(index, **args)
@@ -118,6 +128,7 @@ def execute_tool(agent, index: CodeIndex, name: str, args: dict) -> dict:
                 "definition",
                 agent.features["lsp"],
                 agent._cancelled,
+                pool=agent.services.lsp,
             )
             if resolved is not None:
                 return resolved
@@ -136,6 +147,7 @@ def execute_tool(agent, index: CodeIndex, name: str, args: dict) -> dict:
                 "references",
                 agent.features["lsp"],
                 agent._cancelled,
+                pool=agent.services.lsp,
             )
             if resolved is not None:
                 offset, limit = args.get("offset", 0), args.get("limit", 20)
@@ -157,69 +169,19 @@ def execute_tool(agent, index: CodeIndex, name: str, args: dict) -> dict:
         return agent.knowledge.record(**args)
     if name == "search_findings":
         return agent.knowledge.search(**args)
-    if name == "run_command":
-        if not agent.legacy and agent.mode != Mode.EXECUTE:
-            raise ValueError("Comandos disponíveis somente no modo Executar.")
-        if not agent.commands_available:
-            raise ValueError("Execução de comandos desabilitada nesta sessão.")
-        if agent.edits.pending:
-            raise ValueError(
-                "Revise as propostas pendentes antes de executar comandos. "
-                "O código proposto ainda não foi aplicado."
-            )
-        task = None if agent.legacy else agent.tasks.current()
-        if task:
-            if agent._failures_run >= agent.max_corrections:
-                agent.tasks.state("blocked", "Limite de tentativas de correção atingido.")
-                raise ValueError("Limite de correções atingido. Continue em nova interação.")
-            agent.tasks.state("awaiting_approval")
-        started = time.monotonic()
-        try:
-            approved = (task and agent.policy.permits_command(task["id"], args["argv"])) or (
-                agent.approve_command is not None
-                and agent.approve_command(args["argv"], args.get("timeout", 60), agent._cancelled)
-            )
-        finally:
-            agent._deadline += time.monotonic() - started
-        if task:
-            agent.tasks.event(
-                "approval",
-                {
-                    "kind_action": "command",
-                    "argv": args["argv"],
-                    "approved": bool(approved),
-                    "policy": agent.policy.kind,
-                },
-            )
-        if not approved:
-            if task:
-                agent.tasks.state("blocked", "Comando rejeitado pelo usuário.")
-            return {"error": "Comando rejeitado; nenhuma execução realizada."}
-        if task:
-            agent.tasks.state("validating" if args.get("purpose") == "validation" else "executing")
-            agent.tasks.event("command_started", {"argv": args["argv"]})
-            agent.sync_workspace(index)
-        result = run_command(
-            agent.repository.root, args["argv"], args.get("timeout", 60), agent._cancelled
-        )
-        if task:
-            agent.sync_workspace(index)
-            if args.get("purpose") == "validation":
-                agent.tasks.validation(result)
-                if result["exit_code"] != 0 or result["timed_out"]:
-                    agent._failures_run += 1
-            else:
-                # An arbitrary operation may change sources; old validations become stale.
-                agent.tasks.update(lambda item: item.update(revision=item["revision"] + 1))
-            agent.tasks.event(
-                "command_finished",
-                {
-                    "argv": args["argv"],
-                    "exit_code": result["exit_code"],
-                    "timed_out": result["timed_out"],
-                },
-            )
-        return result
+    if name in {
+        "run_command",
+        "start_command",
+        "get_command_output",
+        "cancel_command",
+        "run_check",
+        "discover_checks",
+        "get_validation_report",
+        "get_language_support",
+    }:
+        from codaro.agent.command_tools import execute_command
+
+        return execute_command(agent, index, name, args)
     if name == "propose_edit":
         if not agent.allow_edits:
             raise ValueError("Edição desabilitada nesta sessão.")
@@ -257,7 +219,7 @@ def execute_tool(agent, index: CodeIndex, name: str, args: dict) -> dict:
         return result
     filters = {key: args[key] for key in ("path", "glob", "language", "extension") if key in args}
     paths = [
-        str(path.relative_to(agent.repository.root))
+        path.relative_to(agent.repository.root).as_posix()
         for path in scoped_files(agent.repository, **filters)
     ]
     offset = args.get("offset", 0)

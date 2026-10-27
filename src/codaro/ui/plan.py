@@ -128,7 +128,9 @@ class ExecutionPlan(Vertical):
             len(Text("○ " + step["title"]).wrap(self.app.console, width))
             for step in self.steps[:index]
         )
-        self.query_one("#plan-steps", VerticalScroll).scroll_to(y=rows, animate=False)
+        self.query_one("#plan-steps", VerticalScroll).scroll_to(
+            y=rows, animate=False, immediate=True
+        )
 
     def on_button_pressed(self, event):
         if event.button.id == "follow-plan":

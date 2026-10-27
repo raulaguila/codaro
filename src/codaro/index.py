@@ -11,7 +11,7 @@ from codaro.dependencies import imports_for
 from codaro.repository import Repository
 from codaro.retrieval import matches_scope, query_terms, scope_options
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 class CodeIndex:
@@ -64,7 +64,7 @@ class CodeIndex:
                             path, symbol, signature, content, tokenize='unicode61'
                         );
                         DROP TABLE IF EXISTS vectors;
-                        PRAGMA user_version = 5;
+                        PRAGMA user_version = 6;
                     """)
         except Exception:
             self.db.close()
@@ -92,7 +92,7 @@ class CodeIndex:
                     from codaro.llm import RequestCancelled
 
                     raise RequestCancelled("Indexação cancelada.")
-                name = str(path.relative_to(self.repository.root))
+                name = path.relative_to(self.repository.root).as_posix()
                 try:
                     info = path.stat(follow_symlinks=False)
                     stamp = repr(

@@ -28,6 +28,7 @@ class EditProposal:
     before_exists: bool = True
     after_exists: bool = True
     file_mode: int = 0o644
+    atomic_group: bool = False
 
     @property
     def operation(self):
@@ -146,6 +147,53 @@ class EditManager:
                 raise ValueError("A proposta já foi resolvida.")
             proposal.state = "rejected"
 
+    def propose_many(self, path, replacements, reason):
+        if not isinstance(replacements, list) or not 1 <= len(replacements) <= 16:
+            raise ValueError("Use de uma a dezesseis substituições por arquivo.")
+        if len(self.pending) >= 8:
+            raise ValueError("Limite de propostas pendentes atingido.")
+        target = self.repository.resolve_file(path)
+        canonical = target.relative_to(self.repository.root).as_posix()
+        data = self.repository.read_bytes(target)
+        observation = self.observed.get(canonical)
+        if not observation or observation[0] != data:
+            raise ValueError("Leia os trechos atuais antes de editar.")
+        if any(item.path == canonical for item in self.pending):
+            raise ValueError("Arquivo já tem proposta pendente.")
+        text = data.decode("utf-8-sig")
+        newline = "\r\n" if "\r\n" in text else "\n"
+        changes = []
+        for replacement in replacements:
+            if not isinstance(replacement, dict) or set(replacement) != {"old_text", "new_text"}:
+                raise ValueError("Substituição exige old_text e new_text.")
+            old, new = replacement["old_text"], replacement["new_text"]
+            if (
+                not isinstance(old, str)
+                or not old
+                or not isinstance(new, str)
+                or max(len(old), len(new)) > 3000
+            ):
+                raise ValueError("Substituição inválida ou grande demais.")
+            old = old.replace("\r\n", "\n").replace("\n", newline)
+            new = new.replace("\r\n", "\n").replace("\n", newline)
+            if text.count(old) != 1:
+                raise ValueError("Cada trecho original deve ocorrer uma única vez.")
+            start = text.index(old)
+            end = start + len(old)
+            if not any(first <= start and end <= last for first, last in observation[1]):
+                raise ValueError("Cada substituição precisa estar inteiramente nas linhas lidas.")
+            if any(max(start, first) < min(end, last) for first, last, _ in changes):
+                raise ValueError("Substituições sobrepostas não são permitidas.")
+            changes.append((start, end, new))
+        for start, end, new in sorted(changes, reverse=True):
+            text = text[:start] + new + text[end:]
+        after = (b"\xef\xbb\xbf" if data.startswith(b"\xef\xbb\xbf") else b"") + text.encode(
+            "utf-8"
+        )
+        if after == data:
+            raise ValueError("As substituições não alteram o arquivo.")
+        return self._proposal(canonical, data, after, reason)
+
     def prepare_operations(self, operations, reason):
         if not isinstance(operations, list) or not 1 <= len(operations) <= 8:
             raise ValueError("Use de uma a oito operações por conjunto.")
@@ -157,7 +205,15 @@ class EditManager:
                 if not isinstance(operation, dict):
                     raise ValueError("Operação inválida.")
                 kind = operation.get("kind")
-                allowed = {"kind", "path", "old_text", "new_text", "destination", "content"}
+                allowed = {
+                    "kind",
+                    "path",
+                    "old_text",
+                    "new_text",
+                    "destination",
+                    "content",
+                    "replacements",
+                }
                 if set(operation) - allowed:
                     raise ValueError("Campo de operação desconhecido.")
                 path = operation.get("path")
@@ -168,6 +224,9 @@ class EditManager:
                     raise ValueError("Reúna alterações de cada arquivo numa operação.")
                 paths.add(canonical)
                 if kind == "edit":
+                    if set(operation) == {"kind", "path", "replacements"}:
+                        prepared.append(self.propose_many(path, operation["replacements"], reason))
+                        continue
                     if set(operation) != {"kind", "path", "old_text", "new_text"}:
                         raise ValueError("Edit exige somente kind/path/old_text/new_text.")
                     result = self.propose(
@@ -294,6 +353,10 @@ class EditManager:
         return proposal
 
     def _apply(self, proposal: EditProposal):
+        if os.name == "nt":
+            from codaro.windows_files import apply
+
+            return apply(self.repository, proposal)
         if os.open not in os.supports_dir_fd or not hasattr(os, "O_NOFOLLOW"):
             raise RepositoryError("Aplicação segura requer POSIX com O_NOFOLLOW e dir_fd.")
         if not proposal.before_exists or not proposal.after_exists:

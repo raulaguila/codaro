@@ -109,6 +109,12 @@ class ProviderSetup(ModalScreen[str | None]):
                     yield Static("Nome do perfil (opcional)", markup=False)
                     yield Input(self.profile_name or "", id="provider-name", compact=True)
                     yield Checkbox(
+                        "Guardar API key no cofre do sistema",
+                        bool(profile.get("credential_ref")),
+                        id="provider-vault",
+                        compact=True,
+                    )
+                    yield Checkbox(
                         "Usar autenticação no Ollama",
                         bool(profile.get("api_key")),
                         id="provider-auth",
@@ -375,6 +381,16 @@ class ProviderSetup(ModalScreen[str | None]):
                 base_url=self.query_one("#provider-url", Input).value.strip(),
                 tls_insecure=self.query_one("#provider-tls", Checkbox).value,
                 cancelled=self.cancel_event,
+                **(
+                    {
+                        "credential_storage": "keyring"
+                        if self.query_one("#provider-vault", Checkbox).value
+                        else "file"
+                    }
+                    if self.query_one("#provider-vault", Checkbox).value
+                    or (self.original or {}).get("credential_ref")
+                    else {}
+                ),
                 **({"previous_name": self.profile_name} if self.original else {}),
             )
             if not self.is_attached or generation != self.generation:
@@ -416,7 +432,7 @@ class ModelPicker(ModalScreen[Settings | None]):
     def __init__(self, store=None, *, profile=None, onboarding=False):
         super().__init__()
         self.store, self.initial_profile = store or ProviderStore(), profile
-        self.profiles = self.store.load()
+        self.profiles = self.store.load(resolve_secrets=False)
         if not self.profiles["profiles"]:
             raise ValueError("Cadastre um provedor antes de selecionar modelos.")
         self.fetching = False

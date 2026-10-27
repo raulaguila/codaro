@@ -51,7 +51,9 @@ def resolve_configuration(**overrides):
     preferences = replace(preferences, **updates)
     store = ProviderStore()
     selected = options.get("provider") or os.getenv("CODARO_PROVIDER", "").strip()
-    data = store.load() if selected != "env" else {"active": None, "profiles": {}}
+    data = (
+        store.load(resolve_secrets=False) if selected != "env" else {"active": None, "profiles": {}}
+    )
     configured = None
     setup_profile = None
     provider_source = "padrão (configuração pendente)"

@@ -20,7 +20,7 @@ Requisitos: Python 3.11+ e [ripgrep](https://github.com/BurntSushi/ripgrep).
 O projeto está em estágio **alpha**, com licença [MIT](LICENSE). Para uso sem
 dependências de desenvolvimento, clone este repositório e execute `pipx install .`
 na raiz. Para instalar um wheel baixado de uma release, use
-`pipx install ./codaro-0.1.1-py3-none-any.whl`. O pacote ainda não tem publicação
+`pipx install ./codaro-0.2.0-py3-none-any.whl`. O pacote ainda não tem publicação
 automática no PyPI. As instruções abaixo são para desenvolvimento:
 
 ```bash
@@ -696,8 +696,10 @@ Versões do `pyproject.toml` e `codaro.__version__` devem coincidir. O workflow
 `release` exige primeiro os mesmos checks do CI (lint, testes, avaliações, pacote
 instalado e capturas da UI), constrói wheel e sdist, executa `twine check`, gera `SHA256SUMS` e valida
 o pacote instalado nos três sistemas. Uma execução manual gera artefatos para
-revisão. Uma tag `v0.1.1`, criada no commit revisado e enviada ao GitHub, publica
-uma **pré-release** apenas depois dessas verificações. Não publica no PyPI.
+revisão. Uma tag `v0.2.0`, criada no commit revisado e enviada ao GitHub, publica
+uma **pré-release** apenas depois dessas verificações e do smoke real com Ollama.
+A publicação PyPI opcional exige configuração administrativa e está desabilitada
+por padrão. Veja [Distribuição e migrações](docs/RELEASES.md) e [Changelog](CHANGELOG.md).
 
 Veja os achados e as limitações em [AUDIT.md](AUDIT.md).
 
@@ -708,7 +710,7 @@ Veja os achados e as limitações em [AUDIT.md](AUDIT.md).
 - Avaliar rerankers neurais além da reordenação lexical já disponível.
 - Ampliar cobertura de construções/dialetos dos parsers e integração LSP por linguagem.
 - Interrupção imediata de conexões que estejam sem enviar fragmentos.
-- Transações de edição envolvendo vários arquivos e adaptadores de sandbox para outros sistemas.
+- Recuperação de lotes após interrupções abruptas e adaptadores de sandbox para outros sistemas.
 
 
 ## Diagnóstico e recuperação
@@ -750,3 +752,25 @@ consumir créditos/enviar código. Revise semanticamente as respostas e compare 
 mesmos casos entre provedores/modelos; conclusão técnica não significa correção.
 
 Avaliações do agente não permitem edição/comandos e usam memória efêmera, preservando a memória das conversas do projeto. Atualizam o índice e o último JSON de debug. Os casos iniciais são testes de fumaça; métricas objetivas e correspondências textuais não substituem revisão humana da qualidade semântica. Compare relatórios ao mudar modelo, prompts, recuperação ou limites de contexto.
+
+## Execução e validação estruturadas (0.2)
+
+O agente pode descobrir verificações com `discover_checks`, associá-las aos
+critérios do plano, executá-las após aprovação com `run_check` e consultar
+`get_validation_report`. Resultados pertencem à revisão verificada: uma alteração
+posterior invalida a aprovação. Scripts declarados são dados do projeto e não
+são executados durante a descoberta. A verificação continua sujeita à revisão
+do comando e às ferramentas instaladas.
+
+`apply_changes` aceita múltiplas substituições por arquivo e usa preflight e
+rollback por padrão (`atomic: false` permite aplicação parcial explícita).
+Não permite alterar trechos não observados e preserva conflitos externos.
+`start_command`/`run_check` em segundo plano retornam um `job_id`;
+`get_command_output` acompanha páginas e `cancel_command` encerra o processo.
+Comandos podem usar `cwd` relativo ao repositório, exibido na aprovação. Jobs
+não são reexecutados ao restaurar a conversa e são encerrados ao fechar a sessão.
+
+`codaro languages --language go` consulta o inventário local de parser, fixture e
+LSP. Disponibilidade de parser não comprova todos os dialetos nem execução do
+compilador. Credenciais podem ficar no cofre nativo opcional em vez de arquivo:
+veja [migração e requisitos](docs/RELEASES.md).

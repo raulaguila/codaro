@@ -29,6 +29,7 @@ from codaro.llm import (
 )
 from codaro.policies import Mode
 from codaro.storage import private_lock
+from codaro.ui import approvals as approval_ui
 from codaro.ui import conversations as conversation_ui
 from codaro.ui import provider_actions
 from codaro.ui import streaming as stream_ui
@@ -41,10 +42,8 @@ from codaro.ui.plan import ExecutionPlan
 from codaro.ui.questions import QuestionDock
 from codaro.ui.recovery import RecoveryCard, failure_kind
 from codaro.ui.reviews import (
-    ChangesReview,
     CommandReview,
     EditReview,
-    ExternalToolReview,
     ScopeReview,
 )
 from codaro.ui.screen import WorkspaceScreen
@@ -287,7 +286,7 @@ class CodaroApp(App):
 
         store = ProviderStore()
         try:
-            if store.load()["profiles"]:
+            if store.load(resolve_secrets=False)["profiles"]:
                 self.push_screen(
                     ModelPicker(store, profile=self.setup_profile, onboarding=True),
                     self.activate_provider,
@@ -871,7 +870,7 @@ class CodaroApp(App):
 
             store = ProviderStore()
             try:
-                configured = store.load()
+                configured = store.load(resolve_secrets=False)
             except (ValueError, OSError) as exc:
                 self.mount_message(Static(safe_preview(str(exc)), classes="notice", markup=False))
                 return
@@ -991,27 +990,8 @@ class CodaroApp(App):
             "Execute o plano da tarefa ativa e valide o resultado.", preserve_draft=True
         )
 
-    def approve_command(self, argv, timeout, cancelled):
-        decision, ready = [], threading.Event()
-
-        def show():
-            dialog = CommandReview(self.agent.repository.root, argv, timeout)
-            self.approval_dialog = dialog
-            self.query_one("#status", Static).update("Aguardando aprovação do comando")
-
-            def resolved(value):
-                decision.append(value)
-                self.approval_dialog = None
-                ready.set()
-
-            self.push_screen(dialog, resolved)
-
-        self.deliver(show)
-        while not ready.wait(0.05):
-            if not self.is_running or cancelled is not None and cancelled.is_set():
-                self.deliver(self.dismiss_command)
-                return False
-        return bool(decision and decision[0])
+    def approve_command(self, argv, timeout, cancelled, *, cwd="."):
+        return approval_ui.approve_command(self, argv, timeout, cancelled, cwd=cwd)
 
     @work(thread=True, exclusive=True, group="reversal")
     def reverse_interaction(self, redo):
@@ -1056,48 +1036,10 @@ class CodaroApp(App):
         self.update_session_header()
 
     def approve_external(self, source, name, arguments, cancelled):
-        decision, ready = [], threading.Event()
-
-        def show():
-            dialog = ExternalToolReview(self.agent.repository.root, source, name, arguments)
-            self.approval_dialog = dialog
-            self.query_one("#status", Static).update("Aguardando aprovação da ferramenta externa")
-
-            def resolved(value):
-                decision.append(value)
-                self.approval_dialog = None
-                ready.set()
-
-            self.push_screen(dialog, resolved)
-
-        self.deliver(show)
-        while not ready.wait(0.05):
-            if not self.is_running or cancelled is not None and cancelled.is_set():
-                self.deliver(self.dismiss_command)
-                return False
-        return bool(decision and decision[0])
+        return approval_ui.approve_external(self, source, name, arguments, cancelled)
 
     def approve_changes(self, proposals, cancelled):
-        decision, ready = [], threading.Event()
-
-        def show():
-            dialog = ChangesReview(proposals)
-            self.approval_dialog = dialog
-            self.query_one("#status", Static).update("Aguardando revisão das alterações")
-
-            def resolved(value):
-                decision.append(value == "apply")
-                self.approval_dialog = None
-                ready.set()
-
-            self.push_screen(dialog, resolved)
-
-        self.deliver(show)
-        while not ready.wait(0.05):
-            if not self.is_running or cancelled is not None and cancelled.is_set():
-                self.deliver(self.dismiss_command)
-                return False
-        return bool(decision and decision[0])
+        return approval_ui.approve_changes(self, proposals, cancelled)
 
     def scope_decision(self, value, task_id):
         if value is None:
@@ -1731,3 +1673,4 @@ class CodaroApp(App):
 
     def on_unmount(self):
         self.cancelled.set()
+        self.agent.close()

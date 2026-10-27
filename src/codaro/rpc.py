@@ -56,12 +56,18 @@ class StdioRPC:
             stderr=subprocess.DEVNULL,
             env=environment(env_names),
             start_new_session=os.name == "posix",
+            creationflags=4 if os.name == "nt" else 0,
         )
         self.queue = queue.Queue(maxsize=64)
         self.notifications = []
         self.sequence = 0
         self.closed = False
         self.reader = threading.Thread(target=self._read, daemon=True)
+        self.windows_job = None
+        if os.name == "nt":
+            from codaro.windows_process import ProcessJob
+
+            self.windows_job = ProcessJob(self.process)
         self.reader.start()
 
     def _read(self):
@@ -97,7 +103,13 @@ class StdioRPC:
                 value = json.loads(line)
                 if not isinstance(value, dict):
                     raise ValueError("Mensagem RPC inválida.")
-                self.queue.put_nowait(value)
+                if self.framing == "headers" and "method" in value and "id" not in value:
+                    try:
+                        self.queue.put_nowait(value)
+                    except queue.Full:
+                        continue  # bounded idle LSP notifications must not kill the reader
+                else:
+                    self.queue.put_nowait(value)
         except (OSError, ValueError, queue.Full, RecursionError):
             try:
                 self.queue.put_nowait({"_failure": True})
@@ -189,6 +201,8 @@ class StdioRPC:
         try:
             if os.name == "posix":
                 os.killpg(self.process.pid, signal.SIGKILL)
+            elif self.windows_job is not None:
+                self.windows_job.close()
             elif self.process.poll() is None:
                 self.process.kill()
         except ProcessLookupError:

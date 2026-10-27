@@ -36,20 +36,23 @@ class ProviderChange:
 
 
 class ProviderStore:
-    def __init__(self, directory=None, *, transport=None):
+    def __init__(self, directory=None, *, transport=None, vault=None):
         parent = Path(os.getenv("XDG_CONFIG_HOME") or str(Path.home() / ".config")).expanduser()
         if directory is None and not parent.is_absolute():
             raise ValueError("XDG_CONFIG_HOME deve ser um caminho absoluto.")
         self.directory = Path(directory) if directory is not None else parent / "codaro"
         self.path = self.directory / "provider-credentials.json"
         self.transport = transport
+        from codaro.credentials import CredentialVault
 
-    def load(self):
+        self.vault = vault or CredentialVault()
+
+    def load(self, *, resolve_secrets=True):
         try:
             value = private_json(self.path, MAX_CONFIG_BYTES, require_private=True)
         except FileNotFoundError:
             return {"version": 1, "active": None, "profiles": {}}
-        if not isinstance(value, dict) or value.get("version") != 1:
+        if not isinstance(value, dict) or value.get("version") not in {1, 2}:
             raise ValueError("Configuração de provedores inválida.")
         profiles = value.get("profiles")
         if not isinstance(profiles, dict) or len(profiles) > 32:
@@ -59,6 +62,17 @@ class ProviderStore:
                 raise ValueError("Perfil de provedor inválido.")
             if profile.get("kind") not in PRESETS or not isinstance(profile.get("api_key"), str):
                 raise ValueError("Perfil de provedor inválido.")
+            reference = profile.get("credential_ref")
+            if reference is not None:
+                if (
+                    value["version"] != 2
+                    or not isinstance(reference, str)
+                    or not re.fullmatch("[a-f0-9]{32}", reference)
+                    or profile["api_key"]
+                ):
+                    raise ValueError("Referência de credencial inválida.")
+                if resolve_secrets:
+                    profile["api_key"] = self.vault.get(reference)
             Settings(
                 profile.get("base_url", ""),
                 profile.get("model") or "unselected",
@@ -88,6 +102,10 @@ class ProviderStore:
                     raise ValueError("Configuração de contexto inválida.")
         if value.get("active") is not None and value["active"] not in profiles:
             raise ValueError("Provedor ativo inválido.")
+        if value["version"] == 2 and not any(
+            item.get("credential_ref") for item in profiles.values()
+        ):
+            raise ValueError("Formato de cofre sem referências de credenciais.")
         return value
 
     def mutate(self, operation):
@@ -95,19 +113,79 @@ class ProviderStore:
             raise ValueError("Configuração de provedores não pode usar links.")
         self.directory.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         with private_lock(self.directory / "providers.lock"):
-            value = self.load()
+            value = self.load(resolve_secrets=False)
+            previous = {
+                item["credential_ref"]: None
+                for item in value["profiles"].values()
+                if item.get("credential_ref")
+            }
             operation(value)
-            raw = json.dumps(value, ensure_ascii=False).encode()
-            if len(raw) > MAX_CONFIG_BYTES:
-                raise ValueError("Configuração de provedores excede 4 MB.")
-            atomic_write(self.path, raw)
+            created = []
+            try:
+                for item in value["profiles"].values():
+                    reference = item.get("credential_ref")
+                    if item.get("credential_storage") == "keyring" or reference:
+                        if reference not in previous or item["api_key"]:
+                            reference = self.vault.create(item["api_key"])
+                            created.append(reference)
+                        item["credential_ref"], item["api_key"] = reference, ""
+                        item.pop("credential_storage", None)
+                value["version"] = (
+                    2
+                    if any(item.get("credential_ref") for item in value["profiles"].values())
+                    else 1
+                )
+                raw = json.dumps(value, ensure_ascii=False).encode()
+                if len(raw) > MAX_CONFIG_BYTES:
+                    raise ValueError("Configuração de provedores excede 4 MB.")
+                atomic_write(self.path, raw)
+            except BaseException:
+                for reference in created:
+                    self.vault.delete(reference)
+                raise
+            retained = {
+                item["credential_ref"]
+                for item in value["profiles"].values()
+                if item.get("credential_ref")
+            }
+            for reference in previous.keys() - retained:
+                self.vault.delete(reference)
+
+    def credential_storage(self, name, storage):
+        if storage not in {"file", "keyring"}:
+            raise ValueError("Escolha file ou keyring.")
+
+        def change(value):
+            if name not in value["profiles"]:
+                raise ValueError("Perfil não cadastrado.")
+            item = value["profiles"][name]
+            if storage == "keyring":
+                if not item["api_key"] and not item.get("credential_ref"):
+                    raise ValueError("Este provedor não possui chave para mover ao cofre.")
+                item["credential_storage"] = "keyring"
+            else:
+                if item.get("credential_ref"):
+                    item["api_key"] = self.vault.get(item["credential_ref"])
+                item.pop("credential_ref", None)
+
+        self.mutate(change)
+
+    def export_profiles(self):
+        value = self.load(resolve_secrets=False)
+        for item in value["profiles"].values():
+            item.pop("api_key", None)
+            item.pop("credential_ref", None)
+        return value
 
     def profile(self, name=None):
-        value = self.load()
+        value = self.load(resolve_secrets=False)
         name = name or value["active"]
         if name not in value["profiles"]:
             raise ValueError("Cadastre um provedor com codaro providers add.")
-        return name, value["profiles"][name]
+        profile = value["profiles"][name]
+        if profile.get("credential_ref"):
+            profile["api_key"] = self.vault.get(profile["credential_ref"])
+        return name, profile
 
     def register(self, kind, key, *, name=None, base_url=None, tls_insecure=False):
         return self.prepare_register(
@@ -115,7 +193,15 @@ class ProviderStore:
         ).commit()
 
     def prepare_register(
-        self, kind, key, *, name=None, base_url=None, tls_insecure=False, cancelled=None
+        self,
+        kind,
+        key,
+        *,
+        name=None,
+        base_url=None,
+        tls_insecure=False,
+        cancelled=None,
+        credential_storage="file",
     ):
         if kind not in PRESETS:
             raise ValueError("Provedor desconhecido; use um preset ou custom.")
@@ -138,6 +224,7 @@ class ProviderStore:
             "tls_insecure": tls_insecure,
             "model": "",
         }
+        self.storage_choice(profile, credential_storage)
         profile["models"] = ModelCatalog(
             profile, transport=self.transport, cancelled=cancelled
         ).list()
@@ -170,6 +257,7 @@ class ProviderStore:
         base_url=None,
         tls_insecure=False,
         cancelled=None,
+        credential_storage=None,
     ):
         previous_name, old = self.profile(previous_name)
         name = name or previous_name
@@ -189,6 +277,7 @@ class ProviderStore:
             "api_key": key,
             "tls_insecure": tls_insecure,
         }
+        self.storage_choice(candidate, credential_storage)
         candidate["models"] = ModelCatalog(
             candidate, transport=self.transport, cancelled=cancelled
         ).list()
@@ -199,7 +288,7 @@ class ProviderStore:
         candidate["updated_at"] = timestamp()
 
         def save(value):
-            if value["profiles"].get(previous_name) != old:
+            if not self.same_profile(value["profiles"].get(previous_name), old):
                 raise ValueError("Perfil alterado durante a consulta; tente novamente.")
             if name != previous_name and name in value["profiles"]:
                 raise ValueError("Já existe um perfil com esse nome.")
@@ -276,7 +365,7 @@ class ProviderStore:
 
         def save(value):
             current = value["profiles"].get(name)
-            if current != profile:
+            if not self.same_profile(current, profile):
                 raise ValueError("O perfil mudou durante a consulta; tente novamente.")
             current.update(models=models, updated_at=timestamp())
 
@@ -301,7 +390,7 @@ class ProviderStore:
 
         def save(value):
             current = value["profiles"].get(name)
-            if current != profile:
+            if not self.same_profile(current, profile):
                 raise ValueError("O perfil mudou durante a seleção; tente novamente.")
             current["models"] = [
                 model if item["id"] == model_id else item for item in current["models"]
@@ -357,3 +446,30 @@ class ProviderStore:
                 value["active"] = None
 
         self.mutate(delete)
+
+    @staticmethod
+    def same_profile(first, second):
+        def normalize(item):
+            if item is None:
+                return None
+            return {
+                key: value
+                for key, value in item.items()
+                if key != "api_key" or not item.get("credential_ref")
+            }
+
+        return normalize(first) == normalize(second)
+
+    @staticmethod
+    def storage_choice(profile, choice):
+        if choice is None:
+            return
+        if choice not in {"file", "keyring"}:
+            raise ValueError("Armazenamento deve ser file ou keyring.")
+        if choice == "keyring":
+            if not profile["api_key"]:
+                raise ValueError("Este provedor não possui chave para salvar no cofre.")
+            profile["credential_storage"] = "keyring"
+        else:
+            profile.pop("credential_ref", None)
+            profile.pop("credential_storage", None)

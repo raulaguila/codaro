@@ -73,9 +73,9 @@ def main(
         ctx.invoke(chat)
 
 
-def approve_command(argv, timeout, cancelled, *, root):
+def approve_command(argv, timeout, cancelled, *, root, cwd="."):
     errors.print(
-        safe_preview(f"Diretório: {root}\nComando · timeout {timeout}s\n{shlex.join(argv)}"),
+        safe_preview(f"Diretório: {root / cwd}\nComando · timeout {timeout}s\n{shlex.join(argv)}"),
         markup=False,
     )
     try:
@@ -571,6 +571,17 @@ def repository_map(
                 json.dumps(ProjectMap().build(index, path=path), ensure_ascii=False, indent=2)
             )
     except (ValueError, OSError, sqlite3.Error) as exc:
+        fail(exc)
+
+
+@app.command("languages", hidden=True)
+def language_inventory(language: Annotated[str | None, typer.Option()] = None):
+    """Mostra suporte de parser/fixtures e instalação local dos servidores LSP."""
+    from codaro.language_support import language_support
+
+    try:
+        typer.echo(json.dumps(language_support(language), ensure_ascii=False, indent=2))
+    except ValueError as exc:
         fail(exc)
 
 

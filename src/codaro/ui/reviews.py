@@ -96,7 +96,12 @@ class ChangesReview(EditReview):
             )
         combined = SimpleNamespace(
             path=f"{len(proposals)} arquivo(s)",
-            reason="Aprovar aplica este conjunto; o agente continuará para validar.",
+            reason=(
+                "Aprovar aplica o lote e autoriza reversão após falha; "
+                "conflitos externos são preservados."
+                if any(getattr(item, "atomic_group", False) for item in proposals)
+                else "Aprovar aplica este conjunto; o agente continuará para validar."
+            ),
             diff="\n\n".join(sections),
         )
         super().__init__(combined)

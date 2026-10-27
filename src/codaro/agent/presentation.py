@@ -51,21 +51,40 @@ TOOL_TITLES = {
     "find_references": "Localizar ocorrências",
     "record_finding": "Registrar descoberta",
     "search_findings": "Recuperar descobertas",
+    "discover_checks": "Descobrir verificações",
+    "get_validation_report": "Conferir critérios de validação",
+    "start_command": "Iniciar comando em segundo plano",
+    "get_command_output": "Acompanhar comando",
+    "cancel_command": "Cancelar comando",
+    "run_check": "Executar verificação",
 }
 
 
 def tool_outcome(result: dict) -> tuple[str, str]:
     if "error" in result:
         return "error", str(result["error"])[:200]
+    if "job_id" in result:
+        state = result.get("state")
+        label = {
+            "running": "Em execução",
+            "completed": "Concluído",
+            "failed": "Falhou",
+            "cancelled": "Cancelado",
+        }.get(state, "Comando")
+        return (
+            "running" if state == "running" else "success" if state == "completed" else "error",
+            label + " · " + result["job_id"],
+        )
     if "user_response" in result:
         return "success", "Decisão registrada"
-    if result.get("state") in {"applied", "partial", "conflict", "rejected"}:
+    if result.get("state") in {"applied", "partial", "conflict", "rejected", "rolled_back"}:
         state = result["state"]
         label = {
             "applied": "Alteração aplicada · validação pendente",
             "partial": "Conjunto parcialmente aplicado; confira os arquivos",
             "conflict": "Conflito; alteração bloqueada",
             "rejected": "Alteração rejeitada; arquivos preservados",
+            "rolled_back": "Lote revertido após falha; confira o diagnóstico",
         }[state]
         return "success" if state == "applied" else "error", label
     if "repository_root" in result:

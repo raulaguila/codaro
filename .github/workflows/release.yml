@@ -8,8 +8,14 @@ permissions:
 jobs:
   quality:
     uses: ./.github/workflows/ci.yml
+  live-protocol:
+    uses: ./.github/workflows/live-providers.yml
+    with:
+      api_style: ollama
+      model: qwen2.5:3b
+      suite: smoke
   build:
-    needs: quality
+    needs: [quality, live-protocol]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -84,3 +90,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes --prerelease
+  pypi:
+    if: github.ref_type == 'tag' && vars.CODARO_PUBLISH_PYPI == 'true'
+    needs: [publish, verify]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/codaro
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-distributions
+          path: dist/
+      - name: Keep only Python distributions for PyPI
+        run: rm dist/SHA256SUMS
+      - uses: pypa/gh-action-pypi-publish@release/v1

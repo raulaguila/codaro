@@ -6,8 +6,19 @@ import hashlib
 import json
 import math
 import os
+import threading
+from functools import wraps
 
 MAX_VECTOR_CANDIDATES = 10000
+
+
+def serialized(function):
+    @wraps(function)
+    def run(self, *args, **kwargs):
+        with self.lock:
+            return function(self, *args, **kwargs)
+
+    return run
 
 
 class SemanticSearch:
@@ -15,8 +26,21 @@ class SemanticSearch:
         self.model = model or os.environ.get("CODARO_EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
         self.encoder = encoder
         self.status = "not_initialized"
+        self.lock = threading.RLock()
 
-    def search(self, index, query, allowed, *, kind=None, language=None, cancelled=None):
+    @serialized
+    def search(
+        self,
+        index,
+        query,
+        allowed,
+        *,
+        kind=None,
+        language=None,
+        cancelled=None,
+        warm_limit=256,
+        warm_only=False,
+    ):
         try:
             if self.encoder is None:
                 from fastembed import TextEmbedding
@@ -59,7 +83,7 @@ class SemanticSearch:
                 if row["id"] not in cached or cached[row["id"]][0] != digest:
                     pending.append((row["id"], digest, text))
             # Incremental warm-up bounds work per question; subsequent searches continue it.
-            for offset in range(0, min(256, len(pending)), 32):
+            for offset in range(0, min(warm_limit, len(pending)), 32):
                 if cancelled is not None and cancelled.is_set():
                     from codaro.llm import RequestCancelled
 
@@ -78,6 +102,9 @@ class SemanticSearch:
                     cached[identifier] = (digest, encoded)
             db.execute("DELETE FROM vectors WHERE id NOT IN (SELECT id FROM chunks)")
             db.commit()
+            if warm_only:
+                self.status = "ready" if len(pending) <= warm_limit else "partial_index_warming"
+                return []
             query_vector = checked_vector(next(iter(self.encoder.query_embed(query))))
             ranked = []
             for row in rows:

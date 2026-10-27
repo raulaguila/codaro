@@ -37,13 +37,30 @@ com hashes, índice incremental e embeddings locais opcionais.
 
 Ainda não implementadas nesta etapa:
 
-- Catálogo pesquisável por descrição/categoria e seleção progressiva antecipada.
-- Múltiplas substituições por arquivo e contratos específicos por operação de edição.
 - Estados de atividade específicos para catálogo, diagnósticos e outras ferramentas.
 - `get_changes`, `inspect_project` e `inspect_path`.
-- Descoberta de verificações e validação estruturada.
-- Diretório por comando, execução em segundo plano, acompanhamento e cancelamento.
 - Orçamento de contexto detalhado e consulta de tarefa também no modo Perguntar.
 
 As novas ferramentas deverão ser carregadas sob demanda e reutilizar as políticas
 de arquivos, revisão, validação e cancelamento existentes.
+
+## Implementado na versão 0.2
+
+- `get_tools_catalog`: busca por descrição/nome e categoria. Seleção antecipada
+  respeita o orçamento; o registro completo continua acessível sob demanda.
+- `apply_changes`: operações `edit` podem fornecer `replacements` (até 16 pares
+  old_text/new_text sem sobreposição, observados no mesmo snapshot). Lotes usam
+  `atomic: true` por padrão: preflight e tentativa de rollback com checkpoints,
+  sem sobrescrever conflitos externos. Não há atomicidade contra queda do processo.
+- `discover_checks`: comandos derivados dos manifestos Python, Node, Go, Rust,
+  Java e .NET. `update_plan.criterion_checks` associa critérios aos IDs descobertos.
+- `run_check`: executa um comando descoberto após aprovação; `get_validation_report`
+  distingue critérios aprovados, pendentes ou indisponíveis na revisão atual.
+- `start_command`, `get_command_output`, `cancel_command`: jobs próprios da sessão,
+  saída paginada, até quatro ativos e cancelamento. IDs antigos não são restaurados
+  como PIDs. `cwd` é relativo à raiz e aparece para o revisor.
+- `get_language_support`: inventário local de parsers, fixtures estruturais e LSP.
+
+LSP e compiladores não são instalados automaticamente. O teste de uma linguagem
+no parser não representa validação de build. Veja [RELEASES.md](RELEASES.md) para
+limites de rollback, processos, sandbox e atualização.
