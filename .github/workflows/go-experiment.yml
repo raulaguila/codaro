@@ -1,0 +1,33 @@
+name: Go experiment
+
+on:
+  push:
+    branches: [develop, main]
+    paths: ['experimental/go/**', '.github/workflows/go-experiment.yml']
+  pull_request:
+    paths: ['experimental/go/**', '.github/workflows/go-experiment.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: experimental/go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: experimental/go/go.mod
+          cache-dependency-path: experimental/go/go.sum
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+      - run: go mod verify
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: go build -trimpath -o bin/codaro-go ./cmd/codaro

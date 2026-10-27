@@ -13,6 +13,11 @@ implementação. Veja configuração, exemplos e limites em
 No chat, Ctrl+P inclui **Preferências**, **Sessões**, **Cadastrar MCP ou plugin**, **Desfazer
 interação**, **Refazer interação** e **Funcionalidades e integrações**.
 
+Há também um [protótipo independente em Go](experimental/go/README.md), com
+interface Bubble Tea, streaming, catálogo de modelos e ferramentas de leitura.
+Para experimentar sem uma API: `cd experimental/go` e
+`go run ./cmd/codaro --demo ../..`. A versão Python continua sendo a aplicação principal.
+
 ## Instalação
 
 Requisitos: Python 3.11+ e [ripgrep](https://github.com/BurntSushi/ripgrep).
