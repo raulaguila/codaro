@@ -218,8 +218,12 @@ ficam nos detalhes.
 **Ctrl+O** (Command no macOS, quando reconhecido) ou clique direito em uma resposta
 abre ações para copiar texto/código e visualizar arquivos citados. A leitura local
 respeita os arquivos permitidos e mascara credenciais reconhecidas, sem enviar uma
-nova solicitação ao modelo nem autorizar edições. Copiar depende do suporte do
-terminal à área de transferência via OSC52. `/sessions` abre a lista pesquisável de
+nova solicitação ao modelo nem autorizar edições. Copiar usa a área de transferência
+nativa quando disponível: `pbcopy` no macOS, `clip.exe` no Windows/WSL, `wl-copy`
+no Wayland ou `xclip`/`xsel` no X11. Em SSH, usa OSC 52 do terminal cliente,
+sem executar helpers de clipboard no servidor. Se não houver confirmação nativa,
+o diálogo oferece **Selecionar texto** para copiar pelo próprio terminal.
+`/sessions` abre a lista pesquisável de
 conversas do projeto, com última atividade, retomada, arquivamento e restauração.
 
 A oferta de retomada identifica a conversa, sua última atividade e uma prévia.

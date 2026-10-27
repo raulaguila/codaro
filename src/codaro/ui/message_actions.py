@@ -1,11 +1,14 @@
 """Local transcript actions; file previews never grant edit evidence to the agent."""
 
+import asyncio
 import re
 
+from textual import work
 from textual.containers import Vertical
 from textual.widgets import Button, OptionList, Static, TextArea
 from textual.widgets.option_list import Option
 
+from codaro.clipboard import copy_native
 from codaro.index import safe_preview
 from codaro.ui.screen import DialogScreen
 
@@ -76,6 +79,7 @@ class MessageActions(DialogScreen):
         self.text = text
         self.codes = re.findall(r"```([^\n]*)\n(.*?)```", text, flags=re.S)[:10]
         self.files = []
+        self.copy_text = text
 
     def compose(self):
         try:
@@ -96,19 +100,24 @@ class MessageActions(DialogScreen):
                 ],
                 id="message-action-list",
             )
+            yield Static("", id="message-copy-status", markup=False)
+            yield Button("Selecionar texto", id="message-copy-manual")
             yield Button("Voltar", id="message-actions-close")
 
     def on_mount(self):
         self.query_one(OptionList).focus()
         self.query_one(OptionList).highlighted = 0
+        self.query_one("#message-copy-manual").display = False
+        self.query_one("#message-copy-status").display = False
         self.fit()
 
     def on_resize(self):
         self.call_after_refresh(self.fit)
 
     def fit(self):
+        extra = 3 if self.query_one("#message-copy-manual").display else 0
         self.query_one(OptionList).styles.max_height = max(
-            3, min(14, int(self.size.height * 0.85) - 6)
+            1, min(14, int(self.size.height * 0.85) - 6 - extra)
         )
 
     def action_close(self):
@@ -116,6 +125,9 @@ class MessageActions(DialogScreen):
 
     def on_button_pressed(self, event):
         event.stop()
+        if event.button.id == "message-copy-manual":
+            self.app.push_screen(CopyPreview(self.copy_text))
+            return
         self.action_close()
 
     def on_option_list_option_selected(self, event):
@@ -125,10 +137,64 @@ class MessageActions(DialogScreen):
             path, line = self.files[int(value[5:])]
             self.app.push_screen(FilePreview(path, line))
             return
-        self.app.copy_to_clipboard(
-            self.text if value == "answer" else self.codes[int(value[5:])][1]
+        self.copy_response(self.text if value == "answer" else self.codes[int(value[5:])][1])
+
+    @work(exclusive=True)
+    async def copy_response(self, text):
+        self.copy_text = text
+        options = self.query_one(OptionList)
+        options.disabled = True
+        status = self.query_one("#message-copy-status", Static)
+        status.display = True
+        status.update("Copiando…")
+        native = await asyncio.to_thread(copy_native, text)
+        if not self.is_mounted:
+            return
+        # Keep Textual's internal paste buffer synchronized and support SSH via OSC 52.
+        try:
+            self.app.copy_to_clipboard(text)
+            sent = True
+        except (OSError, RuntimeError):
+            sent = False
+        if native:
+            self.app.query_one("#status", Static).update("Copiado para a área de transferência")
+            self.action_close()
+            return
+        options.disabled = False
+        status.update(
+            "Cópia enviada ao terminal, sem confirmação. Se não colar, use Selecionar texto."
+            if sent
+            else "Não foi possível copiar automaticamente. Use Selecionar texto."
         )
-        self.app.query_one("#status", Static).update(
-            "Copiado para a área de transferência do terminal"
-        )
+        self.query_one("#message-copy-manual").display = True
+        self.query_one("#message-copy-manual").focus()
+        self.fit()
+
+
+class CopyPreview(DialogScreen):
+    BINDINGS = [("escape", "close", "Voltar")]
+
+    def __init__(self, text):
+        super().__init__()
+        self.text = text
+
+    def compose(self):
+        with Vertical(id="copy-preview"):
+            yield Static("Texto para copiar", classes="dialog-title")
+            yield Static(
+                "Selecione com o mouse (Shift pode ser necessário) e use o atalho de copiar "
+                "do seu terminal.",
+                markup=False,
+            )
+            yield TextArea(self.text, read_only=True, soft_wrap=True, id="copy-preview-text")
+            yield Button("Voltar", id="copy-preview-close")
+
+    def on_mount(self):
+        self.query_one(TextArea).focus()
+
+    def action_close(self):
+        self.dismiss(None)
+
+    def on_button_pressed(self, event):
+        event.stop()
         self.action_close()

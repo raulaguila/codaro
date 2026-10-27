@@ -2,6 +2,10 @@
 
 ## 0.2.0
 
+- Cópia de respostas/código usa clipboard nativo no macOS, Windows/WSL e Linux
+  quando disponível, sem bloquear a UI. SSH mantém OSC 52, com retorno sem falsa
+  confirmação e seleção manual como alternativa.
+
 - Catálogo único de linguagens, nomes e aliases para listagem, grep e buscas
   lexical/semântica. Filtro OCaml inclui interfaces `.mli` sem alterar sua
   gramática. Inventário de suporte paginado com resumo, detalhes e cursores

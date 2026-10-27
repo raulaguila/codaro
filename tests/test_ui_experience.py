@@ -100,6 +100,7 @@ def test_message_copy_and_file_preview_are_local_and_preserve_draft(tmp_path, mo
     app = CodaroApp(agent)
     copied = []
     monkeypatch.setattr(app, "copy_to_clipboard", copied.append)
+    monkeypatch.setattr("codaro.ui.message_actions.copy_native", lambda text: True)
 
     async def scenario():
         async with app.run_test() as pilot:
@@ -111,6 +112,7 @@ def test_message_copy_and_file_preview_are_local_and_preserve_draft(tmp_path, mo
             assert isinstance(app.screen, MessageActions)
             app.screen.query_one(OptionList).highlighted = 1
             await pilot.press("enter")
+            await app.workers.wait_for_complete()
             assert copied == ["print(value)\n"]
             await pilot.press("ctrl+o")
             actions = app.screen.query_one(OptionList)

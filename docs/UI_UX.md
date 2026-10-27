@@ -1,5 +1,23 @@
 # Correções da auditoria de UI e UX do Codaro
 
+## Cópia de respostas e código
+
+- Ações da resposta usam primeiro a área de transferência nativa: `pbcopy` no
+  macOS, `clip.exe` no Windows/WSL, `wl-copy` no Wayland e `xclip`/`xsel` no X11,
+  conforme disponibilidade. X11 usa a seleção clipboard, compatível com Ctrl+V.
+- Texto Unicode e quebras de linha são enviados por stdin, sem shell ou conteúdo
+  nos argumentos do processo. A cópia roda em worker, com timeout por helper,
+  preservando o rascunho e permitindo fechar o diálogo durante a operação.
+- Em SSH, nenhum helper do servidor é executado. A cópia usa OSC 52 do terminal
+  cliente. Como o protocolo não confirma recebimento, o diálogo informa essa
+  limitação e oferece Selecionar texto; somente cópia nativa concluída exibe Copiado.
+- A seleção manual abre uma prévia somente leitura do conteúdo escolhido,
+  inclusive de um bloco de código, com instruções para seleção pelo terminal.
+  Nenhuma chamada ao modelo ou permissão de edição é necessária.
+
+Testes: `tests/test_clipboard.py` e `tests/test_clipboard_ui.py` verificam roteamento,
+stdin Unicode, falhas/timeouts, proteção em SSH, responsividade e telas compactas.
+
 ## Retomada, comandos e configuração de integrações
 
 - Oferta de retomada com título, última atividade e prévia; ações explícitas para
