@@ -30,6 +30,7 @@ sem API paga. Resultado exato da execução completa anterior à revisão final:
 | Qwen 2.5 3B: mesmo smoke | 3/3 |
 | Qwen 2.5 3B: aceitação completa | 3 aprovados, 5 falharam; 1433 s |
 | Qwen 2.5 3B: repetição do smoke após ajustes finais | 3/3; 82 s |
+| Qwen 2.5 3B: endpoint OpenAI-compatible do mesmo Ollama | 3/3; 47 s |
 
 Na aceitação completa, o cenário de análise retornou sem a leitura de arquivo
 esperada; a decisão restaurada não apareceu na resposta; recuperação de histórico,
@@ -42,6 +43,10 @@ execução autônoma. JUnit registra os cenários em novas execuções do workfl
 
 Windows/macOS foram incluídos na matriz de pacote instalado com testes nativos
 de edição, undo, conflito e processos; os resultados dependem do CI dessas máquinas.
+Na primeira execução do CI, Linux/macOS passaram; o teste nativo Windows detectou
+separadores do ripgrep não normalizados na criação de subpastas. A comparação
+passou a normalizar os caminhos com `Path.as_posix()`, mantendo o teste que
+reproduziu a falha como verificação obrigatória.
 APIs pagas e cofres nativos não foram testados com credenciais nesta execução.
 A publicação PyPI continua desabilitada até configuração administrativa.
 Rollback gerenciado não promete recuperação automática após queda abrupta ou

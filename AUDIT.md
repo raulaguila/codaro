@@ -1,5 +1,10 @@
 # Auditoria do Codaro CLI
 
+Este arquivo é um registro histórico das revisões. Limitações descritas em uma
+etapa podem ter sido corrigidas depois. Para a versão 0.2, consulte a
+[verificação de maturidade](docs/audits/2026-10-27-maturity/README.md) e o
+[changelog](CHANGELOG.md).
+
 Data: 2026-10-05. Ambiente validado: Linux, Python 3.12.14, dependências em `requirements-dev.lock`.
 
 ## Resultado

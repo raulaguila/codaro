@@ -228,7 +228,9 @@ class Repository:
             result = subprocess.run(args, cwd=mirror, capture_output=True, timeout=20)
             if result.returncode not in (0, 1):
                 raise RepositoryError("Não foi possível verificar os ignores do destino.")
-            names = {os.fsdecode(item) for item in result.stdout.split(b"\0") if item}
+            names = {
+                Path(os.fsdecode(item)).as_posix() for item in result.stdout.split(b"\0") if item
+            }
             if relative.as_posix() not in names:
                 raise RepositoryError("Destino excluído pelas regras de ignore.")
         return path
