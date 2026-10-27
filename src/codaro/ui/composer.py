@@ -6,6 +6,7 @@ from textual.message import Message
 from textual.widgets import Button, Static, TextArea
 
 from codaro.ui.completions import CompletionMenu
+from codaro.ui.jobs import JobStrip
 from codaro.ui.plan import ExecutionPlan
 from codaro.ui.questions import QuestionDock
 
@@ -14,6 +15,7 @@ class Composer(Vertical):
     """A fixed input area; conversation scrolling cannot move the active plan."""
 
     def compose(self):
+        yield JobStrip(id="job-strip")
         yield ExecutionPlan()
         yield CompletionMenu("", id="completion", markup=False)
         with Vertical(id="response-card"):

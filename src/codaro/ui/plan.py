@@ -56,6 +56,9 @@ class ExecutionPlan(Vertical):
         self.expanded = True
         self.following = True
         self.steps = []
+        self.answering = False
+        self.question_override = None
+        self.compact_question = False
 
     def compose(self):
         with Horizontal(id="plan-heading"):
@@ -111,6 +114,10 @@ class ExecutionPlan(Vertical):
         execute.disabled = busy
 
     def toggle(self):
+        if self.compact_question:
+            self.question_override = True
+            self.expanded = True
+            return
         self.expanded = not self.expanded
 
     def manual_scroll(self):
@@ -140,6 +147,18 @@ class ExecutionPlan(Vertical):
             self.follow_active()
 
     def fit(self, height, *, answering=False, completing=False):
+        if answering != self.answering:
+            self.question_override = None
+        self.answering = answering
+        self.compact_question = answering and height < 25 and self.question_override is not True
+        self.query_one("#plan-steps").display = self.expanded and not self.compact_question
+        self.query_one("#follow-plan").display = (
+            not self.following and self.expanded and not self.compact_question
+        )
+        button = self.query_one("#toggle-plan", Button)
+        label = button.label.plain
+        if label:
+            button.label = ("▾" if self.expanded and not self.compact_question else "▸") + label[1:]
         self.query_one("#plan-steps").styles.max_height = (
             1 if (answering or completing) and height < 25 else 3 if height < 25 or answering else 5
         )

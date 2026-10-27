@@ -34,7 +34,7 @@ from codaro.ui import conversations as conversation_ui
 from codaro.ui import provider_actions
 from codaro.ui import streaming as stream_ui
 from codaro.ui.composer import Composer, Prompt
-from codaro.ui.formatting import short_path
+from codaro.ui.formatting import short_path, transport_label
 from codaro.ui.generation import GenerationRate
 from codaro.ui.messages import AssistantMessage, UserMessage
 from codaro.ui.palette import system_commands
@@ -98,7 +98,7 @@ class CodaroApp(App):
         )
 
     async def open_provider_menu(self, command: str):
-        if (self.busy and command not in {"/help", "/status", "/mode"}) or isinstance(
+        if (self.busy and command not in {"/help", "/status", "/mode", "/jobs"}) or isinstance(
             self.screen, ModalScreen
         ):
             return
@@ -256,6 +256,9 @@ class CodaroApp(App):
             self.query_one("#status", Static).update("Conecte um provedor para começar")
         self.set_interval(0.08, self.flush_preview)
         self.set_interval(1, self.update_generation_status)
+        from codaro.ui.jobs import sync_jobs
+
+        self.set_interval(0.25, lambda: sync_jobs(self))
         self.query_one(Prompt).focus()
         self.refresh_reference_paths()
         if self.resume_requested and not self.offer_resume:
@@ -318,18 +321,17 @@ class CodaroApp(App):
         self.set_class(self.size.height < 25, "short-terminal")
         self.set_class(self.size.width < 80, "compact-terminal")
         settings = self.agent.provider.settings
-        tls = "TLS sem verificação" if settings.tls_insecure else "TLS verificação ativa"
-        if settings.base_url.startswith("http://"):
-            tls = "HTTP"
+        tls = transport_label(settings.base_url, settings.tls_insecure)
         root = self.agent.repository.root.name or short_path(self.agent.repository.root)
         width = max(10, self.size.width - 42)
         identity = root
-        summary = f"{tls} · {identity}" if settings.tls_insecure else identity
+        insecure = settings.tls_insecure and settings.base_url.lower().startswith("https://")
+        summary = f"TLS sem verificação · {identity}" if insecure else identity
         if len(summary) > width:
             summary = summary[: width - 1] + "…"
         session = self.query_one("#session", Static)
         session.update(safe_preview(summary))
-        session.set_class(settings.tls_insecure, "insecure")
+        session.set_class(insecure, "insecure")
         session.tooltip = safe_preview(
             str(self.agent.repository.root)
             + " · "
@@ -455,11 +457,16 @@ class CodaroApp(App):
         menu = self.query_one(CompletionMenu)
         prompt = self.query_one(Prompt)
         unread_row = int(self.query_one("#new-messages").display)
-        reserved = self.query_one(ExecutionPlan).region.height
+        reserved = (
+            self.query_one(ExecutionPlan).region.height + self.query_one("#job-strip").region.height
+        )
         if self.pending_user_question:
             reserved += self.query_one(QuestionDock).region.height
-        max_height = max(2, min(8, self.size.height - 16 - unread_row - reserved))
-        prompt.styles.height = min(max_height, max(2, prompt.wrapped_document.height + 1))
+        minimum = 1 if self.pending_user_question and self.size.height < 25 else 2
+        max_height = max(minimum, min(8, self.size.height - 16 - unread_row - reserved))
+        prompt.styles.height = min(
+            max_height, max(minimum, prompt.wrapped_document.height + int(minimum > 1))
+        )
         cursor = prompt.document.get_index_from_location(prompt.cursor_location)
         command_text = prompt.value[:cursor]
         is_command = command_text.startswith("/") and not any(c.isspace() for c in command_text)
@@ -481,6 +488,7 @@ class CodaroApp(App):
                 + self.query_one("#session").region.height
                 + int(prompt.styles.height.value)
                 + self.query_one(ExecutionPlan).region.height
+                + self.query_one("#job-strip").region.height
             )
             count = max(1, min(5, self.size.height - fixed - 7))
             first = max(0, min(self.completion_index - count // 2, len(options) - count))
@@ -575,6 +583,9 @@ class CodaroApp(App):
     async def local_command(self, question: str):
         name, _, argument = question.partition(" ")
         argument = argument.strip()
+        if name == "/jobs" and not argument:
+            self.show_jobs()
+            return
         if name not in COMMANDS:
             self.mount_message(Static("Comando desconhecido. Use /help.", classes="notice"))
             return
@@ -1329,6 +1340,8 @@ class CodaroApp(App):
         self.call_after_refresh(self.update_completions)
 
     def cancel_execution_plan(self):
+        from codaro.ui.jobs import cancel_jobs
+
         task = self.agent.tasks.current()
         if not task or task["state"] in {"completed", "cancelled"}:
             return
@@ -1337,11 +1350,13 @@ class CodaroApp(App):
             self.action_cancel()
             self.query_one("#status", Static).update("Cancelando plano · preservando alterações…")
         else:
+            cancel_jobs(self)
             self.agent.tasks.state("cancelled", "Plano cancelado pelo usuário.")
             self.agent.policy.reset()
             self.show_plan()
             self.update_session_header()
-            self.query_one("#status", Static).update("Plano cancelado · alterações preservadas")
+            if not self.agent.jobs.active():
+                self.query_one("#status", Static).update("Plano cancelado · alterações preservadas")
 
     def append_delta(self, delta: str):
         return stream_ui.append_delta(self, delta)
@@ -1526,6 +1541,12 @@ class CodaroApp(App):
         return await conversation_ui.reset_conversation(self, objective)
 
     def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "jobs-open":
+            self.show_jobs()
+            return
+        if event.button.id == "jobs-stop":
+            self.action_cancel()
+            return
         if event.button.id == "question-send":
             self.answer_user_question(self.query_one(Prompt).value)
             return
@@ -1667,9 +1688,18 @@ class CodaroApp(App):
         )
 
     def action_cancel(self):
+        from codaro.ui.jobs import cancel_jobs
+
         if self.busy:
             self.cancelled.set()
             self.set_generation_status("Cancelamento solicitado · aguardando resposta ativa…")
+        cancel_jobs(self)
+
+    def show_jobs(self):
+        from codaro.ui.jobs import JobsDialog
+
+        if not isinstance(self.screen, ModalScreen):
+            self.push_screen(JobsDialog(self.agent.jobs))
 
     def on_unmount(self):
         self.cancelled.set()

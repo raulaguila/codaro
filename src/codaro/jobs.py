@@ -40,11 +40,23 @@ class JobManager:
         self.jobs = {}
         self.lock = threading.Lock()
 
-    def start(self, argv, cwd=".", timeout=300, *, purpose="operation", task=None, check_id=None):
+    def start(
+        self,
+        argv,
+        cwd=".",
+        timeout=300,
+        *,
+        purpose="operation",
+        task=None,
+        check_id=None,
+        cancelled=None,
+    ):
         validate_command(argv, timeout, maximum=3600)
         target = command_directory(self.repository, cwd)
         environment = command_environment(os.environ)
         with self.lock:
+            if cancelled is not None and cancelled.is_set():
+                raise RequestCancelled("Execução cancelada antes de iniciar o comando.")
             if sum(not job.done.is_set() for job in self.jobs.values()) >= 4:
                 raise ValueError("Até quatro comandos simultâneos.")
             if len(self.jobs) >= 32:
@@ -156,8 +168,20 @@ class JobManager:
     def cancel(self, job_id):
         if job_id not in self.jobs:
             raise ValueError("Comando não pertence a esta sessão.")
-        self.jobs[job_id].cancelled.set()
+        self.request_cancel([job_id])
         return self.poll(job_id, wait_ms=3000)
+
+    def request_cancel(self, identifiers=None):
+        """Signal owned processes immediately; UI polling confirms actual termination."""
+        with self.lock:
+            selected = list(self.jobs) if identifiers is None else list(identifiers)
+            for identifier in selected:
+                if identifier not in self.jobs:
+                    raise ValueError("Comando não pertence a esta sessão.")
+            active = [self.jobs[key] for key in selected if not self.jobs[key].done.is_set()]
+            for job in active:
+                job.cancelled.set()
+            return [job.id for job in active]
 
     def close(self):
         for job in list(self.jobs.values()):

@@ -53,7 +53,7 @@ class ProviderSetup(ModalScreen[str | None]):
         super().__init__()
         self.store = store or ProviderStore()
         self.profile_name = profile
-        self.original = self.store.profile(profile)[1] if profile else None
+        self.original = self.store.profile(profile, resolve_secrets=False)[1] if profile else None
         self.saving = False
         self.testing = False
         self.test_worker = None
@@ -114,9 +114,10 @@ class ProviderSetup(ModalScreen[str | None]):
                         id="provider-vault",
                         compact=True,
                     )
+                    yield Static("", id="provider-storage-help", markup=False)
                     yield Checkbox(
                         "Usar autenticação no Ollama",
-                        bool(profile.get("api_key")),
+                        bool(profile.get("api_key") or profile.get("credential_ref")),
                         id="provider-auth",
                         compact=True,
                     )
@@ -178,6 +179,8 @@ class ProviderSetup(ModalScreen[str | None]):
         button.tooltip = "Salvar o provedor e escolher um modelo para conversar"
 
     def update_fields(self):
+        from importlib.util import find_spec
+
         kind = str(self.query_one("#provider-kind", Select).value)
         advanced = self.query_one("#provider-advanced", Collapsible)
         self.query_one("#provider-url-field").display = (
@@ -187,6 +190,18 @@ class ProviderSetup(ModalScreen[str | None]):
             kind != "ollama" or self.query_one("#provider-auth", Checkbox).value
         )
         self.query_one("#provider-auth").display = kind == "ollama"
+        stored_key = bool((self.original or {}).get("credential_ref"))
+        has_key = bool(self.form_key()) or stored_key
+        vault = self.query_one("#provider-vault", Checkbox).value
+        self.query_one("#provider-storage-help", Static).update(
+            (
+                "Cofre do sistema · consultado apenas ao testar ou salvar."
+                if find_spec("keyring") is not None or getattr(self.store.vault, "backend", None)
+                else "Cofre: instale codaro[credentials] e configure/desbloqueie o cofre."
+            )
+            if vault
+            else "Armazenamento: arquivo privado neste usuário. Cofre é opcional."
+        )
         self.query_one("#provider-tls-warning").display = self.query_one(
             "#provider-tls", Checkbox
         ).value
@@ -203,9 +218,9 @@ class ProviderSetup(ModalScreen[str | None]):
         except ValueError:
             ready = False
         if kind not in {"ollama", "custom", "openai-compatible"}:
-            ready = ready and bool(self.form_key())
+            ready = ready and has_key
         if kind == "ollama" and self.query_one("#provider-auth", Checkbox).value:
-            ready = ready and bool(self.form_key())
+            ready = ready and has_key
         for identifier in ("#provider-test", "#provider-save"):
             self.query_one(identifier, Button).disabled = self.saving or not ready
         if not ready:
@@ -237,9 +252,14 @@ class ProviderSetup(ModalScreen[str | None]):
     def form_key(self):
         if self.last_kind == "ollama" and not self.query_one("#provider-auth", Checkbox).value:
             return ""
-        return self.query_one("#provider-key", Input).value.strip() or (self.original or {}).get(
-            "api_key", ""
-        )
+        key = self.query_one("#provider-key", Input).value.strip()
+        return key or (self.original or {}).get("api_key", "")
+
+    async def resolve_key(self):
+        key = self.form_key()
+        if not key and (self.original or {}).get("credential_ref"):
+            return await asyncio.to_thread(self.store.vault.get, self.original["credential_ref"])
+        return key
 
     def on_select_changed(self, event: Select.Changed):
         if event.select.id == "provider-kind":
@@ -267,10 +287,11 @@ class ProviderSetup(ModalScreen[str | None]):
         status.update("Testando conexão…")
         model = self.query_one("#provider-test-model", Select).value if inference else None
         try:
+            key = await self.resolve_key()
             models = await asyncio.to_thread(
                 self.store.test_connection,
                 str(self.query_one("#provider-kind", Select).value),
-                self.form_key(),
+                key,
                 base_url=self.query_one("#provider-url", Input).value.strip(),
                 tls_insecure=self.query_one("#provider-tls", Checkbox).value,
                 model_id=model if isinstance(model, str) else None,
@@ -370,13 +391,14 @@ class ProviderSetup(ModalScreen[str | None]):
         self.query_one("#provider-error", Static).update("Consultando catálogo…")
         try:
             kind = str(self.query_one("#provider-kind", Select).value)
+            key = await self.resolve_key()
             name = (
                 self.query_one("#provider-name", Input).value.strip() or self.profile_name or kind
             )
             change = await asyncio.to_thread(
                 self.store.prepare_update if self.original else self.store.prepare_register,
                 kind,
-                self.form_key(),
+                key,
                 name=name,
                 base_url=self.query_one("#provider-url", Input).value.strip(),
                 tls_insecure=self.query_one("#provider-tls", Checkbox).value,
@@ -493,7 +515,7 @@ class ModelPicker(ModalScreen[Settings | None]):
         self.catalogue = models
         self.query_one(ModelList).set_models(models, self.query_one("#model-search", Input).value)
         self.query_one("#model-error", Static).update("")
-        profile = self.store.profile(name)[1]
+        profile = self.store.profile(name, resolve_secrets=False)[1]
         if any(model["id"] == profile["model"] and model["tools"] is not False for model in models):
             if not self.query_one("#model-search", Input).value:
                 self.query_one(ModelList).value = profile["model"]
@@ -545,7 +567,9 @@ class ModelPicker(ModalScreen[Settings | None]):
             info.update("Nenhum modelo disponível para conversa." if not empty else "")
             self.query_one("#model-metadata", Static).update("")
             return
-        settings = self.store.settings_for(name, self.store.profile(name)[1], model)
+        settings = self.store.settings_for(
+            name, self.store.profile(name, resolve_secrets=False)[1], model
+        )
         selection = (name, value)
         if getattr(self, "details_model", None) != selection:
             self.details_model = selection
@@ -628,7 +652,7 @@ class ModelPicker(ModalScreen[Settings | None]):
                 self.query_one("#model-error", Static).update("Selecione um modelo.")
                 return
             if button.id == "model-test":
-                profile = self.store.profile(str(name))[1]
+                _, profile = await asyncio.to_thread(self.store.profile, str(name))
                 await asyncio.to_thread(
                     self.store.test_connection,
                     profile["kind"],

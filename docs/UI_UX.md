@@ -73,7 +73,7 @@
   Voltar continua sendo o foco inicial: Enter não aprova uma edição por acidente.
 - Aprovação automática aparece como Executar · Auto no cabeçalho.
 
-O script `scripts/capture_ui.py` reproduz 31 estados em quatro tamanhos de terminal,
+O script `scripts/capture_ui.py` reproduz 33 estados em quatro tamanhos de terminal,
 com dados sintéticos e sem inferência. Os testes de interação e métricas ficam em
 `tests/test_ui_experience.py` e `tests/test_ui_generation_rate.py`.
 
@@ -153,3 +153,32 @@ anteriores preservam as evidências históricas.
 
 A validação automatizada usa Textual real em modo headless, HTTP simulado e
 eventos sintéticos. Não comprova inferência real nem atalhos de um terminal físico.
+
+## Correções de 27 de outubro
+
+Os dez achados da [auditoria de UI](audits/2026-10-27-ui-ux/report.md) foram
+tratados. A documentação de validação acompanha a entrega nesta mesma pasta.
+
+- Cancelar atividade/plano sinaliza também os comandos em segundo plano. A UI
+  mantém “Parando” até o processo terminar. O acesso `/jobs`, pela paleta ou pela
+  linha junto ao input, permite consultar saída paginada e parar um comando sem
+  solicitar uma chamada ao modelo. A linha some quando não há processos ativos.
+- Perfis e catálogos salvos são abertos sem desbloquear o cofre. Testar/salvar
+  consulta a credencial sob demanda, em uma thread, e apresenta erro recuperável.
+  O formulário mantém seus campos e não muda automaticamente para arquivo.
+- HTTP e política de verificação HTTPS têm rótulos distintos. Política habilitada
+  não é apresentada como conexão já testada.
+- Durante perguntas em terminais baixos, o plano mantém um resumo visível e sua
+  preferência de expansão. O usuário pode expandi-lo; ao responder, a preferência
+  é preservada. O input vazio ocupa uma linha enquanto aguarda a resposta.
+- Opções longas preservam começo e fim, para distinguir alternativas com prefixo
+  comum. A seleção pode usar duas linhas em telas maiores; o texto enviado continua
+  integral. Detalhes mantém o acesso ao conteúdo completo.
+- Autorização de escopo usa corpo rolável e ações fixas. O resumo acompanha campos
+  básicos ou JSON avançado; os efeitos e a revogação ficam nos detalhes.
+- Placeholder sem estilo dim, com contraste verificado nas cores exportadas dos
+  temas claro/escuro. Gerenciador e aprovação de comando adaptam sua altura;
+  código, listas e parágrafos usam menos espaço nos terminais baixos.
+
+A verificação mantém foco seguro nas aprovações, rascunhos, perguntas sem resposta
+presumida e a separação entre raciocínio, etapas e resposta final.

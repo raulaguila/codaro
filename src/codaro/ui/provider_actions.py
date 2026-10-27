@@ -23,10 +23,13 @@ def manage_provider_decision(app, result):
             )
         return
     profile = result.removeprefix("edit:") if result.startswith("edit:") else None
-    app.push_screen(
-        ProviderSetup(store, profile=profile),
-        lambda name: app.provider_edited(profile, name, store),
-    )
+    try:
+        app.push_screen(
+            ProviderSetup(store, profile=profile),
+            lambda name: app.provider_edited(profile, name, store),
+        )
+    except (ValueError, OSError) as exc:
+        app.query_one("#status", Static).update(safe_preview(str(exc)))
 
 
 def provider_edited(app, previous, name, store):

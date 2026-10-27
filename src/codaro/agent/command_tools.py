@@ -166,7 +166,13 @@ def execute_command(agent, index, name, args):
         agent.tasks.event("command_started", {"argv": argv, "cwd": cwd})
     if name == "start_command" or args.get("background", False):
         result = agent.jobs.start(
-            argv, cwd, timeout, purpose=purpose, task=task, check_id=check["id"] if check else None
+            argv,
+            cwd,
+            timeout,
+            purpose=purpose,
+            task=task,
+            check_id=check["id"] if check else None,
+            cancelled=agent._cancelled,
         )
         if task:
             agent.tasks.event(

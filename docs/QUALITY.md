@@ -41,7 +41,7 @@ a pré-release. A avaliação de busca contém 19 casos; cinco fixtures de imple
 aprovações reais e execução dos testes nas cópias temporárias. Esse replay verifica
 o fluxo da aplicação; a qualidade do modelo é medida na aceitação opt-in.
 
-`python scripts/capture_ui.py` gera 124 capturas SVG e texto em `artifacts/ui`, em
+`python scripts/capture_ui.py` gera 132 capturas SVG e texto em `artifacts/ui`, em
 60×20, 80×24, 120×35 e 160×45, sem chamadas ao modelo e usando configuração temporária.
 Inclui geração com velocidade sintética, plano extenso, pergunta longa, detalhes,
 ações da resposta, leitura local, conversas, revisão de diff e seleção de modelos. O job
@@ -217,3 +217,9 @@ relatórios com as mesmas perguntas e publica diferenças de duração, chamadas
 compactações e tokens. Os totais reportados pelo provedor podem ter cobertura
 parcial; cada turno preserva os contadores de cobertura. Para comparar versões,
 use o mesmo projeto, modelo, configuração e conjunto de turnos e revise as respostas.
+
+`tests/test_ui_audit_followup.py` verifica cancelamento com processo filho real,
+perguntas e aprovações pendentes, saída paginada sem inferência, cofre bloqueado,
+rótulos HTTP/HTTPS, resumo de escopo e decisões em 60×20/80×24/120×35. O contraste
+do placeholder é medido nas cores do SVG nos temas claro e escuro; isso não
+substitui avaliação com terminais e tecnologias assistivas reais.

@@ -774,3 +774,11 @@ não são reexecutados ao restaurar a conversa e são encerrados ao fechar a ses
 LSP. Disponibilidade de parser não comprova todos os dialetos nem execução do
 compilador. Credenciais podem ficar no cofre nativo opcional em vez de arquivo:
 veja [migração e requisitos](docs/RELEASES.md).
+
+Para acompanhar comandos em segundo plano, use `/jobs`, a opção correspondente
+no menu Ctrl+P ou a linha que aparece junto ao input enquanto houver processos.
+A saída é paginada e pode ser consultada sem chamar a IA. “Parar comando” encerra
+somente a seleção; Ctrl+X e cancelar o plano solicitam também o encerramento dos
+comandos desta conversa. A UI aguarda o término antes de confirmar a parada.
+Perfis no cofre podem ser editados sem recuperar a chave; testar/salvar consulta o
+cofre e informa indisponibilidade sem trocar automaticamente o armazenamento.

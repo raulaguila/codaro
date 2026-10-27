@@ -266,3 +266,58 @@ ModePicker { align: right top; background: transparent; }
 .plan-proposal #plan-start { background: $accent; color: $background; }
 .welcome-title { color: $text; text-style: bold; margin: 1 0; }
 .compact-terminal #context-meter { max-width: 30%; }
+
+/* Commands only occupy space while owned processes are active. */
+#job-strip { display: none; height: 1; margin-bottom: 0; }
+#job-strip Button { height: 1; min-height: 1; border: none; padding: 0;
+    background: $background; color: $text-muted; text-style: none; }
+#jobs-open { width: 1fr; content-align: left middle; }
+#jobs-stop { width: 8; min-width: 8; color: $warning; }
+#job-strip Button:hover, #job-strip Button:focus { background: $panel; color: $text; }
+#jobs-dialog { width: 95%; max-width: 96; height: 23; max-height: 90%; padding: 0 1;
+    border: round $primary 35%; background: $surface; }
+#jobs-list { height: 3; border: none; padding: 0; }
+#job-state { height: auto; max-height: 2; color: $text-muted; }
+#job-output { height: 1fr; min-height: 3; border: none; }
+#jobs-dialog .dialog-actions Button { min-width: 7; }
+
+Prompt .text-area--placeholder { color: $text-muted; text-style: none; }
+.short-terminal #prompt { min-height: 1; }
+.short-terminal .answering #prompt { height: 1; }
+.short-terminal .answering #response-card { padding: 0 1; }
+.short-terminal .question-label { display: none; }
+.short-terminal .answering #question-dock { max-height: 6; }
+.short-terminal #question-title { max-height: 1; }
+#provider-storage-help { color: $text-muted; max-height: 3; }
+
+#provider-manager { max-height: 90%; padding: 0 1; }
+#provider-manager .dialog-title { margin: 1 0; }
+.profile-actions { height: 2; }
+.profile-row { margin-bottom: 0; }
+#provider-manager > .profile-actions { border-top: solid $primary 30%; }
+#scope-review { width: 95%; max-width: 90; height: 24; max-height: 90%;
+    border: round $primary 35%; padding: 0 1; background: $surface; }
+#scope-review .dialog-title { margin: 0; }
+#scope-task { max-height: 1; text-wrap: nowrap; text-overflow: ellipsis; color: $text-muted; }
+#scope-summary { height: 1; color: $text-muted; }
+#scope-preview { display: none; }
+#scope-fields TextArea { height: 3; border: none; border-left: solid $primary 45%;
+    padding: 0 1; margin-bottom: 1; background: $primary 8%; }
+#scope-fields #scope-json { height: 7; }
+#scope-fields Checkbox { height: 1; margin: 0; }
+#scope-review Horizontal { height: 2; border-top: solid $primary 30%; }
+#scope-review Button { height: 1; min-height: 1; border: none; padding: 0;
+    background: $surface; color: $text-muted; text-style: none; }
+#scope-review #scope-details { width: auto; }
+#scope-review #grant-scope { background: $accent; color: $background; }
+#scope-review Button:hover, #scope-review Button:focus { background: $panel; color: $text; }
+#scope-review #grant-scope:hover, #scope-review #grant-scope:focus {
+    background: $accent-lighten-1; color: $background; }
+#command-review .dialog-title { margin: 0 0 1 0; }
+#command-review > Horizontal { height: 2; border-top: solid $primary 30%; }
+.short-terminal .assistant MarkdownFence, .short-terminal .generation-text MarkdownFence {
+    margin: 0 0 1 0; padding: 0; }
+.short-terminal .assistant MarkdownList, .short-terminal .generation-text MarkdownList {
+    margin: 0; padding: 0; }
+.short-terminal .assistant MarkdownParagraph, .short-terminal .generation-text MarkdownParagraph {
+    margin-bottom: 0; }

@@ -7,6 +7,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Button, Static
 
+from codaro.ui.formatting import transport_label
 from codaro.ui.screen import DialogScreen as ModalScreen
 
 
@@ -75,7 +76,7 @@ class ProviderManager(ModalScreen[str | None]):
 
     def compose(self):
         with Vertical(id="provider-manager"):
-            yield Static("Gerenciar provedores · credenciais mascaradas", markup=False)
+            yield Static("Gerenciar provedores", classes="dialog-title", markup=False)
             with VerticalScroll(id="profile-list"):
                 configured = self.store.load(resolve_secrets=False)
                 for name, profile in configured["profiles"].items():
@@ -83,11 +84,7 @@ class ProviderManager(ModalScreen[str | None]):
                         yield Static(
                             f"{name} {'· ativo' if name == configured['active'] else ''}\n"
                             f"{profile['base_url']}\n"
-                            + (
-                                "TLS sem verificação"
-                                if profile["tls_insecure"]
-                                else "TLS verificado"
-                            ),
+                            + transport_label(profile["base_url"], profile["tls_insecure"]),
                             markup=False,
                         )
                         with Horizontal(classes="profile-actions"):
@@ -100,6 +97,11 @@ class ProviderManager(ModalScreen[str | None]):
 
     def action_back(self):
         self.dismiss(None)
+
+    def on_mount(self):
+        count = len(self.store.load(resolve_secrets=False)["profiles"])
+        self.query_one("#provider-manager").styles.height = min(28, 7 + max(1, count) * 5)
+        self.query_one("#manager-back").focus()
 
     def on_button_pressed(self, event):
         identifier = event.button.id or ""

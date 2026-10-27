@@ -14,6 +14,7 @@ import httpx
 from textual.widgets import Checkbox, Input, Select, SelectionList
 
 from codaro.agent import Agent, AgentEvent
+from codaro.jobs import CommandJob
 from codaro.llm import Settings
 from codaro.llm.profiles import ProviderStore
 from codaro.repository import Repository
@@ -22,6 +23,7 @@ from codaro.ui.composer import Prompt
 from codaro.ui.details import ResumeDialog
 from codaro.ui.features import FeaturesDialog
 from codaro.ui.integrations import IntegrationRegistration
+from codaro.ui.jobs import JobsDialog, sync_jobs
 from codaro.ui.message_actions import FilePreview, MessageActions
 from codaro.ui.messages import UserMessage
 from codaro.ui.model_list import ModelList
@@ -196,6 +198,21 @@ async def capture(output, root):
             app.push_screen(SessionPicker(agent.sessions, agent.session_id))
             await save("sessions")
             await pilot.press("escape")
+            # Synthetic job state only; real process cleanup has separate regressions.
+            job = CommandJob(
+                "preview-job", ["python", "-m", "pytest", "-q"], ".", "validation", "", 0
+            )
+            job.output.extend(b"Checking project...\nTests running...\n")
+            agent.jobs.jobs[job.id] = job
+            sync_jobs(app)
+            await save("background-command")
+            app.push_screen(JobsDialog(agent.jobs))
+            await save("background-output")
+            await pilot.press("escape")
+            job.state = "completed"
+            job.result = {"exit_code": 0, "timed_out": False}
+            job.done.set()
+            sync_jobs(app)
             agent.edits.observe(
                 agent.repository.read_lines("main.py", 1, 2), (project / "main.py").read_bytes()
             )

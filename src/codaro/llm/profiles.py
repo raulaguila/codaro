@@ -177,13 +177,13 @@ class ProviderStore:
             item.pop("credential_ref", None)
         return value
 
-    def profile(self, name=None):
+    def profile(self, name=None, *, resolve_secrets=True):
         value = self.load(resolve_secrets=False)
         name = name or value["active"]
         if name not in value["profiles"]:
             raise ValueError("Cadastre um provedor com codaro providers add.")
         profile = value["profiles"][name]
-        if profile.get("credential_ref"):
+        if resolve_secrets and profile.get("credential_ref"):
             profile["api_key"] = self.vault.get(profile["credential_ref"])
         return name, profile
 
@@ -210,7 +210,7 @@ class ProviderStore:
             raise ValueError("O nome env é reservado à configuração por variáveis de ambiente.")
         if not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", name):
             raise ValueError("Nome do perfil inválido.")
-        if name in self.load()["profiles"]:
+        if name in self.load(resolve_secrets=False)["profiles"]:
             raise ValueError("Perfil já cadastrado; remova-o antes de substituir a credencial.")
         settings = Settings(
             provider_base_url(kind, base_url), "unselected", key, tls_insecure=tls_insecure
@@ -259,7 +259,7 @@ class ProviderStore:
         cancelled=None,
         credential_storage=None,
     ):
-        previous_name, old = self.profile(previous_name)
+        previous_name, old = self.profile(previous_name, resolve_secrets=False)
         name = name or previous_name
         if name == "env" and previous_name != "env":
             raise ValueError("O nome env é reservado à configuração por variáveis de ambiente.")
@@ -354,7 +354,7 @@ class ProviderStore:
         return models
 
     def models(self, name=None, *, refresh=False):
-        name, profile = self.profile(name)
+        name, profile = self.profile(name, resolve_secrets=False)
         if not refresh:
             return profile["models"]
         return self.prepare_refresh(name).commit()

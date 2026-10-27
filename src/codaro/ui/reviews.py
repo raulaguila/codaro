@@ -160,19 +160,15 @@ class ScopeReview(ModalScreen[dict | None]):
 
     def compose(self):
         with Vertical(id="scope-review"):
-            yield Static("Autorizar escopo desta tarefa/sessão", markup=False)
+            yield Static("Autorizar escopo", classes="dialog-title", markup=False)
             yield Static(
                 safe_preview(self.scope_task["id"] + " · " + self.scope_task["objective"]),
                 id="scope-task",
                 markup=False,
             )
-            yield Static(
-                "Permite criar/alterar/remover/renomear nos caminhos e executar os "
-                "comandos exatos. Fora do escopo exige nova aprovação.",
-                markup=False,
-            )
+            yield Static("", id="scope-summary", markup=False)
             with VerticalScroll(id="scope-fields"):
-                yield Static("Caminhos autorizados · um por linha; inclui subpastas", markup=False)
+                yield Static("Caminhos · um por linha, inclui subpastas", markup=False)
                 yield TextArea("src\ntests", id="scope-paths")
                 yield Static(
                     "Comandos exatos · um por linha; aspas preservam argumentos", markup=False
@@ -181,17 +177,34 @@ class ScopeReview(ModalScreen[dict | None]):
                 yield Static("", id="scope-preview", markup=False)
                 yield Checkbox("Editar JSON avançado", id="scope-advanced")
                 yield TextArea('{"paths": ["src", "tests"], "commands": []}', id="scope-json")
-            yield Static(
-                "Revogue com /permissions action. Fora do escopo exige nova aprovação.",
-                markup=False,
-            )
             yield Static("", id="scope-error", markup=False)
             with Horizontal():
                 yield Button("Autorizar escopo", id="grant-scope", variant="warning")
                 yield Button("Cancelar", id="cancel-scope")
+                yield Button("Detalhes", id="scope-details")
 
     def on_mount(self):
+        self.query_one("#scope-task").tooltip = self.scope_task["objective"]
+        self.update_summary()
         self.query_one("#cancel-scope", Button).focus()
+
+    def update_summary(self):
+        paths = self.query_one("#scope-paths", TextArea).text.splitlines()
+        commands = self.query_one("#scope-commands", TextArea).text.splitlines()
+        if self.query_one("#scope-advanced", Checkbox).value:
+            try:
+                value = json.loads(self.query_one("#scope-json", TextArea).text)
+                paths, commands = value["paths"], value["commands"]
+                if not isinstance(paths, list) or not isinstance(commands, list):
+                    raise ValueError("Formato inválido")
+            except (ValueError, KeyError, TypeError):
+                self.query_one("#scope-summary", Static).update(
+                    "JSON em edição · revise antes de autorizar"
+                )
+                return
+        self.query_one("#scope-summary", Static).update(
+            f"{sum(bool(p) for p in paths)} caminhos · {sum(bool(c) for c in commands)} comandos"
+        )
 
     def on_checkbox_changed(self, event):
         if event.checkbox.id == "scope-advanced":
@@ -208,9 +221,13 @@ class ScopeReview(ModalScreen[dict | None]):
                     editor.text = json.dumps(value, ensure_ascii=False, indent=2)
                 except ValueError as exc:
                     self.query_one("#scope-error", Static).update(str(exc))
+            self.update_summary()
 
     def on_text_area_changed(self, event):
+        if event.text_area.id == "scope-json":
+            self.update_summary()
         if event.text_area.id in {"scope-paths", "scope-commands"}:
+            self.update_summary()
             paths = self.query_one("#scope-paths", TextArea).text
             commands = self.query_one("#scope-commands", TextArea).text
             self.query_one("#scope-preview", Static).update(
@@ -224,6 +241,29 @@ class ScopeReview(ModalScreen[dict | None]):
         self.dismiss(None)
 
     def on_button_pressed(self, event):
+        if event.button.id == "scope-details":
+            from codaro.ui.details import DetailsDialog
+
+            event.stop()
+            self.app.push_screen(
+                DetailsDialog(
+                    "Autorização por escopo",
+                    [
+                        ("Objetivo", self.scope_task["objective"]),
+                        (
+                            "Arquivos",
+                            "Permite criar, editar, remover e renomear nos caminhos autorizados.",
+                        ),
+                        (
+                            "Comandos",
+                            "Apenas os argumentos exatos informados. "
+                            "Fora do escopo exige aprovação.",
+                        ),
+                        ("Revogar", "/permissions action"),
+                    ],
+                )
+            )
+            return
         if event.button.id != "grant-scope":
             self.dismiss(None)
             return
@@ -267,7 +307,7 @@ class CommandReview(ModalScreen[bool]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="command-review"):
-            yield Static("Autorizar comando", markup=False)
+            yield Static("Autorizar comando", classes="dialog-title", markup=False)
             with VerticalScroll(id="command-fields"):
                 yield Static(
                     safe_preview(
@@ -285,6 +325,11 @@ class CommandReview(ModalScreen[bool]):
                 yield Button("Rejeitar", id="reject-command")
 
     def on_mount(self):
+        from rich.cells import cell_len
+
+        width = max(20, self.app.size.width - 8)
+        length = cell_len(str(self.root)) + cell_len(shlex.join(self.argv))
+        self.query_one("#command-review").styles.height = min(22, 11 + length // width)
         self.query_one("#reject-command", Button).focus()
 
     def on_button_pressed(self, event: Button.Pressed):

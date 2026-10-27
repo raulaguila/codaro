@@ -4,6 +4,10 @@ from textual.app import SystemCommand
 
 
 def system_commands(app, framework_commands):
+    if app.agent.jobs.jobs:
+        yield SystemCommand(
+            "Comandos em execução e saídas", "/jobs · Acompanhar ou parar processos", app.show_jobs
+        )
     yield SystemCommand(
         "Ajuda",
         "/help · Comandos e atalhos",

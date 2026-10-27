@@ -2,6 +2,11 @@
 
 ## 0.2.0
 
+- Correções da auditoria de UI: cancelamento de jobs com confirmação do término,
+  acesso local a saídas por `/jobs`, cofre consultado sob demanda e rótulos de
+  transporte precisos. Perguntas/planos compactos, opções longas distinguíveis,
+  autorizações com ações fixas e melhorias de contraste/densidade.
+
 - Execução com fases observáveis, detecção de repetição de evidências e módulos
   separados para loop, aprovações, comandos e recuperação de lotes.
 - Correção de diagnóstico LSP com servidor personalizado sem padrão embutido.
