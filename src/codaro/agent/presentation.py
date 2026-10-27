@@ -44,6 +44,13 @@ TOOL_TITLES = {
     "read_symbol": "Ler símbolo",
     "read_lines": "Ler linhas",
     "list_files": "Listar arquivos",
+    "grep_code": "Buscar texto no código",
+    "get_project_map": "Consultar mapa do projeto",
+    "get_file_outline": "Listar símbolos do arquivo",
+    "find_definition": "Localizar definição",
+    "find_references": "Localizar ocorrências",
+    "record_finding": "Registrar descoberta",
+    "search_findings": "Recuperar descobertas",
 }
 
 

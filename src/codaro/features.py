@@ -11,6 +11,7 @@ DEFAULTS = {
     "version": 1,
     "artifacts": True,
     "semantic_compaction": False,
+    "semantic_search": False,
     "exploration": False,
     "context_reserve_ratio": 0.12,
     "recent_ratio": 0.25,
@@ -38,7 +39,7 @@ class FeatureStore:
     def validate(data):
         if not isinstance(data, dict) or set(data) - DEFAULTS.keys() or data.get("version") != 1:
             raise ValueError("Configuração de funcionalidades inválida.")
-        for key in ("artifacts", "semantic_compaction", "exploration"):
+        for key in ("artifacts", "semantic_compaction", "semantic_search", "exploration"):
             if type(data.get(key, DEFAULTS[key])) is not bool:
                 raise ValueError(f"{key} deve ser booleano.")
         for key in ("context_reserve_ratio", "recent_ratio"):
@@ -81,8 +82,10 @@ class FeatureStore:
             or not isinstance(lsp.get("servers", {}), dict)
         ):
             raise ValueError("Configuração LSP inválida.")
-        if set(lsp.get("servers", {})) - {"python", "typescript"}:
-            raise ValueError("Servidores LSP suportados: python e typescript.")
+        from codaro.languages import EXTENSIONS
+
+        if set(lsp.get("servers", {})) - EXTENSIONS.keys():
+            raise ValueError("Linguagem LSP desconhecida.")
         for argv in lsp.get("servers", {}).values():
             if (
                 not isinstance(argv, list)
@@ -103,7 +106,13 @@ class FeatureStore:
             atomic_write(self.path, raw)
 
     def toggle(self, feature, enabled):
-        if feature not in {"artifacts", "semantic_compaction", "exploration", "lsp"}:
+        if feature not in {
+            "artifacts",
+            "semantic_compaction",
+            "semantic_search",
+            "exploration",
+            "lsp",
+        }:
             raise ValueError("Funcionalidade desconhecida.")
         return self.update_options({feature: enabled})
 

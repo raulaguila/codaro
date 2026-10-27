@@ -18,6 +18,19 @@ Os testes de workflow cobrem aplicação, conflito, rejeição, cancelamento e
 validação de código com modelos simulados. Isso permite reproduzir falhas sem
 depender da disponibilidade ou da variabilidade de um provedor.
 
+O benchmark de recuperação contém 19 casos, incluindo 13 cenários de um projeto
+poliglota com perguntas naturais, filtros e expectativas por símbolo. O relatório
+registra também posição do primeiro caminho relevante, recall de símbolos e
+estimativa de tokens retornados. `tests/test_multilingual_retrieval.py` verifica
+extração, busca e leitura atual em 36 exemplos de linguagens/formatos, filtros
+antes do ranking, invalidação de índice, paginação reduzida por orçamento e
+memória com fontes alteradas. `tests/test_navigation_lsp.py` verifica resolução,
+exclusão de URIs não permitidas, indisponibilidade e cancelamento.
+
+O loop das ferramentas é exercitado com mensagens de protocolo simuladas, parsers
+e ripgrep reais. Embeddings e LSP usam implementações simuladas nessas verificações;
+não há download de pesos ou inferência real no CI padrão. Veja [RETRIEVAL.md](RETRIEVAL.md).
+
 O job de pacote mantém a matriz Linux/macOS/Windows. `runs-on: matrix.os` é
 intencional e necessário para executar nos três sistemas.
 

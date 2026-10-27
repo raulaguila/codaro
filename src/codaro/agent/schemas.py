@@ -17,6 +17,121 @@ def schema(name: str, description: str, properties: dict, required: list[str]) -
     }
 
 
+SCOPE = {
+    "path": {
+        "type": "string",
+        "maxLength": 500,
+        "description": "Arquivo ou diretório relativo à raiz.",
+    },
+    "glob": {"type": "string", "maxLength": 500},
+    "language": {"type": "string", "maxLength": 80},
+    "extension": {"type": "string", "maxLength": 30},
+}
+POSITION = {
+    "line": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "Com path/column, tenta resolução LSP se habilitado.",
+    },
+    "column": {"type": "integer", "minimum": 0, "description": "Coluna UTF-16 começando em zero."},
+}
+
+RETRIEVAL_TOOLS = [
+    schema(
+        "grep_code",
+        "Busca literal ou regex em arquivos permitidos. Filtre o escopo; resultados paginados.",
+        {
+            "query": {"type": "string", "maxLength": 1000},
+            "regex": {"type": "boolean"},
+            "case_sensitive": {"type": "boolean"},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 60},
+            "offset": {"type": "integer", "minimum": 0, "maximum": 10000},
+            **SCOPE,
+        },
+        ["query"],
+    ),
+    schema(
+        "get_project_map",
+        "Mapa automático de diretórios, linguagens, pacotes, scripts e dependências candidatas. "
+        "Não comprova implementação.",
+        {
+            "path": SCOPE["path"],
+            "offset": {"type": "integer", "minimum": 0},
+            "limit": {"type": "integer", "minimum": 200, "maximum": 6000},
+        },
+        [],
+    ),
+    schema(
+        "get_file_outline",
+        "Lista funções, classes, tipos e outros símbolos sem ler o corpo inteiro.",
+        {
+            "path": SCOPE["path"],
+            "offset": {"type": "integer", "minimum": 0},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 60},
+        },
+        ["path"],
+    ),
+    schema(
+        "find_definition",
+        "Localiza definições estruturais por nome. Com path/line/column, tenta LSP habilitado; "
+        "caso contrário, retorna candidatos por nome.",
+        {"symbol": {"type": "string", "maxLength": 300}, **SCOPE, **POSITION},
+        ["symbol"],
+    ),
+    schema(
+        "find_references",
+        "Com path/line/column, tenta LSP habilitado. Alternativa textual inclui comentários e "
+        "homônimos, identificada por resolved=false.",
+        {
+            "symbol": {"type": "string", "maxLength": 300},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 60},
+            "offset": {"type": "integer", "minimum": 0, "maximum": 10000},
+            **SCOPE,
+            **POSITION,
+        },
+        ["symbol"],
+    ),
+    schema(
+        "record_finding",
+        "Salva descoberta, hipótese ou pendência do agente com hashes de fontes. "
+        "Não registra decisões do usuário nem concede permissão.",
+        {
+            "kind": {
+                "type": "string",
+                "enum": ["finding", "hypothesis", "pending"],
+                "maxLength": 20,
+            },
+            "text": {"type": "string", "maxLength": 800},
+            "sources": {
+                "type": "array",
+                "maxItems": 6,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "path": SCOPE["path"],
+                        "start_line": {"type": "integer", "minimum": 1},
+                        "end_line": {"type": "integer", "minimum": 1},
+                    },
+                    "required": ["path", "start_line", "end_line"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        ["kind", "text"],
+    ),
+    schema(
+        "search_findings",
+        "Recupera descobertas e pendências; source_status identifica fontes alteradas. "
+        "Não é evidência atual.",
+        {
+            "query": {"type": "string", "maxLength": 1000},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 12},
+        },
+        [],
+    ),
+]
+RETRIEVAL_NAMES = {tool["function"]["name"] for tool in RETRIEVAL_TOOLS}
+
 TOOLS = [
     schema(
         "get_repository_info",
@@ -31,6 +146,8 @@ TOOLS = [
         {
             "query": {"type": "string", "maxLength": 1000},
             "limit": {"type": "integer", "minimum": 1, "maximum": 12},
+            **SCOPE,
+            "kind": {"type": "string", "maxLength": 30},
         },
         ["query"],
     ),
@@ -64,10 +181,11 @@ TOOLS = [
         {
             "offset": {"type": "integer", "minimum": 0},
             "limit": {"type": "integer", "minimum": 1, "maximum": 60},
+            **SCOPE,
         },
         [],
     ),
-]
+] + RETRIEVAL_TOOLS
 
 CONTEXT_TOOLS = [
     schema(

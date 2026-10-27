@@ -1,6 +1,6 @@
 import pytest
 
-from codaro.index import CodeIndex
+from codaro.index import SCHEMA_VERSION, CodeIndex
 from codaro.repository import Repository
 
 
@@ -247,7 +247,7 @@ def test_legacy_index_is_migrated(project):
         )
     with CodeIndex(Repository(project)) as index:
         assert index.search("can_edit")
-        assert index.db.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert index.db.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
 
 
 def test_index_transaction_rolls_back_on_parser_failure(project, monkeypatch):

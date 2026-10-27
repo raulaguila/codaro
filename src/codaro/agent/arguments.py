@@ -37,6 +37,12 @@ def validate_arguments(name: str, args: dict):
                 raise ValueError(f"{key} deve ser inteiro.")
             if value < spec.get("minimum", value) or value > spec.get("maximum", value):
                 raise ValueError(f"{key} fora dos limites.")
+        if spec["type"] == "boolean" and type(value) is not bool:
+            raise ValueError(f"{key} deve ser booleano.")
+        if name == "record_finding" and key == "sources":
+            from codaro.tool_registry import validate_schema
+
+            validate_schema(spec, value)
 
     if name == "run_command":
         validate_command(args["argv"], args.get("timeout", 60))

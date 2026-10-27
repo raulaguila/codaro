@@ -55,6 +55,18 @@ def load_cases(path: Path):
         ):
             raise ValueError("Caso de avaliação inválido.")
         ids.add(case["id"])
+        filters = case.get("search_options", {})
+        if (
+            not isinstance(filters, dict)
+            or set(filters) - {"path", "glob", "language", "extension", "kind"}
+            or not all(isinstance(value, str) and len(value) <= 500 for value in filters.values())
+        ):
+            raise ValueError("Filtros de avaliação inválidos.")
+        symbols = case.get("expected_symbols", [])
+        if not isinstance(symbols, list) or not all(
+            isinstance(value, str) and len(value) <= 500 for value in symbols
+        ):
+            raise ValueError("Símbolos esperados inválidos.")
     return data
 
 
@@ -114,7 +126,8 @@ def evaluate(path: Path, *, provider=None, mode="retrieval"):
             result["repository_root"] = str(repository.root)
             if mode == "retrieval":
                 with CodeIndex(repository) as index:
-                    matches = index.search(case["query"], limit=6)
+                    matches = index.search(case["query"], limit=6, **case.get("search_options", {}))
+                    diagnostics = dict(index.last_search)
                 found = {item["path"] for item in matches}
                 relevant = sum(item["path"] in case["expected_paths"] for item in matches)
                 recall = len(found.intersection(case["expected_paths"])) / len(
@@ -123,7 +136,29 @@ def evaluate(path: Path, *, provider=None, mode="retrieval"):
                 result.update(
                     retrieval_precision_at_6=relevant / len(matches) if matches else 0.0,
                     expected_path_recall=recall,
-                    expectations_passed=recall == 1.0,
+                    expectations_passed=recall == 1.0
+                    and set(case.get("expected_symbols", []))
+                    <= {item["symbol"] for item in matches},
+                    reciprocal_rank=next(
+                        (
+                            1 / rank
+                            for rank, item in enumerate(matches, 1)
+                            if item["path"] in case["expected_paths"]
+                        ),
+                        0.0,
+                    ),
+                    symbol_recall=len(
+                        set(case.get("expected_symbols", [])) & {item["symbol"] for item in matches}
+                    )
+                    / len(case["expected_symbols"])
+                    if case.get("expected_symbols")
+                    else None,
+                    retrieved_tokens_estimate=(
+                        len(json.dumps(matches, ensure_ascii=False).encode()) + 1
+                    )
+                    // 2,
+                    search_calls=1,
+                    retrieval=diagnostics,
                     matches=[
                         {key: item[key] for key in ("path", "start_line", "end_line")}
                         for item in matches

@@ -7,6 +7,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from codaro.languages import BY_EXTENSION
+
 MAX_FILE_BYTES = 512_000
 MAX_FILES = 20_000
 SOURCE_EXTENSIONS = {
@@ -62,7 +64,14 @@ SOURCE_NAMES = {
     "cmakelists.txt",
     "readme",
     "license",
+    "build.gradle",
+    "build.gradle.kts",
+    "settings.gradle",
+    "gradlew",
+    "meson.build",
 }
+SOURCE_EXTENSIONS.update(BY_EXTENSION)
+SOURCE_EXTENSIONS.update({".csproj", ".fsproj", ".vbproj", ".sln", ".xml", ".props", ".targets"})
 IGNORE_RULE_FILES = {".gitignore", ".dockerignore", ".codaroignore", ".gitattributes"}
 EXCLUDED_DIRS = {
     ".git",

@@ -12,12 +12,15 @@ from codaro.ui.screen import DialogScreen
 FEATURE_LABELS = {
     "artifacts": "Recuperar resultados extensos",
     "semantic_compaction": "Resumir contexto antigo",
+    "semantic_search": "Busca semântica local (opcional)",
     "exploration": "Exploração assistida",
     "lsp": "Navegação por símbolos (LSP)",
 }
 DESCRIPTIONS = {
     "artifacts": "Guarda resultados para consultar em partes.",
     "semantic_compaction": "Pode gerar chamadas adicionais ao provedor para resumir o histórico.",
+    "semantic_search": "Requer codaro[semantic]. Baixa os pesos do modelo local na primeira busca; "
+    "não envia código ao provedor.",
     "exploration": "Permite investigações adicionais com o modelo.",
     "lsp": "Usa os servidores de linguagem configurados no projeto.",
 }

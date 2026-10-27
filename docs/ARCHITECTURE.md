@@ -97,6 +97,12 @@ antigos de compatibilidade não devem virar novas dependências internas.
 | Gravação compartilhada e decisões da conversa | `conversation.py`, `sessions.py` |
 | Catálogo e arquivamento de sessões | `session_catalog.py` |
 | Seleção de ferramentas e perfis de contexto | `agent/capabilities.py` |
+| Gramáticas e extração multilíngue | `languages.py`, `chunks.py` |
+| Busca com filtros, ranking e índice incremental | `retrieval.py`, `index.py` |
+| Mapa de diretórios, pacotes e imports | `project_map.py`, `dependencies.py` |
+| Outline, definições e referências | `navigation.py`, `lsp.py` |
+| Notas de investigação com fontes e hashes | `knowledge.py` |
+| Embeddings locais opcionais e cache vetorial | `semantic.py` |
 | Compactação de lotes de ferramentas concluídos | `agent/context_recovery.py` |
 | Aprovação e aplicação de alterações | `agent/reviews.py` |
 | Reconhecimento de pedidos | `intent.py` |

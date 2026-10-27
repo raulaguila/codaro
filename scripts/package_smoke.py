@@ -11,7 +11,10 @@ from pathlib import Path
 
 import codaro
 from codaro.agent import Agent
+from codaro.index import CodeIndex
 from codaro.llm import Settings
+from codaro.navigation import file_outline
+from codaro.project_map import ProjectMap
 from codaro.repository import Repository
 from codaro.ui.app import CodaroApp
 from codaro.ui.composer import Composer, Prompt
@@ -28,6 +31,15 @@ class Model:
 
 async def scenario():
     with tempfile.TemporaryDirectory(prefix="codaro-package-") as directory:
+        root = Path(directory)
+        (root / "main.go").write_text("package main\nfunc main() {}\n", encoding="utf-8")
+        (root / "schema.sql").write_text("CREATE TABLE users (id INTEGER);\n", encoding="utf-8")
+        repository = Repository(root)
+        with CodeIndex(repository) as index:
+            assert index.search("main", language="go")[0]["symbol"] == "main"
+            assert index.search("users", kind="table")[0]["path"] == "schema.sql"
+            assert ProjectMap().build(index)["languages"]["go"] == 1
+        assert file_outline(repository, "main.go")["results"][0]["symbol"] == "main"
         agent = Agent(Repository(Path(directory)), Model())
         assert "Resposta de teste" in agent.ask("Olá")
         trace = json.loads((Path(directory) / ".codaro/prompt.json").read_text(encoding="utf-8"))

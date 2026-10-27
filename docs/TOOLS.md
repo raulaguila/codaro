@@ -20,13 +20,24 @@ do conteúdo, sem ampliar permissões de escrita.
 Testes: `tests/test_read_cursors.py`, incluindo linha Unicode, redução por orçamento,
 mudança de arquivo, execução pelo loop nativo e proteção contra edição de texto não lido.
 
-## Próximas etapas da proposta aprovada
+## Implementado: recuperação multilíngue e mapa automático
+
+Busca/listagem com filtros, `grep_code`, `get_project_map`, `get_file_outline`,
+`find_definition`, `find_references`, `record_finding` e `search_findings` estão
+disponíveis. As ferramentas adicionais são carregadas sob demanda. O mapa é
+construído automaticamente durante a interação, com uma projeção pequena no
+contexto; detalhes podem ser recuperados por diretório e por páginas.
+
+Os parsers abrangem diversas linguagens; referências LSP dependem de servidor
+instalado/habilitado e alternativa textual é identificada. Veja
+[Recuperação de código](RETRIEVAL.md) para contratos, níveis de suporte, memória
+com hashes, índice incremental e embeddings locais opcionais.
+
+## Próximas etapas ainda pendentes
 
 Ainda não implementadas nesta etapa:
 
-- Busca e listagem com filtros; busca literal/regex com `grep_code`.
 - Catálogo pesquisável por descrição/categoria e seleção progressiva antecipada.
-- Símbolos JavaScript/TypeScript, outline de arquivos e navegação por referências.
 - Múltiplas substituições por arquivo e contratos específicos por operação de edição.
 - Estados de atividade específicos para catálogo, diagnósticos e outras ferramentas.
 - `get_changes`, `inspect_project` e `inspect_path`.

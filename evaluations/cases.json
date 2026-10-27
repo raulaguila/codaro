@@ -4,47 +4,263 @@
     "repo": "..",
     "question": "Como o Codaro envia ferramentas na API OpenAI compatible e trata rejeição de contexto? Cite os arquivos e linhas reais.",
     "query": "build_payload ContextLimitError",
-    "expected_paths": ["src/codaro/llm/protocol.py", "src/codaro/llm/errors.py"],
-    "answer_contains": ["tool_calls", "contexto"]
+    "expected_paths": [
+      "src/codaro/llm/protocol.py",
+      "src/codaro/llm/errors.py"
+    ],
+    "answer_contains": [
+      "tool_calls",
+      "contexto"
+    ]
   },
   {
     "id": "codaro-edit-safety",
     "repo": "..",
     "question": "Como a aplicação verifica se um arquivo mudou antes de aplicar uma edição? Cite a implementação.",
     "query": "EditManager _apply",
-    "expected_paths": ["src/codaro/edits.py"],
-    "answer_contains": ["mudou"]
+    "expected_paths": [
+      "src/codaro/edits.py"
+    ],
+    "answer_contains": [
+      "mudou"
+    ]
   },
   {
     "id": "demo-authorization",
     "repo": "../examples/demo",
     "question": "Quem pode editar neste projeto? Leia a implementação e cite as linhas.",
     "query": "can_edit",
-    "expected_paths": ["auth.py"],
-    "answer_contains": ["admin"]
+    "expected_paths": [
+      "auth.py"
+    ],
+    "answer_contains": [
+      "admin"
+    ]
   },
   {
     "id": "codaro-session-decisions",
     "repo": "..",
     "question": "Como decisões confirmadas da conversa são preservadas e recuperadas pelo modelo?",
     "query": "Conversation index_decisions",
-    "expected_paths": ["src/codaro/conversation.py"],
-    "answer_contains": ["decisões"]
+    "expected_paths": [
+      "src/codaro/conversation.py"
+    ],
+    "answer_contains": [
+      "decisões"
+    ]
   },
   {
     "id": "codaro-context-tool-profiles",
     "repo": "..",
     "question": "Como as ferramentas são reduzidas quando o contexto disponível diminui?",
     "query": "select_tools requested_tools micro",
-    "expected_paths": ["src/codaro/agent/capabilities.py"],
-    "answer_contains": ["request_tools"]
+    "expected_paths": [
+      "src/codaro/agent/capabilities.py"
+    ],
+    "answer_contains": [
+      "request_tools"
+    ]
   },
   {
     "id": "codaro-session-archive",
     "repo": "..",
     "question": "Como arquivar conversas libera a capacidade de sessões sem excluir o histórico?",
     "query": "SessionCatalog archive",
-    "expected_paths": ["src/codaro/session_catalog.py"],
-    "answer_contains": ["archive"]
+    "expected_paths": [
+      "src/codaro/session_catalog.py"
+    ],
+    "answer_contains": [
+      "archive"
+    ]
+  },
+  {
+    "id": "natural-permission-python",
+    "repo": "fixtures/polyglot",
+    "question": "Onde o sistema verifica a permissão do usuário para editar um documento?",
+    "query": "permissão usuário editar documento",
+    "search_options": {
+      "language": "python"
+    },
+    "expected_paths": [
+      "auth.py"
+    ],
+    "expected_symbols": [
+      "Policy.authorize"
+    ]
+  },
+  {
+    "id": "natural-permission-java",
+    "repo": "fixtures/polyglot",
+    "question": "Onde o sistema verifica a permissão do usuário para editar um documento?",
+    "query": "permissão usuário editar documento",
+    "search_options": {
+      "language": "java"
+    },
+    "expected_paths": [
+      "Security.java"
+    ],
+    "expected_symbols": [
+      "Security.authorize"
+    ]
+  },
+  {
+    "id": "natural-permission-typescript",
+    "repo": "fixtures/polyglot",
+    "question": "Onde o sistema verifica a permissão do usuário para editar um documento?",
+    "query": "permissão usuário editar documento",
+    "search_options": {
+      "language": "typescript"
+    },
+    "expected_paths": [
+      "policy.ts"
+    ],
+    "expected_symbols": [
+      "authorize"
+    ]
+  },
+  {
+    "id": "natural-permission-c",
+    "repo": "fixtures/polyglot",
+    "question": "Onde o sistema verifica a permissão do usuário para editar um documento?",
+    "query": "permissão usuário editar documento",
+    "search_options": {
+      "language": "c"
+    },
+    "expected_paths": [
+      "access.c"
+    ],
+    "expected_symbols": [
+      "authorize"
+    ]
+  },
+  {
+    "id": "natural-permission-cpp",
+    "repo": "fixtures/polyglot",
+    "question": "Onde o sistema verifica a permissão do usuário para editar um documento?",
+    "query": "permissão usuário editar documento",
+    "search_options": {
+      "language": "cpp"
+    },
+    "expected_paths": [
+      "access.cpp"
+    ],
+    "expected_symbols": [
+      "policy.authorize"
+    ]
+  },
+  {
+    "id": "natural-permission-csharp",
+    "repo": "fixtures/polyglot",
+    "question": "Onde o sistema verifica a permissão do usuário para editar um documento?",
+    "query": "permissão usuário editar documento",
+    "search_options": {
+      "language": "csharp"
+    },
+    "expected_paths": [
+      "Security.cs"
+    ],
+    "expected_symbols": [
+      "Permissions.Security.Authorize"
+    ]
+  },
+  {
+    "id": "natural-permission-rust",
+    "repo": "fixtures/polyglot",
+    "question": "Onde o sistema verifica a permissão do usuário para editar um documento?",
+    "query": "permissão usuário editar documento",
+    "search_options": {
+      "language": "rust"
+    },
+    "expected_paths": [
+      "access.rs"
+    ],
+    "expected_symbols": [
+      "authorize"
+    ]
+  },
+  {
+    "id": "natural-permission-ruby",
+    "repo": "fixtures/polyglot",
+    "question": "Onde o sistema verifica a permissão do usuário para editar um documento?",
+    "query": "permissão usuário editar documento",
+    "search_options": {
+      "language": "ruby"
+    },
+    "expected_paths": [
+      "policy.rb"
+    ],
+    "expected_symbols": [
+      "Policy.authorize"
+    ]
+  },
+  {
+    "id": "natural-permission-php",
+    "repo": "fixtures/polyglot",
+    "question": "Onde o sistema verifica a permissão do usuário para editar um documento?",
+    "query": "permissão usuário editar documento",
+    "search_options": {
+      "language": "php"
+    },
+    "expected_paths": [
+      "policy.php"
+    ],
+    "expected_symbols": [
+      "Policy.authorize"
+    ]
+  },
+  {
+    "id": "natural-node-auth",
+    "repo": "fixtures/polyglot",
+    "question": "Onde a requisição é autenticada pelo token da sessão?",
+    "query": "autenticação usuário token session",
+    "search_options": {
+      "language": "node"
+    },
+    "expected_paths": [
+      "routes.mjs"
+    ],
+    "expected_symbols": [
+      "authenticate"
+    ]
+  },
+  {
+    "id": "natural-go-startup",
+    "repo": "fixtures/polyglot",
+    "question": "Onde é iniciado o servidor HTTP?",
+    "query": "network listener incoming requests",
+    "expected_paths": [
+      "server.go"
+    ],
+    "expected_symbols": [
+      "StartHTTPServer"
+    ]
+  },
+  {
+    "id": "natural-tsx-payment",
+    "repo": "fixtures/polyglot",
+    "question": "Onde aparece a confirmação do pagamento?",
+    "query": "pagamento confirmation screen",
+    "expected_paths": [
+      "view.tsx"
+    ],
+    "expected_symbols": [
+      "PaymentView"
+    ]
+  },
+  {
+    "id": "sql-view-definition",
+    "repo": "fixtures/polyglot",
+    "question": "Onde está a consulta que seleciona os administradores?",
+    "query": "administrators",
+    "search_options": {
+      "language": "sql",
+      "kind": "view"
+    },
+    "expected_paths": [
+      "schema.sql"
+    ],
+    "expected_symbols": [
+      "administrators"
+    ]
   }
 ]

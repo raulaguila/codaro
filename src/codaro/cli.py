@@ -192,14 +192,34 @@ def search(
     repo: Root = Path("."),
     limit: Annotated[int, typer.Option(min=1, max=12)] = 6,
     as_json: Annotated[bool, typer.Option("--json", help="Saída estruturada.")] = False,
+    path: Annotated[str | None, typer.Option(help="Diretório ou arquivo relativo.")] = None,
+    glob: Annotated[str | None, typer.Option(help="Padrão de caminhos.")] = None,
+    language: Annotated[str | None, typer.Option(help="Linguagem ou alias.")] = None,
+    extension: Annotated[str | None, typer.Option(help="Extensão do arquivo.")] = None,
+    kind: Annotated[str | None, typer.Option(help="Tipo de símbolo.")] = None,
+    semantic: Annotated[
+        bool, typer.Option(help="Embeddings locais opcionais; pode baixar pesos.")
+    ] = False,
 ):
     """Busca textual e por símbolos, sem chamar uma API de IA."""
     index = None
     try:
         index = CodeIndex(Repository(repo))
-        results = index.search(query, limit)
+        if semantic:
+            from codaro.semantic import SemanticSearch
+
+            index.semantic = SemanticSearch()
+        results = index.search(
+            query, limit, path=path, glob=glob, language=language, extension=extension, kind=kind
+        )
         if as_json:
-            typer.echo(json.dumps({"results": results}, ensure_ascii=False, indent=2))
+            typer.echo(
+                json.dumps(
+                    {"results": results, "retrieval": index.last_search},
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
         else:
             for item in results:
                 console.print(
@@ -538,13 +558,18 @@ def task_memory(
 
 
 @app.command("map")
-def repository_map(repo: Root = Path(".")):
+def repository_map(
+    repo: Root = Path("."),
+    path: Annotated[str | None, typer.Option(help="Escopo relativo ao projeto.")] = None,
+):
     """Mostra módulos, manifestos e candidatos a pontos de entrada atuais."""
     from codaro.project_map import ProjectMap
 
     try:
         with CodeIndex(Repository(repo)) as index:
-            typer.echo(json.dumps(ProjectMap().build(index), ensure_ascii=False, indent=2))
+            typer.echo(
+                json.dumps(ProjectMap().build(index, path=path), ensure_ascii=False, indent=2)
+            )
     except (ValueError, OSError, sqlite3.Error) as exc:
         fail(exc)
 

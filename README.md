@@ -387,7 +387,14 @@ codaro memory clear --repo /caminho/do/projeto
 
 ## Mapa do projeto e calibração
 
-`codaro map --repo CAMINHO` e `/map` mostram módulos, extensões, manifestos e candidatos a pontos de entrada. O mapa usa os caminhos e hashes do índice incremental e é atualizado com arquivos modificados, removidos ou excluídos por ignore. O agente reutiliza o mapa enquanto o digest não muda e inclui uma versão compacta nas perguntas de arquitetura. Nomes como `main.py` e definições Python são candidatos para investigação; não são apresentados como prova de execução.
+O agente gera o mapa automaticamente durante a interação, sem uma preparação manual.
+Ele inclui diretórios, árvore compacta, linguagens, pacotes, scripts de manifests,
+candidatos a pontos de entrada e relações estáticas candidatas entre arquivos.
+Uma projeção pequena orienta as buscas; `get_project_map` permite aprofundar um diretório.
+`codaro map --repo CAMINHO`, `/map` e `codaro map --repo . --path packages/api` permitem
+consultá-lo diretamente. O mapa usa os caminhos e hashes do índice incremental e
+é atualizado com arquivos modificados, removidos ou excluídos por ignore. Scripts
+de manifests não são executados. Candidatos e imports não comprovam execução.
 
 Quando o endpoint informa `usage.prompt_tokens`, o contador compara entrada real e estimativa. A calibração fica separada por projeto, endpoint, modelo e encoding. Uma subestimativa aumenta o fator imediatamente, com margem de 15%; a redução só ocorre após oito amostras, considera o maior desvio das últimas vinte e mantém um fator mínimo de 0,6. O fator máximo é 4. Valores inválidos são ignorados. Sem usage, continua valendo a estimativa configurada.
 
@@ -552,12 +559,29 @@ O dump do Thoth representa definições como `{name, description, parameters}`. 
 ## Como a recuperação funciona
 
 1. `ripgrep` lista arquivos e aplica `.gitignore` e `.codaroignore`, mesmo sem um repositório Git inicializado.
-2. Tree-sitter extrai funções, métodos, classes e decoradores Python, preservando linhas e nomes qualificados. Classes e funções grandes são divididas em trechos de até 100 linhas. Janelas de arquivo retêm imports e expressões de módulo. Outras linguagens usam janelas de 60 linhas nesta versão.
+2. Tree-sitter extrai declarações em diversas linguagens: Python, Go, Java,
+   JavaScript/TypeScript/JSX/TSX, C/C++, C#, Rust, SQL e outras. Vue/Svelte incluem
+   scripts embutidos. As gramáticas são distribuídas com o pacote; construções
+   não reconhecidas continuam disponíveis em janelas de texto de 60 linhas.
 3. SQLite FTS5/BM25 busca termos e identificadores, incluindo partes de `camelCase` e `snake_case`.
-4. Correspondências exatas de símbolo/caminho e resultados textuais são combinados com RRF; intervalos sobrepostos são deduplicados.
+4. Correspondências exatas de símbolo/caminho e resultados textuais são combinados
+   com RRF e reordenação por cobertura de termos; intervalos sobrepostos são
+   deduplicados. Filtros por diretório, glob, linguagem, extensão e tipo de símbolo
+   são aplicados antes da seleção. `grep_code` oferece texto literal e regex.
 5. O agente recebe primeiro metadados e previews; solicita `read_symbol` ou `read_lines` apenas quando necessário. A leitura de símbolos analisa o arquivo atual, em vez de reutilizar linhas possivelmente antigas. Definições duplicadas exigem `start_line` para desambiguar.
 
-A busca inicial é textual e estrutural. Embeddings, reranking e LSP serão adicionados conforme avaliação: não há compreensão semântica por vetores neste estágio.
+A busca padrão é textual e estrutural. `get_file_outline`, `find_definition` e
+`find_references` ajudam a navegar; LSP habilitado pode resolver posições, enquanto
+a alternativa textual informa `resolved: false`. As ferramentas novas são carregadas
+sob demanda. Descobertas/hipóteses/pendências podem ser salvas com `record_finding`
+e recuperadas com `search_findings`, com hashes para sinalizar fontes alteradas.
+
+Embeddings locais opcionais estão disponíveis com `pip install 'codaro[semantic]'`
+e **Busca semântica local** em `/features`, ou `codaro search "consulta" --semantic`.
+A primeira busca pode baixar pesos; o código é processado localmente. Se o extra
+estiver indisponível, a busca lexical continua. O modelo padrão é orientado a inglês;
+outro modelo suportado pode ser escolhido por `CODARO_EMBEDDING_MODEL`.
+Detalhes, níveis de suporte e limitações: [Recuperação de código](docs/RETRIEVAL.md).
 
 ## Limites de contexto e arquivos
 
@@ -679,10 +703,10 @@ Veja os achados e as limitações em [AUDIT.md](AUDIT.md).
 
 ## Próximas entregas
 
-- Embeddings multilíngues opcionais e combinação com a busca textual.
+- Avaliar embeddings de código/multilíngues nos projetos reais do usuário.
 - Ampliar o conjunto de avaliações com projetos e perguntas reais do usuário.
-- Reranking quando houver ganho medido.
-- Definições e referências via LSP, com novos parsers Tree-sitter.
+- Avaliar rerankers neurais além da reordenação lexical já disponível.
+- Ampliar cobertura de construções/dialetos dos parsers e integração LSP por linguagem.
 - Interrupção imediata de conexões que estejam sem enviar fragmentos.
 - Transações de edição envolvendo vários arquivos e adaptadores de sandbox para outros sistemas.
 

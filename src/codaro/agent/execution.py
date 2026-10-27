@@ -8,7 +8,9 @@ from codaro.agent.messages import serialize
 from codaro.artifacts import ARTIFACT_TOOLS
 from codaro.commands import run_command
 from codaro.index import CodeIndex
+from codaro.navigation import file_outline, find_definition, find_references
 from codaro.policies import Mode
+from codaro.retrieval import grep_code, scoped_files
 from codaro.trace import current_flow
 
 
@@ -85,7 +87,76 @@ def execute_tool(agent, index: CodeIndex, name: str, args: dict) -> dict:
     if name == "get_repository_info":
         return agent.repository_info()
     if name == "search_code":
-        return {"results": index.search(args["query"], args.get("limit", 6))}
+        filters = {
+            key: args[key]
+            for key in ("path", "glob", "language", "extension", "kind")
+            if key in args
+        }
+        if agent.features.get("semantic_search") and index.semantic is None:
+            from codaro.semantic import SemanticSearch
+
+            index.semantic = SemanticSearch()
+        result = {"results": index.search(args["query"], args.get("limit", 6), **filters)}
+        flow = current_flow.get()
+        if flow is not None:
+            flow.data.setdefault("retrieval_metrics", []).append(index.last_search)
+        result["retrieval"] = index.last_search
+        return result
+    if name == "get_project_map":
+        return agent.project_map.page(index, **args)
+    if name == "get_file_outline":
+        return file_outline(agent.repository, **args)
+    if name == "find_definition":
+        from codaro.lsp import navigate
+
+        if all(key in args for key in ("path", "line", "column")):
+            resolved = navigate(
+                agent.repository,
+                args["path"],
+                args["line"],
+                args["column"],
+                "definition",
+                agent.features["lsp"],
+                agent._cancelled,
+            )
+            if resolved is not None:
+                return resolved
+        return find_definition(
+            index, **{key: value for key, value in args.items() if key not in {"line", "column"}}
+        )
+    if name == "find_references":
+        from codaro.lsp import navigate
+
+        if all(key in args for key in ("path", "line", "column")):
+            resolved = navigate(
+                agent.repository,
+                args["path"],
+                args["line"],
+                args["column"],
+                "references",
+                agent.features["lsp"],
+                agent._cancelled,
+            )
+            if resolved is not None:
+                offset, limit = args.get("offset", 0), args.get("limit", 20)
+                return {
+                    **resolved,
+                    "results": resolved["results"][offset : offset + limit],
+                    "next_offset": offset + limit
+                    if offset + limit < len(resolved["results"])
+                    else None,
+                }
+        return find_references(
+            agent.repository,
+            cancelled=agent._cancelled,
+            **{key: value for key, value in args.items() if key not in {"line", "column"}},
+        )
+    if name == "grep_code":
+        return grep_code(agent.repository, cancelled=agent._cancelled, **args)
+    if name == "record_finding":
+        return agent.knowledge.record(**args)
+    if name == "search_findings":
+        return agent.knowledge.search(**args)
     if name == "run_command":
         if not agent.legacy and agent.mode != Mode.EXECUTE:
             raise ValueError("Comandos disponíveis somente no modo Executar.")
@@ -184,7 +255,11 @@ def execute_tool(agent, index: CodeIndex, name: str, args: dict) -> dict:
         result["file_hash"] = digest
         agent._read_snapshot = data
         return result
-    paths = [str(path.relative_to(agent.repository.root)) for path in agent.repository.files()]
+    filters = {key: args[key] for key in ("path", "glob", "language", "extension") if key in args}
+    paths = [
+        str(path.relative_to(agent.repository.root))
+        for path in scoped_files(agent.repository, **filters)
+    ]
     offset = args.get("offset", 0)
     limit = args.get("limit", 60)
     return {

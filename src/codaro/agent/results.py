@@ -99,6 +99,8 @@ def _fit_result(result: dict, budget: int) -> dict:
         ]
         while result["results"] and len(serialize(result)) > budget:
             result["results"].pop()
+        if "next_offset" in result:
+            result["next_offset"] = result.get("offset", 0) + len(result["results"])
         if available and not result["results"]:
             result["omitted_results"] = available
             result["notice"] = (
