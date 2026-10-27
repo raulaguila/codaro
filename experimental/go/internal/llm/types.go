@@ -45,9 +45,10 @@ type Response struct {
 	Usage     Usage  `json:"usage"`
 }
 type Model struct {
-	ID      string
-	Context int
-	Source  string
+	Capabilities []string
+	ID           string
+	Context      int
+	Source       string
 }
 type Delta struct {
 	Content   string

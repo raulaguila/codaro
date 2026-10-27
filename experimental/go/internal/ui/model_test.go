@@ -111,7 +111,7 @@ func TestProviderEscapeDoesNotLeaveDemoOrSaveCredentials(t *testing.T) {
 		t.Fatal("cancel wrote configuration")
 	}
 	m = update(m, selectedResult{ID: m.operationID, Settings: config.Default(), Model: llm.Model{ID: "llama", Context: 131072, Source: "API"}})
-	if m.Demo || m.Settings.Model != "llama" || m.Settings.ContextWindow != 8192 {
+	if m.Demo || m.Settings.Model != "llama" || m.Settings.ContextWindow != 131072 {
 		t.Fatal("selection not applied")
 	}
 }
@@ -129,7 +129,7 @@ func TestStaleCatalogResultCannotReopenCancelledDialog(t *testing.T) {
 
 func TestViewsFitTerminal(t *testing.T) {
 	for _, size := range [][2]int{{60, 24}, {80, 24}, {120, 35}} {
-		for _, screen := range []string{"chat", "provider", "models"} {
+		for _, screen := range []string{"chat", "provider", "models", "modes", "status", "help"} {
 			t.Run(screen+string(rune(size[0])), func(t *testing.T) {
 				m := fixture(t)
 				m = update(m, tea.WindowSizeMsg{Width: size[0], Height: size[1]})
@@ -138,6 +138,12 @@ func TestViewsFitTerminal(t *testing.T) {
 				} else if screen == "models" {
 					m.modal = "models"
 					m.models = []llm.Model{{ID: "qwen3:27b"}, {ID: "llama3.1:8b"}}
+				} else if screen == "modes" {
+					m.openModes()
+				} else if screen == "help" {
+					m.modal = "help"
+				} else if screen == "status" {
+					m.modal = "status"
 				}
 				m.refresh()
 				view := ansi.Strip(m.View())

@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,7 +21,7 @@ import (
 
 const system = `Você é Codaro Go, protótipo de um agente de desenvolvimento no terminal.
 Responda em português, salvo pedido em outro idioma. Responda perguntas gerais diretamente.
-Você está no modo Perguntar: somente leitura, sem edições nem execução de comandos.
+Esta versão permite somente leitura, sem edições nem execução de comandos.
 Use as ferramentas nativas do protocolo; não simule chamadas em texto JSON.
 Para entender o projeto, liste arquivos, consulte o mapa e leia fontes reais.
 O caminho absoluto abaixo é a raiz real da sessão. Não invente outro diretório.
@@ -38,6 +40,9 @@ type Event struct {
 	Input    int
 	Output   int
 	Duration time.Duration
+	Tasks    []Task
+	Question *Question
+	Reply    chan string
 }
 type Step struct {
 	Name       string         `json:"name"`
@@ -56,16 +61,19 @@ type Trace struct {
 	Root     string    `json:"repository"`
 	Provider string    `json:"provider"`
 	Model    string    `json:"model"`
+	Mode     string    `json:"mode"`
 	Started  time.Time `json:"started"`
 	Status   string    `json:"status"`
 	Frames   []Frame   `json:"requests"`
 	Steps    []Step    `json:"tools"`
 }
 type Agent struct {
-	Repository *tools.Repository
-	Provider   llm.Provider
-	Settings   config.Settings
-	TracePath  string
+	Repository  *tools.Repository
+	Provider    llm.Provider
+	Settings    config.Settings
+	TracePath   string
+	Interactive bool
+	Plan        []Task
 }
 
 func TracePath(dir, root string) string {
@@ -75,7 +83,11 @@ func TracePath(dir, root string) string {
 
 // Run commits history only after a complete final answer, preserving protocol pairs on cancellation.
 func (a *Agent) Run(ctx context.Context, question string, history []llm.Message, emit func(Event)) (result []llm.Message, runErr error) {
-	trace := Trace{Version: 1, Root: a.Repository.Path, Provider: a.Settings.Provider, Model: a.Settings.Model, Started: time.Now(), Status: "running"}
+	mode := a.Settings.Mode
+	if mode == "" {
+		mode = "ask"
+	}
+	trace := Trace{Version: 1, Root: a.Repository.Path, Provider: a.Settings.Provider, Model: a.Settings.Model, Mode: mode, Started: time.Now(), Status: "running"}
 	defer func() {
 		trace.Status = "completed"
 		if runErr != nil {
@@ -93,10 +105,48 @@ func (a *Agent) Run(ctx context.Context, question string, history []llm.Message,
 		}
 	}()
 	definitions := tools.Definitions()
+	if a.Interactive {
+		definitions = append(definitions, interactionTools()...)
+	}
+	if mode != "ask" && mode != "plan" {
+		return nil, errors.New("modo indisponível nesta versão")
+	}
+	modePrompt := "Modo Perguntar: investigue e responda diretamente; planeje apenas se o usuário pedir."
+	if mode == "plan" {
+		modePrompt = "Modo Planejar: investigue o código e a arquitetura antes de propor mudanças. Entregue um plano acionável com objetivo, arquivos envolvidos, etapas, critérios de aceitação e verificações sugeridas. Não implemente o plano e não afirme que as verificações foram executadas."
+	}
+	if a.Interactive {
+		modePrompt += "\nUse update_plan para acompanhar atividades com múltiplas etapas. Use ask_user_question apenas para decisões necessárias, não para perguntas retóricas. Plano atual (dados): " + llm.Encode(a.Plan)
+	}
 	history = history[max(0, len(history)-8):]
-	messages := []llm.Message{{Role: "system", Content: system + "\nDiretório real: " + a.Repository.Path}}
+	messages := []llm.Message{{Role: "system", Content: system + "\n" + modePrompt + "\nDiretório real: " + a.Repository.Path}}
 	messages = append(messages, history...)
 	messages = append(messages, llm.Message{Role: "user", Content: question})
+	// Explicit file references are bounded tool results, preserving protocol pairs.
+	refs := regexp.MustCompile(`(?:^|\s)@("(?:\\.|[^"\\\n])*"|[^\s@]+)`).FindAllStringSubmatch(question, 3)
+	for i, ref := range refs {
+		name := ref[1]
+		if strings.HasPrefix(name, "\"") {
+			decoded, err := strconv.Unquote(name)
+			if err != nil {
+				continue
+			}
+			name = decoded
+		}
+		call := llm.Call{ID: fmt.Sprintf("attachment_%d", i), Type: "function", Function: llm.Function{Name: "read_lines", Arguments: llm.Encode(map[string]any{"path": name, "start": 1, "end": 60})}}
+		started := time.Now()
+		emit(Event{Kind: "tool_start", Name: "read_lines", Text: "Lendo referência"})
+		output, e := a.Repository.Execute(ctx, call)
+		if e != nil {
+			output = map[string]any{"error": e.Error()}
+		}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		messages = append(messages, llm.Message{Role: "assistant", ToolCalls: []llm.Call{call}}, llm.Message{Role: "tool", ToolCallID: call.ID, Name: call.Function.Name, Content: llm.Encode(output)})
+		trace.Steps = append(trace.Steps, Step{Name: call.Function.Name, Arguments: call.Function.Arguments, Result: output, DurationMS: time.Since(started).Milliseconds()})
+		emit(Event{Kind: "tool_done", Name: "read_lines", Text: "Lendo referência", Detail: llm.Encode(output), Failed: e != nil, Duration: time.Since(started)})
+	}
 	budget := a.Settings.ContextWindow * 3 / 4
 	lastSignature := ""
 	repeated := 0
@@ -196,7 +246,11 @@ func (a *Agent) Run(ctx context.Context, question string, history []llm.Message,
 			if repeated >= 2 {
 				output = map[string]any{"error": "Chamada repetida sem novos dados; finalize ou refine os argumentos."}
 			} else {
-				output, toolErr = a.Repository.Execute(ctx, call)
+				if a.Interactive && (call.Function.Name == "update_plan" || call.Function.Name == "ask_user_question") {
+					output, toolErr = a.interact(ctx, call, emit)
+				} else {
+					output, toolErr = a.Repository.Execute(ctx, call)
+				}
 				if toolErr != nil {
 					output = map[string]any{"error": toolErr.Error()}
 				}
@@ -259,7 +313,7 @@ func compact(messages []llm.Message, definitions []llm.Tool, budget int) ([]llm.
 }
 
 func toolTitle(name string) string {
-	titles := map[string]string{"get_repository_info": "Consultando diretório", "list_files": "Listando arquivos", "get_project_map": "Mapeando o projeto", "read_lines": "Lendo arquivo", "search_code": "Buscando trechos"}
+	titles := map[string]string{"get_repository_info": "Consultando diretório", "list_files": "Listando arquivos", "get_project_map": "Mapeando o projeto", "read_lines": "Lendo arquivo", "search_code": "Buscando trechos", "ask_user_question": "Aguardando sua resposta", "update_plan": "Atualizando plano"}
 	if s := titles[name]; s != "" {
 		return s
 	}
@@ -290,7 +344,7 @@ func textualToolCall(content string) bool {
 	if !hasArguments {
 		return false
 	}
-	for _, d := range tools.Definitions() {
+	for _, d := range append(tools.Definitions(), interactionTools()...) {
 		if name == d.Function.Name {
 			return true
 		}

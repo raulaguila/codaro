@@ -7,8 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -126,7 +129,7 @@ func (c *Client) Catalog(ctx context.Context) ([]Model, error) {
 		for _, m := range doc.Data {
 			if id, ok := m["id"].(string); ok {
 				n, source := contextMetadata(m)
-				models = append(models, Model{ID: id, Context: n, Source: source})
+				models = append(models, Model{ID: id, Context: n, Source: source, Capabilities: compatibleCapabilities(m)})
 			}
 		}
 	}
@@ -145,12 +148,55 @@ func (c *Client) Catalog(ctx context.Context) ([]Model, error) {
 }
 
 func contextMetadata(m map[string]any) (int, string) {
-	for _, key := range []string{"context_window", "context_length", "max_model_len", "input_token_limit"} {
-		if n, ok := m[key].(float64); ok && n >= 4096 && n <= 2000000 {
-			return int(n), "API: " + key
+	n := 0
+	source := "não informado pela API"
+	for _, key := range []string{"context_window", "context_length", "max_context_length", "max_model_len", "max_input_tokens", "inputTokenLimit", "input_token_limit"} {
+		if value := contextNumber(m[key]); value > 0 {
+			n = value
+			source = "API: " + key
+			break
 		}
 	}
-	return 0, "não informado pela API"
+	if top, ok := m["top_provider"].(map[string]any); ok {
+		if limit := contextNumber(top["context_length"]); limit > 0 && (n == 0 || limit < n) {
+			n = limit
+			source = "API: top_provider.context_length"
+		}
+	}
+	if n == 0 {
+		for _, container := range []string{"limits", "metadata"} {
+			if nested, ok := m[container].(map[string]any); ok {
+				for _, key := range []string{"context_window", "context_length", "max_model_len", "max_input_tokens"} {
+					if value := contextNumber(nested[key]); value > 0 {
+						return value, "API: " + container + "." + key
+					}
+				}
+			}
+		}
+	}
+	return n, source
+}
+
+func contextNumber(value any) int {
+	var n float64
+	switch v := value.(type) {
+	case float64:
+		n = v
+	case int:
+		n = float64(v)
+	case string:
+		i, err := strconv.Atoi(v)
+		if err != nil {
+			return 0
+		}
+		n = float64(i)
+	default:
+		return 0
+	}
+	if n < 1024 || n > 2000000 || math.Trunc(n) != n {
+		return 0
+	}
+	return int(n)
 }
 
 func (c *Client) Describe(ctx context.Context, id string) (Model, error) {
@@ -172,10 +218,30 @@ func (c *Client) Describe(ctx context.Context, id string) (Model, error) {
 	}
 	defer resp.Body.Close()
 	var doc struct {
-		Info map[string]any `json:"model_info"`
+		Info         map[string]any `json:"model_info"`
+		Capabilities []string       `json:"capabilities"`
+		Parameters   any            `json:"parameters"`
 	}
 	if err = readJSON(resp.Body, &doc); err != nil {
 		return Model{}, err
+	}
+	if value, ok := doc.Parameters.(string); ok {
+		match := regexp.MustCompile(`(?m)^\s*num_ctx\s+(\d+)\s*$`).FindStringSubmatch(value)
+		if len(match) > 1 {
+			if n := contextNumber(match[1]); n > 0 {
+				return Model{ID: id, Capabilities: doc.Capabilities, Context: n, Source: "API: parameters.num_ctx → options.num_ctx"}, nil
+			}
+		}
+	}
+	if values, ok := doc.Parameters.(map[string]any); ok {
+		if n := contextNumber(values["num_ctx"]); n > 0 {
+			return Model{ID: id, Capabilities: doc.Capabilities, Context: n, Source: "API: parameters.num_ctx → options.num_ctx"}, nil
+		}
+	}
+	if architecture, ok := doc.Info["general.architecture"].(string); ok {
+		if n := contextNumber(doc.Info[architecture+".context_length"]); n > 0 {
+			return Model{ID: id, Capabilities: doc.Capabilities, Context: n, Source: "API: model_info." + architecture + ".context_length → options.num_ctx"}, nil
+		}
 	}
 	keys := []string{}
 	for key := range doc.Info {
@@ -184,24 +250,36 @@ func (c *Client) Describe(ctx context.Context, id string) (Model, error) {
 		}
 	}
 	sort.Strings(keys)
+	limit := 0
 	for _, key := range keys {
-		if n, ok := doc.Info[key].(float64); ok && n >= 4096 && n <= 2000000 {
-			return Model{ID: id, Context: int(n), Source: "API: model_info." + key}, nil
+		if n := contextNumber(doc.Info[key]); n >= 4096 && (limit == 0 || n < limit) {
+			limit = n
 		}
 	}
-	return Model{ID: id, Source: "API sem contexto; limite configurado"}, nil
+	if limit > 0 {
+		return Model{ID: id, Capabilities: doc.Capabilities, Context: limit, Source: "API: model_info.context_length → options.num_ctx"}, nil
+	}
+	return Model{ID: id, Capabilities: doc.Capabilities, Source: "fallback: API não informou contexto"}, nil
 }
 
 // ResolveContext records both the provider's capacity and this experiment's active budget.
 func ResolveContext(s config.Settings, m Model) config.Settings {
 	s.Model = m.ID
 	s.ModelContext = m.Context
-	if m.Context > 0 && s.ContextWindow > m.Context {
+	s.ContextWindow = 8192
+	s.ContextSource = "fallback: API não informou contexto"
+	if m.Context >= 1024 && m.Context <= 2000000 {
 		s.ContextWindow = m.Context
+		s.ContextSource = m.Source
+		if s.ContextSource == "" {
+			s.ContextSource = "API: contexto do modelo"
+		}
 	}
-	s.ContextSource = m.Source
-	if s.ContextSource == "" {
-		s.ContextSource = "limite configurado; API sem metadados"
+	if s.ContextLimit > 0 {
+		if m.Context == 0 || s.ContextLimit < s.ContextWindow {
+			s.ContextWindow = s.ContextLimit
+		}
+		s.ContextSource = "override explícito · " + s.ContextSource
 	}
 	return s
 }
@@ -211,4 +289,24 @@ func (c *Client) Chat(ctx context.Context, messages []Message, tools []Tool, onD
 		return c.ollama(ctx, messages, tools, onDelta)
 	}
 	return c.openai(ctx, messages, tools, onDelta)
+}
+
+func compatibleCapabilities(metadata map[string]any) []string {
+	out := []string{}
+	if items, ok := metadata["capabilities"].([]any); ok {
+		for _, v := range items {
+			if s, ok := v.(string); ok && len(s) < 80 && len(out) < 8 {
+				out = append(out, s)
+			}
+		}
+	}
+	if params, ok := metadata["supported_parameters"].([]any); ok {
+		for _, p := range params {
+			if p == "tools" {
+				out = append(out, "tools")
+				break
+			}
+		}
+	}
+	return out
 }

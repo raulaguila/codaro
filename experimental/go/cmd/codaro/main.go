@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -92,12 +91,9 @@ func run() error {
 		})
 		return err
 	}
-	if !*demo && settings.Model != "" && strings.TrimSpace(os.Getenv("CODARO_GO_CONTEXT_WINDOW")) == "" {
-		settings.ContextSource = "limite configurado; /models consulta metadados"
-	}
 	app := ui.New(repo, settings, dir, *demo)
 	defer app.Shutdown()
-	program := tea.NewProgram(app, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithFPS(30), tea.WithContext(ctx))
+	program := tea.NewProgram(app, tea.WithAltScreen(), tea.WithMouseAllMotion(), tea.WithFPS(30), tea.WithContext(ctx))
 	_, err = program.Run()
 	return err
 }

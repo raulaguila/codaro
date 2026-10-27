@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -27,19 +26,23 @@ var accent = lipgloss.Color("#77D4D8")
 var muted = lipgloss.NewStyle().Foreground(lipgloss.Color("#93A3B5"))
 var bright = lipgloss.NewStyle().Foreground(accent).Bold(true)
 var warning = lipgloss.NewStyle().Foreground(lipgloss.Color("#E7BB70"))
-var panel = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(accent).Padding(1, 2)
+var panel = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#314553")).Padding(1, 2)
 
 type step struct {
 	Kind, Title, Body, Summary string
 	Failed                     bool
+	Name                       string
 }
 type turn struct {
 	Question, Final, Rendered string
 	Steps                     []step
-	Draft, Reasoning          strings.Builder
+	Draft                     strings.Builder
 	Started                   time.Time
 	Done                      bool
 	Width                     int
+	FirstToken                time.Time
+	ProcessOpen               bool
+	Finished                  time.Time
 }
 type envelope struct {
 	ID    int
@@ -63,6 +66,12 @@ type selectedResult struct {
 	Model    llm.Model
 	Err      error
 }
+type metadataResult struct {
+	ID       int
+	Settings config.Settings
+	Model    llm.Model
+	Err      error
+}
 type preset struct{ Name, Kind, URL string }
 
 var presets = []preset{
@@ -75,49 +84,87 @@ var presets = []preset{
 
 type command struct{ Name, Description string }
 
-var commands = []command{{"providers", "Conectar ou configurar provedor"}, {"models", "Escolher modelo"}, {"process", "Expandir ou recolher o processo"}, {"new", "Nova conversa"}, {"pwd", "Conferir diretório"}, {"status", "Contexto e diagnóstico"}, {"help", "Atalhos e recursos do protótipo"}}
+var commands = []command{{"providers", "Conectar ou configurar provedor"}, {"models", "Escolher modelo"}, {"mode", "Escolher modo de trabalho"}, {"process", "Expandir ou recolher o processo"}, {"new", "Nova conversa"}, {"pwd", "Conferir diretório"}, {"status", "Contexto e diagnóstico"}, {"help", "Atalhos e recursos do protótipo"}, {"plan", "Acompanhar plano"}, {"cancel-plan", "Cancelar plano"}, {"thinking", "Mostrar ou recolher pensamento"}, {"details", "Mostrar detalhes das ferramentas"}, {"sessions", "Retomar conversa salva"}, {"diff", "Rever alterações no Git"}, {"permissions", "Consultar permissões"}, {"queue", "Editar última mensagem na fila"}, {"export", "Exportar conversa e processo completos"}}
 
 type workers struct {
-	Cancel context.CancelFunc
-	WG     sync.WaitGroup
+	Cancel  context.CancelFunc
+	WG      sync.WaitGroup
+	Context context.Context
+	Close   context.CancelFunc
 }
 type Model struct {
-	Repo               *tools.Repository
-	Settings           config.Settings
-	Directory          string
-	Demo               bool
-	Width, Height      int
-	prompt             textarea.Model
-	viewport           viewport.Model
-	turns              []*turn
-	history            []llm.Message
-	events             chan envelope
-	results            chan done
-	workers            *workers
-	runID              int
-	busy               bool
-	dirty              bool
-	follow             bool
-	expanded           bool
-	manualExpanded     bool
-	processLine        int
-	status             string
-	contextUsed        int
-	outputTokens       int
-	commandIndex       int
-	commandDraft       string
-	modal              string
-	fields             []textinput.Model
-	focus, presetIndex int
-	tls                bool
-	loading            bool
-	operationID        int
-	operationCancel    context.CancelFunc
-	pending            config.Settings
-	models             []llm.Model
-	modelSearch        textinput.Model
-	modelIndex         int
-	modalError         string
+	catalogRefreshing                           bool
+	previewID                                   int
+	previewCancel                               context.CancelFunc
+	profilesInvalid, profilesDirty              bool
+	Repo                                        *tools.Repository
+	Settings                                    config.Settings
+	Directory                                   string
+	Demo                                        bool
+	Width, Height                               int
+	prompt                                      textarea.Model
+	viewport                                    viewport.Model
+	turns                                       []*turn
+	history                                     []llm.Message
+	events                                      chan envelope
+	results                                     chan done
+	workers                                     *workers
+	runID                                       int
+	busy                                        bool
+	dirty                                       bool
+	follow                                      bool
+	expanded                                    bool
+	manualExpanded                              bool
+	processLine                                 int
+	status                                      string
+	contextUsed                                 int
+	outputTokens                                int
+	commandIndex                                int
+	commandDraft                                string
+	modal                                       string
+	fields                                      []textinput.Model
+	focus, presetIndex                          int
+	tls                                         bool
+	loading                                     bool
+	operationID                                 int
+	operationCancel                             context.CancelFunc
+	pending                                     config.Settings
+	models                                      []llm.Model
+	modelSearch                                 textinput.Model
+	modelIndex                                  int
+	modalError                                  string
+	metadataID                                  int
+	metadataLoading                             bool
+	deferredQuestion                            string
+	catalogSettings                             config.Settings
+	modeIndex                                   int
+	hover                                       string
+	providerFactory                             func(config.Settings) llm.Provider
+	preferences                                 preferences
+	profiles                                    []providerProfile
+	catalogGroups                               []catalogGroup
+	favoritesOnly                               bool
+	showThinking, showDetails                   bool
+	processHits                                 []processHit
+	plan                                        []agent.Task
+	planExpanded                                bool
+	planSeen                                    bool
+	planOffset                                  int
+	question                                    *agent.Question
+	questionReply                               chan string
+	questionIndex                               int
+	questionDraft                               string
+	queued                                      []string
+	files                                       []string
+	filesLoaded, filesLoading, completionHidden bool
+	fileIndex                                   int
+	inputHistory                                []string
+	historySearch                               textinput.Model
+	historyIndex                                int
+	sessions                                    []session
+	sessionIndex                                int
+	sessionID                                   string
+	diffView                                    viewport.Model
 }
 
 func New(repo *tools.Repository, s config.Settings, dir string, demo bool) Model {
@@ -132,19 +179,39 @@ func New(repo *tools.Repository, s config.Settings, dir string, demo bool) Model
 	})
 	p.ShowLineNumbers = false
 	p.CharLimit = 12000
-	p.SetHeight(3)
+	p.SetHeight(1)
 	p.Focus()
 	search := textinput.New()
 	search.Placeholder = "Buscar modelo…"
 	search.CharLimit = 200
-	return Model{Repo: repo, Settings: s, Directory: dir, Demo: demo, prompt: p, viewport: viewport.New(80, 20), Width: 80, Height: 30, events: make(chan envelope, 1024), results: make(chan done, 2), workers: &workers{}, dirty: true, follow: true, status: "Pronto · / comandos · Ctrl+P menu", modelSearch: search}
+	ctx, cancel := context.WithCancel(context.Background())
+	if s.ModelContext > 0 {
+		s = llm.ResolveContext(s, llm.Model{ID: s.Model, Context: s.ModelContext, Source: "cache: " + s.ContextSource})
+	}
+	m := Model{Repo: repo, Settings: s, Directory: dir, Demo: demo, prompt: p, viewport: viewport.New(80, 20), Width: 80, Height: 30, events: make(chan envelope, 1024), results: make(chan done, 2), workers: &workers{Context: ctx, Close: cancel}, dirty: true, follow: true, status: "Pronto", modelSearch: search, historySearch: search, sessionID: fmt.Sprintf("%020d", time.Now().UnixNano())}
+	if s.Model != "" && !demo {
+		m.metadataLoading = true
+		m.metadataID = 1
+		m.status = "Consultando contexto do modelo…"
+	}
+	m.loadPreferences()
+	return m
 }
 
-func (m Model) Init() tea.Cmd { return tea.Batch(textarea.Blink, timer()) }
+func (m Model) Init() tea.Cmd {
+	cmds := []tea.Cmd{textarea.Blink, timer()}
+	if m.metadataLoading {
+		cmds = append(cmds, m.metadataCmd())
+	}
+	return tea.Batch(cmds...)
+}
 func timer() tea.Cmd {
 	return tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg { return tick(t) })
 }
 func (m Model) Shutdown() {
+	if m.workers.Close != nil {
+		m.workers.Close()
+	}
 	if m.workers.Cancel != nil {
 		m.workers.Cancel()
 	}
@@ -160,6 +227,9 @@ func (m Model) current() *turn {
 	return m.turns[len(m.turns)-1]
 }
 func (m Model) provider(s config.Settings) llm.Provider {
+	if m.providerFactory != nil {
+		return m.providerFactory(s)
+	}
 	if s.Provider == "demo" {
 		return llm.Demo{}
 	}
@@ -176,11 +246,19 @@ func (m *Model) start(question string) {
 		m.status = "Aguarde a conclusão ou use Ctrl+X para cancelar"
 		return
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	if m.metadataLoading {
+		m.deferredQuestion = question
+		m.status = "Consultando contexto antes de enviar…"
+		return
+	}
+	ctx, cancel := context.WithCancel(m.workers.Context)
 	m.workers.Cancel = cancel
 	m.busy = true
 	m.runID++
 	id := m.runID
+	if m.current() != nil {
+		m.current().ProcessOpen = m.expanded
+	}
 	m.expanded = true
 	m.manualExpanded = false
 	m.follow = true
@@ -193,7 +271,11 @@ func (m *Model) start(question string) {
 	m.prompt.Reset()
 	m.status = "Investigando…"
 	m.dirty = true
-	a := agent.Agent{Repository: m.Repo, Settings: m.Settings, Provider: m.provider(m.Settings), TracePath: agent.TracePath(m.Directory, m.Repo.Path)}
+	a := agent.Agent{Repository: m.Repo, Settings: m.Settings, Provider: m.provider(m.Settings), TracePath: agent.TracePath(m.Directory, m.Repo.Path), Interactive: true, Plan: append([]agent.Task(nil), m.plan...)}
+	m.inputHistory = append(m.inputHistory, question)
+	if len(m.inputHistory) > 100 {
+		m.inputHistory = m.inputHistory[len(m.inputHistory)-100:]
+	}
 	history := append([]llm.Message(nil), m.history...)
 	events, results := m.events, m.results
 	m.workers.WG.Add(1)
@@ -218,6 +300,9 @@ func (m *Model) handleEvent(e agent.Event) {
 	m.dirty = true
 	switch e.Kind {
 	case "delta":
+		if t.FirstToken.IsZero() {
+			t.FirstToken = time.Now()
+		}
 		t.Draft.WriteString(clean(e.Text))
 		m.status = "Gerando resposta…"
 	case "reasoning":
@@ -227,6 +312,7 @@ func (m *Model) handleEvent(e agent.Event) {
 		t.Steps[len(t.Steps)-1].Body += clean(e.Text)
 		m.status = "Pensando…"
 	case "intermediate", "retry":
+		t.FirstToken = time.Time{}
 		if t.Draft.Len() > 0 {
 			t.Steps = append(t.Steps, step{Kind: "text", Title: "Etapa intermediária", Body: t.Draft.String()})
 			t.Draft.Reset()
@@ -235,8 +321,28 @@ func (m *Model) handleEvent(e agent.Event) {
 			m.status = e.Text
 			t.Steps = append(t.Steps, step{Kind: "phase", Title: e.Text})
 		}
+	case "plan":
+		m.plan = append([]agent.Task(nil), e.Tasks...)
+		if !m.planSeen {
+			m.planExpanded = true
+			m.planSeen = true
+		}
+		for i, task := range m.plan {
+			if task.Status == "in_progress" {
+				m.planOffset = max(0, i-1)
+				break
+			}
+		}
+	case "question":
+		m.question = e.Question
+		m.questionReply = e.Reply
+		m.questionIndex = 0
+		m.questionDraft = m.prompt.Value()
+		m.prompt.Reset()
+		m.prompt.Placeholder = "Escreva sua resposta ou escolha uma opção…"
+		m.status = "Aguardando sua resposta"
 	case "tool_start":
-		t.Steps = append(t.Steps, step{Kind: "tool", Title: e.Text})
+		t.Steps = append(t.Steps, step{Kind: "tool", Title: e.Text, Name: e.Name})
 		m.status = e.Text + "…"
 	case "tool_done":
 		for i := len(t.Steps) - 1; i >= 0; i-- {
@@ -275,6 +381,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.Height = max(12, msg.Height)
 		m.prompt.SetWidth(max(16, m.Width-4))
 		m.modelSearch.Width = max(15, min(65, m.Width-12))
+		m.historySearch.Width = max(15, min(65, m.Width-14))
+		m.diffView.Width = max(16, min(76, m.Width-8)-6)
+		m.diffView.Height = max(3, m.Height-14)
 		m.dirty = true
 	case tick:
 		for i := 0; i < 500; i++ {
@@ -297,6 +406,14 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				t := m.current()
 				if t != nil {
 					t.Done = true
+					t.Finished = time.Now()
+					if m.question != nil {
+						m.question = nil
+						m.questionReply = nil
+						m.prompt.SetValue(m.questionDraft)
+						m.questionDraft = ""
+						m.prompt.Placeholder = "Pergunte sobre o projeto…"
+					}
 					if result.Err != nil {
 						m.status = "Interrompido · rascunho preservado"
 						if result.Err != context.Canceled {
@@ -310,12 +427,25 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 					} else {
 						m.history = result.History
 						m.status = "Pronto"
-						if !m.manualExpanded {
+						if !m.manualExpanded && m.follow {
 							m.expanded = false
 						}
 					}
 				}
 				m.dirty = true
+				if result.Err != nil {
+					m.queued = nil
+				}
+				save := m.saveSession()
+				if result.Err == nil && len(m.queued) > 0 {
+					next := m.queued[0]
+					m.queued = m.queued[1:]
+					draft := m.prompt.Value()
+					m.start(next)
+					m.prompt.SetValue(draft)
+				}
+				m.refresh()
+				return m, tea.Batch(timer(), save)
 			}
 		default:
 		}
@@ -323,6 +453,84 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.refresh()
 		}
 		return m, timer()
+	case previewRequest:
+		return m, m.startPreview(msg)
+	case previewResult:
+		m.acceptPreview(msg)
+		return m, nil
+	case exportResult:
+		m.status = "Conversa exportada: " + msg.Path
+		if msg.Err != nil {
+			m.status = "Não foi possível exportar a conversa"
+		}
+		return m, nil
+	case storageResult:
+		if msg.Err != nil {
+			m.status = "Não foi possível salvar dados locais · confira permissões"
+		}
+		return m, nil
+	case filesResult:
+		m.filesLoading = false
+		m.filesLoaded = msg.Err == nil
+		m.files = msg.Files
+		m.dirty = true
+		if msg.Err != nil {
+			m.status = "Não foi possível listar arquivos para @"
+		}
+	case sessionsResult:
+		if m.modal == "sessions" {
+			m.sessions = msg.Sessions
+			if msg.Err != nil {
+				m.modalError = "Não foi possível ler as conversas"
+			}
+		}
+		return m, nil
+	case diffResult:
+		if m.modal == "diff" {
+			m.diffView.SetContent(clean(msg.Text))
+			if msg.Err != nil {
+				m.modalError = msg.Err.Error()
+			}
+		}
+		return m, nil
+	case catalogsResult:
+		if msg.ID != m.operationID {
+			return m, nil
+		}
+		m.loading = false
+		m.catalogRefreshing = false
+		m.operationCancel = nil
+		selectedKey := ""
+		if entries := m.entries(); len(entries) > 0 {
+			e := entries[min(m.modelIndex, len(entries)-1)]
+			selectedKey = modelID(e.Settings, e.Model.ID)
+		}
+		for _, g := range msg.Groups {
+			if g.Err != "" {
+				m.modalError = "Provedor indisponível · mantendo modelos em cache, quando disponíveis"
+				continue
+			}
+			found := false
+			for i, old := range m.catalogGroups {
+				if providerID(old.Settings) == providerID(g.Settings) {
+					m.catalogGroups[i] = g
+					found = true
+					break
+				}
+			}
+			if !found {
+				m.catalogGroups = append(m.catalogGroups, g)
+			}
+		}
+		m.modelIndex = 0
+		for i, e := range m.entries() {
+			if modelID(e.Settings, e.Model.ID) == selectedKey {
+				m.modelIndex = i
+				break
+			}
+		}
+		m.modelSearch.Focus()
+		return m, tea.Batch(textinput.Blink, m.previewSelected(), m.savePreferences())
 	case catalogResult:
 		if msg.ID != m.operationID {
 			return m, nil
@@ -334,12 +542,38 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.pending = msg.Settings
+		m.catalogGroups = nil
+		if sameProvider(m.catalogSettings, msg.Settings) {
+			for i := range msg.Models {
+				if msg.Models[i].Context == 0 {
+					for _, cached := range m.models {
+						if cached.ID == msg.Models[i].ID && cached.Context > 0 {
+							msg.Models[i] = cached
+							if !strings.HasPrefix(msg.Models[i].Source, "cache:") {
+								msg.Models[i].Source = "cache: " + cached.Source
+							}
+							break
+						}
+					}
+				}
+			}
+		}
+		m.catalogSettings = msg.Settings
 		m.models = msg.Models
+		if sameProvider(msg.Settings, m.Settings) && m.Settings.ModelContext > 0 {
+			m.cacheModel(llm.Model{ID: m.Settings.Model, Context: m.Settings.ModelContext, Source: m.Settings.ContextSource})
+		}
 		m.modelIndex = 0
+		for i, model := range m.models {
+			if model.ID == m.Settings.Model {
+				m.modelIndex = i
+				break
+			}
+		}
 		m.modelSearch.Reset()
 		m.modelSearch.Focus()
 		m.modal = "models"
-		return m, textinput.Blink
+		return m, tea.Batch(textinput.Blink, m.previewSelected())
 	case selectedResult:
 		if msg.ID != m.operationID {
 			return m, nil
@@ -358,39 +592,114 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.Settings = candidate
+		m.rememberProvider(candidate)
+		key := modelID(candidate, candidate.Model)
+		recent := []string{key}
+		for _, v := range m.preferences.Recent {
+			if v != key && len(recent) < 20 {
+				recent = append(recent, v)
+			}
+		}
+		m.preferences.Recent = recent
+		m.cacheModel(msg.Model)
+		m.metadataID++
+		m.metadataLoading = false
+		m.deferredQuestion = ""
 		m.Demo = candidate.Provider == "demo"
 		m.modal = ""
-		m.history = nil
-		m.status = "Pronto · histórico do modelo anterior liberado"
+		m.status = "Pronto · conversa preservada"
 		m.contextUsed = 0
 		m.dirty = true
-		return m, m.prompt.Focus()
+		return m, tea.Batch(m.prompt.Focus(), m.savePreferences())
+	case metadataResult:
+		return m, m.acceptMetadata(msg)
 	case tea.KeyMsg:
 		key := msg.String()
 		if key == "ctrl+q" {
+			m.queued = nil
 			if m.workers.Cancel != nil {
 				m.workers.Cancel()
 			}
 			if m.operationCancel != nil {
 				m.operationCancel()
 			}
-			return m, tea.Quit
+			save := m.saveSession()
+			if save == nil {
+				return m, tea.Quit
+			}
+			return m, func() tea.Msg { save(); return tea.Quit() }
 		}
 		if m.modal != "" {
 			return m, m.updateModal(msg)
 		}
-		if key == "ctrl+x" {
+		if key == "ctrl+x" || key == "esc" && m.question != nil {
+			m.queued = nil
+			m.deferredQuestion = ""
 			if m.workers.Cancel != nil {
 				m.workers.Cancel()
 				m.status = "Cancelando…"
 			}
 			return m, nil
 		}
+		if key == "ctrl+b" {
+			m.planExpanded = !m.planExpanded
+			m.planSeen = true
+			m.dirty = true
+			return m, nil
+		}
+		if (key == "alt+up" || key == "alt+down") && len(m.plan) > 0 {
+			delta := 1
+			if key == "alt+up" {
+				delta = -1
+			}
+			m.planOffset = max(0, min(max(0, len(m.plan)-3), m.planOffset+delta))
+			m.dirty = true
+			return m, nil
+		}
+		if key == "ctrl+o" && m.question != nil {
+			m.modal = "question"
+			m.diffView = viewport.New(max(16, min(76, m.Width-8)-6), max(3, m.Height-14))
+			m.diffView.SetContent(wrap(clean(m.question.Text), m.diffView.Width))
+			return m, nil
+		}
+		if key == "ctrl+r" {
+			m.modal = "history"
+			m.historySearch.Reset()
+			m.historySearch.Placeholder = "Buscar mensagem…"
+			m.historySearch.Focus()
+			m.historyIndex = 0
+			return m, textinput.Blink
+		}
+		if m.question != nil {
+			if key == "up" && len(m.question.Options) > 0 {
+				m.questionIndex = (m.questionIndex + len(m.question.Options) - 1) % len(m.question.Options)
+				return m, nil
+			}
+			if key == "down" && len(m.question.Options) > 0 {
+				m.questionIndex = (m.questionIndex + 1) % len(m.question.Options)
+				return m, nil
+			}
+			if key == "enter" {
+				m.answerQuestion()
+				return m, nil
+			}
+		}
+		if key == "ctrl+l" {
+			return m, m.openModels()
+		}
+		if key == "shift+tab" {
+			next := "plan"
+			if m.Settings.Mode == "plan" {
+				next = "ask"
+			}
+			m.applyMode(next)
+			return m, nil
+		}
 		if key == "ctrl+t" {
 			m.toggleProcess()
 			return m, nil
 		}
-		if key == "ctrl+p" {
+		if key == "ctrl+p" && m.question == nil {
 			m.commandDraft = m.prompt.Value()
 			m.prompt.SetValue("/")
 			m.commandIndex = 0
@@ -412,6 +721,24 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, cmd
 		}
+		files := m.fileMatches()
+		if len(files) > 0 {
+			switch key {
+			case "up":
+				m.fileIndex = (m.fileIndex + len(files) - 1) % len(files)
+				return m, nil
+			case "down":
+				m.fileIndex = (m.fileIndex + 1) % len(files)
+				return m, nil
+			case "enter", "tab":
+				m.selectFile()
+				return m, nil
+			case "esc":
+				m.completionHidden = true
+				m.dirty = true
+				return m, nil
+			}
+		}
 		available := m.matchingCommands()
 		if len(available) > 0 {
 			switch key {
@@ -431,8 +758,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "enter", "tab":
 				selected := available[m.commandIndex%len(available)]
-				m.prompt.Reset()
+				draft := m.commandDraft
 				m.commandDraft = ""
+				m.prompt.SetValue(draft)
 				return m, m.executeCommand(selected.Name)
 			}
 		}
@@ -445,7 +773,23 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				m.prompt.Reset()
 				return m, m.executeCommand(strings.TrimPrefix(q, "/"))
 			}
+			if m.busy {
+				if len(m.queued) >= 5 {
+					m.status = "Fila cheia · aguarde ou cancele"
+				} else {
+					m.queued = append(m.queued, q)
+					m.dirty = true
+					m.prompt.Reset()
+					m.status = "Mensagem adicionada à fila"
+				}
+				return m, nil
+			}
 			m.start(q)
+			return m, nil
+		}
+		if key == "up" && m.prompt.Value() == "" && len(m.inputHistory) > 0 {
+			m.prompt.SetValue(m.inputHistory[len(m.inputHistory)-1])
+			m.prompt.CursorEnd()
 			return m, nil
 		}
 		if key == "alt+enter" {
@@ -456,11 +800,25 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.prompt, cmd = m.prompt.Update(msg)
 		if m.prompt.Value() != before {
 			m.commandIndex = 0
+			m.fileIndex = 0
+			m.completionHidden = false
 			m.dirty = true
+			if _, ok := m.fileQuery(); ok {
+				return m, tea.Batch(cmd, m.loadFiles())
+			}
 		}
 		return m, cmd
 	case tea.MouseMsg:
-		if m.modal == "" {
+		if m.modal != "" {
+			return m, m.modalMouse(msg)
+		}
+		if handled, command := m.headerMouse(msg); handled {
+			return m, command
+		}
+		if m.processMouse(msg) {
+			return m, nil
+		}
+		if msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown {
 			m.viewport, cmd = m.viewport.Update(msg)
 			m.follow = m.viewport.AtBottom()
 			return m, cmd
@@ -501,19 +859,73 @@ func (m *Model) executeCommand(name string) tea.Cmd {
 			m.status = "Cancele a geração antes de trocar o modelo"
 			return nil
 		}
-		return m.loadCatalog(m.Settings)
+		return m.openModels()
+	case "mode":
+		m.openModes()
 	case "process":
 		m.toggleProcess()
+	case "thinking":
+		m.showThinking = !m.showThinking
+		m.dirty = true
+		if m.showThinking && !m.expanded {
+			m.toggleProcess()
+		}
+		return m.savePreferences()
+	case "details":
+		m.showDetails = !m.showDetails
+		m.dirty = true
+		if m.showDetails && !m.expanded {
+			m.toggleProcess()
+		}
+		return m.savePreferences()
+	case "plan":
+		m.planExpanded = !m.planExpanded
+		m.planSeen = true
+		m.dirty = true
+	case "cancel-plan":
+		if m.busy && m.workers.Cancel != nil {
+			m.workers.Cancel()
+			m.queued = nil
+		}
+		for i := range m.plan {
+			if m.plan[i].Status == "pending" || m.plan[i].Status == "in_progress" {
+				m.plan[i].Status = "cancelled"
+			}
+		}
+		m.planExpanded = false
+		m.dirty = true
+		return m.saveSession()
+	case "sessions":
+		return m.openSessions()
+	case "diff":
+		return m.openDiff()
+	case "export":
+		return m.exportConversation()
+	case "permissions":
+		m.modal = "permissions"
+	case "queue":
+		if len(m.queued) > 0 {
+			m.prompt.SetValue(m.queued[len(m.queued)-1])
+			m.queued = m.queued[:len(m.queued)-1]
+			m.dirty = true
+			m.status = "Última mensagem retirada da fila para editar"
+		}
 	case "new":
 		if m.busy {
 			m.status = "Cancele a geração antes de começar outra conversa"
 			break
 		}
+		save := m.saveSession()
 		m.turns = nil
 		m.history = nil
+		m.plan = nil
+		m.planSeen = false
+		m.queued = nil
+		m.sessionID = fmt.Sprintf("%020d", time.Now().UnixNano())
 		m.status = "Nova conversa"
 		m.contextUsed = 0
 		m.dirty = true
+		return save
 	case "pwd":
 		m.status = m.Repo.Path
 	case "status":
@@ -535,154 +947,14 @@ func (m Model) matchingCommands() []command {
 	out := []command{}
 	for _, c := range commands {
 		if strings.HasPrefix(c.Name, query) {
-			out = append(out, c)
+			if c.Name == query {
+				out = append([]command{c}, out...)
+			} else {
+				out = append(out, c)
+			}
 		}
 	}
 	return out
-}
-
-func (m *Model) refresh() {
-	width := max(16, m.Width-4)
-	menu := len(m.matchingCommands())
-	if menu > 5 {
-		menu = 5
-	}
-	m.viewport.Width = width
-	m.viewport.Height = max(2, m.Height-8-menu)
-	var b strings.Builder
-	if len(m.turns) == 0 {
-		b.WriteString("\n" + bright.Render("Codaro, agora em Go.") + "\n\n")
-		b.WriteString("Pergunte sobre o projeto e acompanhe as fontes consultadas.\n\n")
-		if m.Settings.Model == "" && !m.Demo {
-			b.WriteString(muted.Render("Digite /providers para conectar seu modelo."))
-		} else if m.Demo {
-			b.WriteString(warning.Render("Demonstração local · sem chamadas a modelos de IA."))
-		}
-	} else {
-		for _, t := range m.turns {
-			b.WriteString(muted.Render("Você") + "\n" + wrap(clean(t.Question), width) + "\n\n")
-			if len(t.Steps) > 0 {
-				if t == m.current() {
-					m.processLine = strings.Count(b.String(), "\n")
-				}
-				expanded := !t.Done || (t == m.current() && m.expanded)
-				if t == m.current() {
-					expanded = m.expanded
-				}
-				if !expanded {
-					b.WriteString(muted.Render(fmt.Sprintf("▸ Ver processo · %d etapas · Ctrl+T", len(t.Steps))) + "\n\n")
-				} else {
-					for _, s := range t.Steps {
-						title := s.Title
-						if s.Kind == "tool" {
-							title = "↳ " + title
-						}
-						style := muted
-						if s.Failed {
-							style = warning
-						}
-						b.WriteString(style.Render(wrap(title, width)) + "\n")
-						if s.Body != "" {
-							limit := 500
-							body := s.Body
-							if s.Kind == "tool" && !m.manualExpanded {
-								body = s.Summary
-							}
-							if s.Kind == "reasoning" {
-								limit = 900
-							}
-							b.WriteString(muted.Render(wrap(shorten(body, limit), width)) + "\n")
-						}
-						b.WriteString("\n")
-					}
-				}
-			}
-			if t.Final != "" {
-				if t.Rendered == "" || t.Width != width {
-					t.Rendered = markdown(shorten(t.Final, 24000), width)
-					t.Width = width
-				}
-				b.WriteString(bright.Render("Codaro") + "\n" + t.Rendered + "\n\n")
-			} else if t.Draft.Len() > 0 {
-				b.WriteString(bright.Render("Codaro · gerando") + "\n" + wrap(shorten(t.Draft.String(), 16000), width) + "\n\n")
-			}
-		}
-	}
-	m.viewport.SetContent(b.String())
-	if m.follow {
-		m.viewport.GotoBottom()
-	}
-	m.dirty = false
-}
-
-func (m *Model) toggleProcess() {
-	m.expanded = !m.expanded
-	m.manualExpanded = true
-	m.follow = !m.expanded
-	m.dirty = true
-	m.refresh()
-	if m.expanded {
-		m.viewport.SetYOffset(m.processLine)
-	}
-}
-
-func (m Model) View() string {
-	model := m.Settings.Model
-	if model == "" {
-		model = "Conectar modelo"
-	}
-	if m.Demo {
-		model = "demo-local"
-	}
-	header := bright.Render("◆ Codaro Go") + muted.Render(" · "+filepath.Base(m.Repo.Path))
-	right := muted.Render(shorten(model, 28) + " · Perguntar")
-	if m.Width >= 70 {
-		header += strings.Repeat(" ", max(1, m.Width-lipgloss.Width(header)-lipgloss.Width(right)-4)) + right
-	}
-	header = "  " + header + "\n" + muted.Render(strings.Repeat("─", m.Width))
-	if m.modal != "" {
-		return header + "\n" + lipgloss.Place(m.Width, max(8, m.Height-2), lipgloss.Center, lipgloss.Center, m.modalView())
-	}
-	var menu strings.Builder
-	matches := m.matchingCommands()
-	if len(matches) > 0 {
-		start := max(0, m.commandIndex-4)
-		for i := start; i < min(start+5, len(matches)); i++ {
-			line := fmt.Sprintf("/%-11s %s", matches[i].Name, matches[i].Description)
-			if i == m.commandIndex {
-				menu.WriteString("  " + bright.Render("› "+shorten(line, max(15, m.Width-7))) + "\n")
-			} else {
-				menu.WriteString("    " + muted.Render(shorten(line, max(15, m.Width-7))) + "\n")
-			}
-		}
-	}
-	status := m.status
-	if m.busy {
-		if t := m.current(); t != nil {
-			status += fmt.Sprintf(" · %ds", int(time.Since(t.Started).Seconds()))
-		}
-	}
-	meta := ""
-	if m.contextUsed > 0 {
-		meta = fmt.Sprintf("Contexto ≈%d/%d", m.contextUsed, m.Settings.ContextWindow)
-	}
-	if t := m.current(); t != nil && m.busy && t.Draft.Len() > 0 {
-		elapsed := time.Since(t.Started).Seconds()
-		if elapsed > 0 {
-			meta = fmt.Sprintf("≈%.0f t/s · %s", float64(t.Draft.Len())/4/elapsed, meta)
-		}
-	}
-	if m.Width > 90 && meta != "" {
-		status = shorten(status, m.Width-len(meta)-8) + strings.Repeat(" ", max(1, m.Width-lipgloss.Width(status)-len(meta)-4)) + meta
-	}
-	hint := "Enter envia · Alt+Enter nova linha · / comandos · Ctrl+Q sair"
-	if m.busy {
-		hint = "Ctrl+X cancela · PgUp/PgDn histórico · Ctrl+T processo · Ctrl+Q sair"
-	}
-	if len(matches) > 0 {
-		hint = "↑↓ navegar · Enter selecionar · Esc fechar"
-	}
-	return header + "\n" + lipgloss.NewStyle().Padding(0, 2).Render(m.viewport.View()) + "\n" + menu.String() + muted.Render("  "+strings.Repeat("─", max(1, m.Width-4))) + "\n  " + m.prompt.View() + "\n  " + muted.Render(shorten(status, max(15, m.Width-4))) + "\n  " + muted.Render(shorten(hint, max(15, m.Width-4)))
 }
 
 func clean(s string) string {

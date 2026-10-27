@@ -61,6 +61,9 @@ func (Demo) Chat(ctx context.Context, messages []Message, tools []Tool, emit fun
 			text = fmt.Sprintf("**Demonstração local — sem modelo de IA.**\n\nListei os arquivos permitidos e li `%s` no diretório escolhido. Abaixo está uma prévia real:\n\n```text\n%s\n```\n\nUse `/providers` para conectar Ollama ou uma API compatível com OpenAI. `/process` mostra as etapas deste teste.", data.Path, strings.TrimSpace(data.Content))
 		}
 	}
+	if len(messages) > 0 && strings.Contains(messages[0].Content, "Modo Planejar") {
+		text = "**Demonstração de planejamento — sem modelo de IA.**\n\nConsultei arquivos reais com as ferramentas de leitura. Um plano de demonstração seria:\n\n1. Confirmar o objetivo e os arquivos envolvidos.\n2. Definir a alteração e seus critérios de aceitação.\n3. Implementar em uma etapa futura, com autorização.\n4. Executar as verificações adequadas e revisar o resultado.\n\nNenhum arquivo foi alterado e nenhuma verificação foi executada. Conecte seu modelo em `/providers` para gerar um plano específico."
+	}
 	for _, word := range strings.SplitAfter(text, " ") {
 		select {
 		case <-ctx.Done():

@@ -72,7 +72,7 @@ func TestOllamaCatalogMetadataAndNativeProtocol(t *testing.T) {
 		case "/api/chat":
 			var payload map[string]any
 			json.NewDecoder(r.Body).Decode(&payload)
-			if payload["options"].(map[string]any)["num_ctx"] != float64(8192) {
+			if payload["options"].(map[string]any)["num_ctx"] != float64(131072) {
 				t.Fatal("active context not sent")
 			}
 			tool := payload["tools"].([]any)[0].(map[string]any)
@@ -94,9 +94,10 @@ func TestOllamaCatalogMetadataAndNativeProtocol(t *testing.T) {
 		t.Fatal(info, err)
 	}
 	resolved := ResolveContext(s, info)
-	if resolved.ContextWindow != 8192 || resolved.ModelContext != 131072 {
+	if resolved.ContextWindow != 131072 || resolved.ModelContext != 131072 {
 		t.Fatal(resolved)
 	}
+	c.Settings = resolved
 	got, err := c.Chat(context.Background(), []Message{{Role: "user", Content: "Liste"}}, []Tool{{Type: "function", Function: Definition{Name: "list_files"}}}, func(Delta) {})
 	if err != nil || len(got.Calls) != 1 || got.Calls[0].ID == "" || got.Reasoning != "Pensando" || got.Usage.Input != 32 {
 		t.Fatal(got, err)

@@ -17,14 +17,16 @@ type Settings struct {
 	BaseURL       string `json:"base_url"`
 	Model         string `json:"model"`
 	ContextWindow int    `json:"context_window"`
+	ContextLimit  int    `json:"context_limit,omitempty"`
 	ModelContext  int    `json:"model_context,omitempty"`
 	ContextSource string `json:"context_source,omitempty"`
 	TLSInsecure   bool   `json:"tls_insecure,omitempty"`
 	APIKey        string `json:"-"`
+	Mode          string `json:"mode,omitempty"`
 }
 
 func Default() Settings {
-	return Settings{Provider: "ollama", BaseURL: "http://localhost:11434", ContextWindow: 8192, ContextSource: "configuração · 8k"}
+	return Settings{Provider: "ollama", BaseURL: "http://localhost:11434", ContextWindow: 8192, ContextSource: "fallback: API sem contexto", Mode: "ask"}
 }
 
 func Directory() (string, error) {
@@ -51,10 +53,16 @@ func Load(dir string) (Settings, error) {
 	} else if !os.IsNotExist(err) {
 		return s, err
 	}
-	for name, target := range map[string]*string{"CODARO_GO_PROVIDER": &s.Provider, "CODARO_GO_BASE_URL": &s.BaseURL, "CODARO_GO_MODEL": &s.Model, "CODARO_GO_API_KEY": &s.APIKey} {
+	previousProvider, previousURL, previousModel := s.Provider, s.BaseURL, s.Model
+	for name, target := range map[string]*string{"CODARO_GO_PROVIDER": &s.Provider, "CODARO_GO_BASE_URL": &s.BaseURL, "CODARO_GO_MODEL": &s.Model, "CODARO_GO_API_KEY": &s.APIKey, "CODARO_GO_MODE": &s.Mode} {
 		if v, ok := os.LookupEnv(name); ok {
 			*target = v
 		}
+	}
+	if s.Provider != previousProvider || s.BaseURL != previousURL || s.Model != previousModel {
+		s.ModelContext = 0
+		s.ContextWindow = 8192
+		s.ContextSource = "fallback: modelo alterado; aguardando API"
 	}
 	if v := os.Getenv("CODARO_GO_CONTEXT_WINDOW"); v != "" {
 		n, e := strconv.Atoi(v)
@@ -62,7 +70,11 @@ func Load(dir string) (Settings, error) {
 			return s, errors.New("CODARO_GO_CONTEXT_WINDOW deve ser inteiro")
 		}
 		s.ContextWindow = n
-		s.ContextSource = "ambiente"
+		if n == 0 {
+			s.ContextWindow = 8192
+		}
+		s.ContextLimit = n
+		s.ContextSource = "override: CODARO_GO_CONTEXT_WINDOW"
 	}
 	if v := os.Getenv("CODARO_GO_TLS_INSECURE"); v != "" {
 		b, e := strconv.ParseBool(v)
@@ -78,8 +90,11 @@ func (s Settings) Validate() error {
 	if s.Provider != "ollama" && s.Provider != "openai" && s.Provider != "demo" {
 		return errors.New("provedor deve usar protocolo ollama ou openai")
 	}
-	if s.ContextWindow < 4096 || s.ContextWindow > 262144 {
-		return errors.New("contexto do protótipo deve ficar entre 4096 e 262144 tokens")
+	if s.ContextWindow < 1024 || s.ContextWindow > 2000000 || (s.ContextLimit != 0 && (s.ContextLimit < 1024 || s.ContextLimit > 2000000)) {
+		return errors.New("contexto deve ficar entre 1024 e 2000000 tokens; context_limit=0 usa a API")
+	}
+	if s.Mode != "" && s.Mode != "ask" && s.Mode != "plan" {
+		return errors.New("modo deve ser ask ou plan; execução ainda não está habilitada")
 	}
 	if len(s.APIKey) > 16384 || len(s.Model) > 300 {
 		return errors.New("chave ou modelo excede o limite")

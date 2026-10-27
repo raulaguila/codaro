@@ -65,3 +65,38 @@ func TestRedactionKeepsJSONValidForQuotedSecret(t *testing.T) {
 		t.Fatal("secret leaked")
 	}
 }
+
+func TestEnvironmentModelChangeInvalidatesCachedMetadata(t *testing.T) {
+	dir := t.TempDir()
+	s := Default()
+	s.Model = "old"
+	s.ModelContext = 131072
+	s.ContextWindow = 131072
+	s.ContextSource = "API: context_length"
+	if err := Save(dir, s); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CODARO_GO_MODEL", "new")
+	got, err := Load(dir)
+	if err != nil || got.ModelContext != 0 || got.ContextWindow != 8192 {
+		t.Fatal(got, err)
+	}
+}
+
+func TestManualContextAndModeAreExplicit(t *testing.T) {
+	t.Setenv("CODARO_GO_CONTEXT_WINDOW", "32768")
+	t.Setenv("CODARO_GO_MODE", "plan")
+	s, err := Load(t.TempDir())
+	if err != nil || s.ContextLimit != 32768 || s.Mode != "plan" {
+		t.Fatal(s, err)
+	}
+	s.Mode = "execute"
+	if s.Validate() == nil {
+		t.Fatal("unsupported execution mode accepted")
+	}
+	t.Setenv("CODARO_GO_CONTEXT_WINDOW", "0")
+	got, err := Load(t.TempDir())
+	if err != nil || got.ContextLimit != 0 {
+		t.Fatal(got, err)
+	}
+}

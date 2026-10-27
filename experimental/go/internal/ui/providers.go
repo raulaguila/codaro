@@ -37,13 +37,16 @@ func (m *Model) openProvider() {
 	m.fields[1].EchoCharacter = '•'
 	m.fields[1].SetValue(m.Settings.APIKey)
 	m.fields[1].CharLimit = 16384
-	m.fields[2].SetValue(strconv.Itoa(m.Settings.ContextWindow))
+	m.fields[2].Placeholder = "Automático · API do modelo"
+	if m.Settings.ContextLimit > 0 {
+		m.fields[2].SetValue(strconv.Itoa(m.Settings.ContextLimit))
+	}
 }
 
 func (m *Model) loadCatalog(s config.Settings) tea.Cmd {
 	m.operationID++
 	id := m.operationID
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(m.workers.Context, 30*time.Second)
 	m.operationCancel = cancel
 	m.loading = true
 	m.modalError = ""
@@ -59,12 +62,25 @@ func (m *Model) loadCatalog(s config.Settings) tea.Cmd {
 }
 
 func (m *Model) submitProvider() tea.Cmd {
-	n, err := strconv.Atoi(strings.TrimSpace(m.fields[2].Value()))
+	n := 0
+	var err error
+	if value := strings.TrimSpace(m.fields[2].Value()); value != "" {
+		n, err = strconv.Atoi(value)
+	}
 	if err != nil {
 		m.modalError = "A janela de trabalho deve ser um número inteiro"
 		return nil
 	}
-	s := config.Settings{Provider: presets[m.presetIndex].Kind, BaseURL: strings.TrimSpace(m.fields[0].Value()), APIKey: strings.TrimSpace(m.fields[1].Value()), ContextWindow: n, TLSInsecure: m.tls}
+	s := config.Default()
+	s.Provider = presets[m.presetIndex].Kind
+	s.BaseURL = strings.TrimSpace(m.fields[0].Value())
+	s.APIKey = strings.TrimSpace(m.fields[1].Value())
+	s.ContextLimit = n
+	s.TLSInsecure = m.tls
+	s.Mode = m.Settings.Mode
+	if n > 0 {
+		s.ContextWindow = n
+	}
 	if err = s.Validate(); err != nil {
 		m.modalError = err.Error()
 		return nil
@@ -73,18 +89,21 @@ func (m *Model) submitProvider() tea.Cmd {
 }
 
 func (m *Model) chooseModel() tea.Cmd {
+	if m.operationCancel != nil {
+		m.operationCancel()
+	}
+	m.catalogRefreshing = false
 	models := m.filteredModels()
 	if len(models) == 0 {
 		return nil
 	}
-	selected := models[min(m.modelIndex, len(models)-1)]
-	s := m.pending
-	if s.Provider == "" {
-		s = m.Settings
-	}
+	entry := m.entries()[min(m.modelIndex, len(models)-1)]
+	selected := entry.Model
+	s := entry.Settings
+	s.Mode = m.Settings.Mode
 	m.operationID++
 	id := m.operationID
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(m.workers.Context, 30*time.Second)
 	m.operationCancel = cancel
 	m.loading = true
 	m.modalError = ""
@@ -92,17 +111,21 @@ func (m *Model) chooseModel() tea.Cmd {
 	return func() tea.Msg {
 		defer cancel()
 		info, err := provider.Describe(ctx, selected.ID)
+		if err != nil && ctx.Err() == nil {
+			info = selected
+			if info.Source == "" {
+				info.Source = "fallback: detalhes indisponíveis na API"
+			}
+			err = nil
+		}
 		return selectedResult{id, s, info, err}
 	}
 }
 
 func (m Model) filteredModels() []llm.Model {
-	query := strings.ToLower(m.modelSearch.Value())
 	out := []llm.Model{}
-	for _, model := range m.models {
-		if strings.Contains(strings.ToLower(model.ID), query) {
-			out = append(out, model)
-		}
+	for _, entry := range m.entries() {
+		out = append(out, entry.Model)
 	}
 	return out
 }
@@ -110,16 +133,25 @@ func (m Model) filteredModels() []llm.Model {
 func (m *Model) updateModal(msg tea.KeyMsg) tea.Cmd {
 	key := msg.String()
 	if key == "esc" {
+		m.previewID++
+		if m.previewCancel != nil {
+			m.previewCancel()
+			m.previewCancel = nil
+		}
 		if m.operationCancel != nil {
 			m.operationCancel()
 		}
 		m.operationID++
 		m.loading = false
+		m.catalogRefreshing = false
 		m.operationCancel = nil
 		m.modal = ""
 		m.modalError = ""
 		m.dirty = true
 		return m.prompt.Focus()
+	}
+	if handled, cmd := m.updateExtraDialog(msg); handled {
+		return cmd
 	}
 	if m.modal == "help" || m.modal == "status" {
 		if key == "enter" {
@@ -130,6 +162,17 @@ func (m *Model) updateModal(msg tea.KeyMsg) tea.Cmd {
 	if m.loading {
 		return nil
 	}
+	if m.modal == "modes" {
+		switch key {
+		case "up":
+			m.modeIndex = (m.modeIndex + len(modes) - 1) % len(modes)
+		case "down":
+			m.modeIndex = (m.modeIndex + 1) % len(modes)
+		case "enter":
+			m.applyMode(modes[m.modeIndex].ID)
+		}
+		return nil
+	}
 	if m.modal == "models" {
 		models := m.filteredModels()
 		switch key {
@@ -137,19 +180,45 @@ func (m *Model) updateModal(msg tea.KeyMsg) tea.Cmd {
 			if len(models) > 0 {
 				m.modelIndex = (m.modelIndex + len(models) - 1) % len(models)
 			}
-			return nil
+			return m.previewSelected()
 		case "down":
 			if len(models) > 0 {
 				m.modelIndex = (m.modelIndex + 1) % len(models)
 			}
-			return nil
+			return m.previewSelected()
 		case "enter":
 			return m.chooseModel()
+		case "ctrl+r":
+			return m.loadAllCatalogs()
+		case "ctrl+f":
+			m.favoritesOnly = !m.favoritesOnly
+			m.modelIndex = 0
+			return nil
+		case "ctrl+s":
+			entries := m.entries()
+			if len(entries) == 0 {
+				return nil
+			}
+			e := entries[min(m.modelIndex, len(entries)-1)]
+			key := modelID(e.Settings, e.Model.ID)
+			if has(m.preferences.Favorites, key) {
+				out := []string{}
+				for _, v := range m.preferences.Favorites {
+					if v != key {
+						out = append(out, v)
+					}
+				}
+				m.preferences.Favorites = out
+			} else {
+				m.preferences.Favorites = append(m.preferences.Favorites, key)
+			}
+			m.modelIndex = 0
+			return m.savePreferences()
 		}
 		var cmd tea.Cmd
 		m.modelSearch, cmd = m.modelSearch.Update(msg)
 		m.modelIndex = 0
-		return cmd
+		return tea.Batch(cmd, m.previewSelected())
 	}
 	switch key {
 	case "tab", "shift+tab":
@@ -204,16 +273,22 @@ func (m *Model) updateModal(msg tea.KeyMsg) tea.Cmd {
 func (m Model) modalView() string {
 	w := max(20, min(76, m.Width-8))
 	var body strings.Builder
-	if m.modal == "status" {
+	if extra, ok := m.extraDialog(w); ok {
+		body.WriteString(extra)
+	} else if m.modal == "modes" {
+		body.WriteString(bright.Render("Como você quer trabalhar?") + "\n\n")
+		for i := range modes {
+			body.WriteString(m.modeRow(i, w) + "\n\n")
+		}
+		body.WriteString(muted.Render("Clique ou ↑↓ · Enter seleciona · Esc volta"))
+	} else if m.modal == "status" {
 		body.WriteString(bright.Render("Sessão do protótipo") + "\n\n")
-		body.WriteString(wrap(fmt.Sprintf("Diretório: %s\nModelo: %s\nContexto de trabalho: %d tokens\nCapacidade informada pela API: %d\nOrigem: %s\n\nÚltimo fluxo JSON:\n%s", m.Repo.Path, m.Settings.Model, m.Settings.ContextWindow, m.Settings.ModelContext, m.Settings.ContextSource, agent.TracePath(m.Directory, m.Repo.Path)), w-6))
+		body.WriteString(wrap(fmt.Sprintf("Diretório: %s\nModelo: %s\nModo: %s\nContexto ativo: %d tokens\nContexto informado pela API: %d\nLimite manual (0 = automático): %d\nOrigem: %s\n\nÚltimo fluxo JSON:\n%s", m.Repo.Path, m.Settings.Model, modeLabel(m.Settings.Mode), m.Settings.ContextWindow, m.Settings.ModelContext, m.Settings.ContextLimit, m.Settings.ContextSource, agent.TracePath(m.Directory, m.Repo.Path)), w-6))
 		body.WriteString("\n\n" + muted.Render("Esc volta · estimativas conservadoras de contexto"))
 	} else if m.modal == "help" {
 		body.WriteString(bright.Render("Codaro Go · experimento") + "\n\n")
-		body.WriteString("Consulta ao projeto com ferramentas somente leitura.\n\n")
-		body.WriteString("/providers    Configurar Ollama ou API OpenAI compatible\n/models       Buscar e escolher modelo\n/process      Ver pensamento e ferramentas\n/new          Começar outra conversa\n/pwd          Conferir diretório\n/status       Contexto e caminho do prompt.json\n\n")
-		body.WriteString("Ctrl+X cancela · Ctrl+Q sai · Ctrl+T processo\nPgUp/PgDn navegam · Alt+Enter nova linha\n\n")
-		body.WriteString(muted.Render("Sem edições, shell, MCP ou migração de sessões nesta versão.\nEsc volta"))
+		body.WriteString("Ctrl+P    Menu de comandos\nCtrl+L    Escolher modelo\nShift+Tab Alternar modo\nCtrl+T    Ver processo\nCtrl+B    Recolher ou expandir plano\nCtrl+R    Buscar mensagens\nCtrl+X    Cancelar atividade\nCtrl+Q    Sair\n\n@ arquivo · /sessions conversas · /diff alterações\n\n")
+		body.WriteString(muted.Render("Somente leitura · Esc volta"))
 	} else if m.modal == "provider" {
 		body.WriteString(bright.Render("Conectar provedor") + "\n\n")
 		line := "‹ " + presets[m.presetIndex].Name + " ›"
@@ -221,7 +296,7 @@ func (m Model) modalView() string {
 			line = bright.Render(line)
 		}
 		body.WriteString("Provedor  " + line + "\n\n")
-		labels := []string{"URL base", "API key · somente nesta sessão", "Janela de trabalho · tokens"}
+		labels := []string{"URL base", "API key · somente nesta sessão", "Contexto · vazio usa a API"}
 		for i, label := range labels {
 			style := muted
 			if m.focus == i+1 {
@@ -246,24 +321,37 @@ func (m Model) modalView() string {
 	} else {
 		body.WriteString(bright.Render("Escolher modelo") + "\n\n" + m.modelSearch.View() + "\n\n")
 		models := m.filteredModels()
-		height := max(2, min(10, m.Height-14))
-		start := max(0, m.modelIndex-height+1)
-		for i := start; i < min(start+height, len(models)); i++ {
-			line := shorten(models[i].ID, w-6)
-			if models[i].Context > 0 {
-				line += fmt.Sprintf(" · %dk", models[i].Context/1024)
-			}
-			if i == m.modelIndex {
-				body.WriteString(bright.Render("› "+line) + "\n")
-			} else {
-				body.WriteString("  " + line + "\n")
-			}
+		for _, row := range m.modelRows() {
+			body.WriteString(row.Text + "\n")
 		}
+
 		if len(models) == 0 && !m.loading {
 			body.WriteString(muted.Render("Nenhum modelo nesta busca.") + "\n")
 		}
-		body.WriteString(fmt.Sprintf("\n%d modelos · contexto consultado ao selecionar\n", len(models)))
-		body.WriteString(muted.Render("↑↓ navega · digite para filtrar · Enter usa · Esc volta"))
+		source := "contexto consultado ao selecionar"
+		if len(models) > 0 {
+			entry := m.entries()[min(m.modelIndex, len(models)-1)]
+			selected := entry.Model
+			if selected.Context > 0 {
+				source = fmt.Sprintf("Contexto %s", compactNumber(selected.Context))
+				if strings.HasPrefix(selected.Source, "cache:") {
+					source += " (cache)"
+				}
+				if len(selected.Capabilities) > 0 {
+					source += " · " + strings.Join(selected.Capabilities, ", ")
+				} else {
+					source += " · capacidades não informadas"
+				}
+				if source == "" {
+					source = "contexto informado pelo provedor"
+				}
+			}
+		}
+		body.WriteString(fmt.Sprintf("\n%d modelos · %s\n", len(models), shorten(source, max(15, w-22))))
+		body.WriteString(muted.Render("Enter usa · Ctrl+S ★ · Ctrl+F favoritos · Ctrl+R atualiza"))
+	}
+	if m.catalogRefreshing && !m.loading {
+		body.WriteString("\n" + muted.Render("Atualizando catálogo… · seleção disponível"))
 	}
 	if m.loading {
 		body.WriteString("\n\n" + bright.Render("Consultando API… · Esc cancela"))

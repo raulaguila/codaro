@@ -274,7 +274,7 @@ func (r *Repository) Execute(ctx context.Context, call llm.Call) (map[string]any
 	}
 	switch call.Function.Name {
 	case "get_repository_info":
-		return map[string]any{"root": r.Path, "mode": "ask", "read_only": true}, nil
+		return map[string]any{"root": r.Path, "read_only": true}, nil
 	case "read_lines":
 		return r.readLines(ctx, args)
 	}

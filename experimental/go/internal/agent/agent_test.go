@@ -180,3 +180,26 @@ func TestDemoUsesRealToolsWithoutAPI(t *testing.T) {
 		t.Fatal(out)
 	}
 }
+
+func TestPlanningModeChangesInstructionsAndTraceWithoutAddingWriteTools(t *testing.T) {
+	p := &fakeProvider{Responses: []llm.Response{{Content: "Plano: investigar main.go e definir critérios."}}}
+	a := newAgent(t, p)
+	a.Settings.Mode = "plan"
+	if _, err := a.Run(context.Background(), "Planeje a melhoria", nil, func(Event) {}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(p.Requests[0][0].Content, "Modo Planejar") || !strings.Contains(p.Requests[0][0].Content, "Não implemente") {
+		t.Fatal("planning policy missing")
+	}
+	raw, _ := os.ReadFile(a.TracePath)
+	var trace Trace
+	json.Unmarshal(raw, &trace)
+	if trace.Mode != "plan" {
+		t.Fatal(trace.Mode)
+	}
+	for _, definition := range trace.Frames[0].Tools {
+		if strings.Contains(definition.Function.Name, "edit") || strings.Contains(definition.Function.Name, "command") {
+			t.Fatal("planning exposes mutations")
+		}
+	}
+}
